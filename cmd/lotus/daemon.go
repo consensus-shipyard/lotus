@@ -29,11 +29,11 @@ import (
 
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-paramfetch"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -313,6 +313,10 @@ var DaemonCmd = &cli.Command{
 		if err := metricsprom.Inject(); err != nil {
 			log.Warnf("unable to inject prometheus ipfs/go-metrics exporter; some metrics will be unavailable; err: %s", err)
 		}
+
+		// FIXME: Hide behind a compilation flag.
+		node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc))
+		node.Override(new(consensus.Consensus), mir.NewConsensus)
 
 		var api api.FullNode
 		stop, err := node.New(ctx,
