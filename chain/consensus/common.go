@@ -5,19 +5,20 @@ import (
 	"fmt"
 	"strings"
 
-	"go.opencensus.io/stats"
-	"golang.org/x/xerrors"
-
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	logging "github.com/ipfs/go-log/v2"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	cbg "github.com/whyrusleeping/cbor-gen"
+	"go.opencensus.io/stats"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/network"
+	blockadt "github.com/filecoin-project/specs-actors/actors/util/adt"
+
 	"github.com/filecoin-project/lotus/api"
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/build"
@@ -30,7 +31,6 @@ import (
 	"github.com/filecoin-project/lotus/lib/async"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/metrics"
-	blockadt "github.com/filecoin-project/specs-actors/actors/util/adt"
 )
 
 // Common operations shared by all consensus algorithm implementations.
@@ -70,7 +70,6 @@ func RunAsyncChecks(ctx context.Context, await []async.ErrorFuture) error {
 }
 
 // CommonBlkChecks performed by all consensus implementations.
-//TODO: Take stateManager and ChainStore in a common object abstracted by all consensus algorithms?
 func CommonBlkChecks(ctx context.Context, sm *stmgr.StateManager, cs *store.ChainStore,
 	b *types.FullBlock, baseTs *types.TipSet) []async.ErrorFuture {
 	h := b.Header
