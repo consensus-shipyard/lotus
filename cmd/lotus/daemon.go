@@ -314,9 +314,10 @@ var DaemonCmd = &cli.Command{
 			log.Warnf("unable to inject prometheus ipfs/go-metrics exporter; some metrics will be unavailable; err: %s", err)
 		}
 
-		// FIXME: Hide behind a compilation flag.
-		node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc))
+		// FIXME: Instantiating Mir. Hide behind a compilation or config flag.
 		node.Override(new(consensus.Consensus), mir.NewConsensus)
+		node.Override(new(store.WeightFunc), mir.Weight)
+		node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc))
 
 		var api api.FullNode
 		stop, err := node.New(ctx,
