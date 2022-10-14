@@ -10,6 +10,7 @@ func main() {
 	if err := gen.WriteTupleEncodersToFile("./cbor_gen.go", "mir",
 		mir.Validator{},
 		mir.ValidatorSet{},
+		mir.Checkpoint{},
 	); err != nil {
 		panic(err)
 	}

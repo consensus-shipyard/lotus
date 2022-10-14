@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/eventlog"
 	"github.com/filecoin-project/mir/pkg/logging"
@@ -29,6 +30,10 @@ import (
 
 const (
 	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
+	// Desired CheckpointPeriod
+	// TODO: Pass it as an Option to NewManager. Allow
+	// NewManager to receive cfg as an option also.
+	CheckpointPeriod = 4
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
@@ -47,6 +52,7 @@ type Manager struct {
 	StateManager  *StateManager
 	interceptor   *eventlog.Recorder
 	ToMir         chan chan []*mirproto.Request
+	segmentLength int // segment length determinint the checkpoint period.
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
@@ -130,7 +136,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		ToMir:               make(chan chan []*mirproto.Request),
 	}
 
-	m.StateManager = NewStateManager(initialMembership, &m)
+	m.StateManager = NewStateManager(initialMembership, &m, api)
 
 	mpool := pool.NewModule(
 		m.ToMir,
@@ -138,12 +144,21 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		pool.DefaultModuleParams(),
 	)
 
+	params := smr.DefaultParams(initialMembership)
+	// configure SegmentLength for specific checkpoint period.
+	m.segmentLength, err = segmentForCheckpointPeriod(CheckpointPeriod, initialMembership)
+	if err != nil {
+		return nil, fmt.Errorf("error getting segment lengt: %w", err)
+	}
+	params.Iss.SegmentLength = m.segmentLength
+
 	smrSystem, err := smr.New(
 		t.NodeID(mirID),
 		h,
 		initialMembership,
 		m.CryptoManager,
 		m.StateManager,
+		params,
 		logger,
 	)
 	if err != nil {
@@ -348,4 +363,12 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 // ID prints Manager ID.
 func (m *Manager) ID() string {
 	return m.Addr.String()
+}
+
+// GetCheckpointPeriod returns the checkpoint period for the current epoch.
+//
+// The checkpoint period is computed as the number of validator times the
+// segment length.
+func (m *Manager) GetCheckpointPeriod() abi.ChainEpoch {
+	return abi.ChainEpoch(m.segmentLength * len(m.StateManager.memberships[m.StateManager.currentEpoch]))
 }

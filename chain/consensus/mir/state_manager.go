@@ -2,14 +2,19 @@ package mir
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	"github.com/filecoin-project/mir/pkg/pb/commonpb"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
+	cid "github.com/ipfs/go-cid"
 )
 
 var _ smr.AppLogic = &StateManager{}
@@ -23,6 +28,9 @@ type Batch struct {
 
 type StateManager struct {
 
+	// Lotus API
+	api v1api.FullNode
+
 	// The current epoch number.
 	currentEpoch t.EpochNr
 
@@ -32,15 +40,20 @@ type StateManager struct {
 	// Channel to send batches to Lotus.
 	NextBatch chan *Batch
 
+	// Channel to send checkpoints to Lotus
+	NextCheckpoint chan *checkpointpb.StableCheckpoint
+
 	// Channel to send a membership.
 	NewMembership chan map[t.NodeID]t.NodeAddress
 
 	MirManager *Manager
 
 	reconfigurationVotes map[t.EpochNr]map[string]int
+
+	prevCheckpoint cid.Cid
 }
 
-func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager) *StateManager {
+func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) *StateManager {
 	// Initialize the membership for the first epochs.
 	// We use configOffset+2 memberships to account for:
 	// - The first epoch (epoch 0)
@@ -54,11 +67,13 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager) *
 
 	sm := StateManager{
 		NextBatch:            make(chan *Batch),
+		NextCheckpoint:       make(chan *checkpointpb.StableCheckpoint),
 		NewMembership:        make(chan map[t.NodeID]t.NodeAddress, 1),
 		MirManager:           m,
 		memberships:          memberships,
 		currentEpoch:         0,
 		reconfigurationVotes: make(map[t.EpochNr]map[string]int),
+		prevCheckpoint:       cid.Undef,
 	}
 	return &sm
 }
@@ -79,6 +94,8 @@ func (sm *StateManager) RestoreState(snapshot []byte, config *commonpb.EpochConf
 
 	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
 	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
+
+	// TODO FIXME: Return only after we have received a signal by the syncer that we are fully synced.
 
 	return nil
 }
@@ -195,10 +212,25 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // and include it in block 4. When block 4 is delivered with the checkpoint, we
 // can verify blocks 0,1,2,3 and execute them.
 func (sm *StateManager) Snapshot() ([]byte, error) {
-	// TODO: No snapshot supported yet.
-	// applySnapshotRequest produces a StateSnapshotResponse event containing the current snapshot of the state.
-	// The snapshot is a binary representation of the application state that can be passed to applyRestoreState().
-	return []byte{0}, nil
+	ch := Checkpoint{
+		Height:    abi.ChainEpoch(sm.currentEpoch),
+		Parent:    sm.prevCheckpoint,
+		BlockCids: make([]cid.Cid, 0),
+	}
+
+	i := sm.currentEpoch - 1
+	for i <= sm.currentEpoch-t.EpochNr(sm.MirManager.GetCheckpointPeriod()) {
+		ts, err := sm.api.ChainGetTipSetByHeight(context.TODO(), abi.ChainEpoch(i), types.EmptyTSK)
+		if err != nil {
+			return nil, fmt.Errorf("error getting tipset of height: %d: %w", i, err)
+		}
+		// In Mir tipsets have a single block, so we can access directly the block for
+		// the tipset by accessing the first position.
+		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
+		i--
+	}
+
+	return ch.Bytes()
 }
 
 // This is called after check_period blocks have been produced, Mir creates a new
@@ -214,7 +246,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 // From there, we iterate and verify all signatures.
 // 3f+1 number of nodes to tolerate f failures. f+1 for the signature to be correct.
 func (sm *StateManager) Checkpoint(checkpoint *checkpointpb.StableCheckpoint) error {
-	// TODO: Not implemented yet.
+	// Send the checkpoint to Lotus and handle it there
+	sm.NextCheckpoint <- checkpoint
 	return nil
 }
 

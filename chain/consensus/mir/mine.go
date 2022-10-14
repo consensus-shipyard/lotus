@@ -114,6 +114,12 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			log.With("epoch", nextHeight).
 				Infof("try to create a block: msgs - %d", len(msgs))
 
+			// TODO: As the chckpoint period is dynamic, how can we be informed
+			// that the next block should include a checkpoint?
+			// TODO: Also, if using Mir consensus the computation of the block should
+			// be performed considering the checkpoint but disregarding the checkpoint
+			// certificate.
+
 			bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
 				// mir blocks are created by all miners. We use system actor as miner of the block
 				Miner:            builtin.SystemActorAddr,
