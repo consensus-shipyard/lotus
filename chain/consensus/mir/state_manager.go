@@ -2,10 +2,8 @@ package mir
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
@@ -15,6 +13,8 @@ import (
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
 	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ smr.AppLogic = &StateManager{}
@@ -41,7 +41,7 @@ type StateManager struct {
 	NextBatch chan *Batch
 
 	// Channel to send checkpoints to Lotus
-	NextCheckpoint chan *checkpointpb.StableCheckpoint
+	NextCheckpoint chan *CheckpointData
 
 	// Channel to send a membership.
 	NewMembership chan map[t.NodeID]t.NodeAddress
@@ -50,10 +50,10 @@ type StateManager struct {
 
 	reconfigurationVotes map[t.EpochNr]map[string]int
 
-	prevCheckpoint cid.Cid
+	prevCheckpoint ParentMeta
 }
 
-func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) *StateManager {
+func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
 	// Initialize the membership for the first epochs.
 	// We use configOffset+2 memberships to account for:
 	// - The first epoch (epoch 0)
@@ -67,15 +67,28 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 
 	sm := StateManager{
 		NextBatch:            make(chan *Batch),
-		NextCheckpoint:       make(chan *checkpointpb.StableCheckpoint),
+		NextCheckpoint:       make(chan *CheckpointData),
 		NewMembership:        make(chan map[t.NodeID]t.NodeAddress, 1),
 		MirManager:           m,
 		memberships:          memberships,
 		currentEpoch:         0,
 		reconfigurationVotes: make(map[t.EpochNr]map[string]int),
-		prevCheckpoint:       cid.Undef,
+		api:                  api,
 	}
-	return &sm
+
+	// Initialize manager checkpoint state with the corresponding latest
+	// checkpoint
+	ch, err := sm.firstEpochCheckpoint()
+	if err != nil {
+		xerrors.Errorf("error getting checkpoint for epoch 0: %w", err)
+	}
+	c, err := ch.Cid()
+	if err != nil {
+		xerrors.Errorf("error getting cid for checkpoint: %w", err)
+	}
+	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
+
+	return &sm, nil
 }
 
 // RestoreState restores the application's state to the one represented by the passed argument.
@@ -147,7 +160,7 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
 	// Sanity check.
 	if nr != sm.currentEpoch+1 {
-		return nil, fmt.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
+		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
 	}
 
 	// The base membership is the last one membership.
@@ -212,22 +225,32 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // and include it in block 4. When block 4 is delivered with the checkpoint, we
 // can verify blocks 0,1,2,3 and execute them.
 func (sm *StateManager) Snapshot() ([]byte, error) {
+	if sm.currentEpoch == 0 {
+		return sm.MirManager.ds.Get(sm.MirManager.ctx, datastore.NewKey(sm.prevCheckpoint.Cid.String()))
+	}
+
+	nextHeight := sm.prevCheckpoint.Height + sm.MirManager.GetCheckpointPeriod()
 	ch := Checkpoint{
-		Height:    abi.ChainEpoch(sm.currentEpoch),
+		Height:    nextHeight,
 		Parent:    sm.prevCheckpoint,
 		BlockCids: make([]cid.Cid, 0),
 	}
+	fmt.Println(">>>>>>>>>>>>>>>>>> Requesting snapshot for epoch", sm.currentEpoch)
 
-	i := sm.currentEpoch - 1
-	for i <= sm.currentEpoch-t.EpochNr(sm.MirManager.GetCheckpointPeriod()) {
-		ts, err := sm.api.ChainGetTipSetByHeight(context.TODO(), abi.ChainEpoch(i), types.EmptyTSK)
+	// return genesis checkpoint for the first snapshot.
+
+	i := sm.prevCheckpoint.Height
+	for i <= nextHeight-1 {
+		ts, err := sm.api.ChainGetTipSetByHeight(sm.MirManager.ctx, i, types.EmptyTSK)
 		if err != nil {
-			return nil, fmt.Errorf("error getting tipset of height: %d: %w", i, err)
+			return nil, xerrors.Errorf("error getting tipset of height: %d: %w", i, err)
 		}
+		fmt.Println(">>>>>>>>>>>>>>>>>> Getting cid for block", i)
+		fmt.Println(">>>> Getting blocks cid for height", i, ts.Blocks())
 		// In Mir tipsets have a single block, so we can access directly the block for
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
-		i--
+		i++
 	}
 
 	return ch.Bytes()
@@ -246,8 +269,33 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 // From there, we iterate and verify all signatures.
 // 3f+1 number of nodes to tolerate f failures. f+1 for the signature to be correct.
 func (sm *StateManager) Checkpoint(checkpoint *checkpointpb.StableCheckpoint) error {
+	// deserialize checkpoint data from Mir checkpoint to check that is the
+	// right format.
+	ch := &Checkpoint{}
+	if err := ch.FromBytes(checkpoint.Snapshot.AppData); err != nil {
+		return xerrors.Errorf("error getting checkpoint data from mir checkpoint: %w", err)
+	}
+
+	// if we deserialized it correctly, we can persist it directly in the data store.
+	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LasestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
+		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+	}
+
+	// flush checkpoint by cid
+	c, err := ch.Cid()
+	if err != nil {
+		return xerrors.Errorf("error computing cid for checkpoint", err)
+	}
+
+	// store metadata for previous checkpoint in datastore and manager
+	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
+	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, datastore.NewKey(c.String()), checkpoint.Snapshot.AppData); err != nil {
+		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+	}
+
 	// Send the checkpoint to Lotus and handle it there
-	sm.NextCheckpoint <- checkpoint
+	fmt.Println(">>>>>>>> Sending checkpoint to channel")
+	sm.NextCheckpoint <- &CheckpointData{ch, checkpoint.Cert, checkpoint.Sn}
 	return nil
 }
 
@@ -261,4 +309,40 @@ func weakQuorum(n int) int {
 	// assuming n > 3f:
 	//   return min q: q > f
 	return maxFaulty(n) + 1
+}
+
+func (sm *StateManager) pollCheckpoint() *CheckpointData {
+	select {
+	case ch := <-sm.NextCheckpoint:
+		fmt.Println(">>>>>>>>> Receiving from channel check")
+		return ch
+	default:
+		return nil
+	}
+}
+
+func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
+	// if we are restarting the peer we may have something in the
+	// mir database, if not let's return the genesis one.
+	chb, err := sm.MirManager.ds.Get(sm.MirManager.ctx, LasestCheckpointKey)
+	if err != nil {
+		if err == datastore.ErrNotFound {
+			genesis, err := sm.api.ChainGetGenesis(sm.MirManager.ctx)
+			if err != nil {
+				return nil, xerrors.Errorf("error getting genesis block: %w", err)
+			}
+			// return genesis checkpoint
+			return &Checkpoint{
+				Height:    0,
+				Parent:    ParentMeta{Height: 0, Cid: genesis.Blocks()[0].Cid()}, // genesis checkpoint
+				BlockCids: make([]cid.Cid, 0),
+			}, nil
+		}
+		return nil, err
+	}
+	ch := &Checkpoint{}
+	if err := ch.FromBytes(chb); err != nil {
+		return nil, err
+	}
+	return ch, nil
 }

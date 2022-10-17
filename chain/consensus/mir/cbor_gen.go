@@ -221,12 +221,6 @@ func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 		}
 	}
 
-	// t.Parent (cid.Cid) (struct)
-
-	if err := cbg.WriteCid(cw, t.Parent); err != nil {
-		return xerrors.Errorf("failed to write cid field t.Parent: %w", err)
-	}
-
 	return nil
 }
 
@@ -308,15 +302,5 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 
 	// t.Parent (cid.Cid) (struct)
 
-	{
-
-		c, err := cbg.ReadCid(cr)
-		if err != nil {
-			return xerrors.Errorf("failed to read cid field t.Parent: %w", err)
-		}
-
-		t.Parent = c
-
-	}
 	return nil
 }

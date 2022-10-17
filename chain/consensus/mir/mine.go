@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/mir"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
+	levelds "github.com/ipfs/go-ds-leveldb"
+	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -34,11 +37,12 @@ const (
 // 5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //    they already have it.
 //
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membershipCfg string) error {
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) error {
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 
-	m, err := NewManager(ctx, addr, h, api, membershipCfg)
+	// TODO: Initialize manager from a snapshot or checkpoint instead of from scratch
+	m, err := NewManager(ctx, addr, h, api, cfg)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
@@ -92,7 +96,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := GetValidatorsFromCfg(membershipCfg)
+			newValidatorSet, err := GetValidatorsFromCfg(cfg.MembershipCfg)
 			if err != nil {
 				log.With("epoch", nextHeight).Warnf("failed to get subnet validators: %v", err)
 				continue
@@ -141,6 +145,10 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 				continue
 			}
 
+			if ch := m.StateManager.pollCheckpoint(); ch != nil {
+				fmt.Println(">>>>> DETECTED CHECKPOINT FOR EPOCH", ch.Sn)
+			}
+
 			// TODO: At this point we only support Mir networks with validators
 			// as we are not broadcasting the nodes further. This will come soon.
 			err = api.SyncBlock(ctx, &types.BlockMsg{
@@ -174,4 +182,17 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		}
 	}
+}
+
+// Use levelDB as Mir datastore.
+func levelDs(path string, readonly bool) (datastore.Batching, error) {
+	fmt.Println(">>>>>> ")
+	fmt.Println(">>>>>> RETURNING LEVELDB DATASTORE FOR PATH", path)
+	fmt.Println(">>>>>> ")
+	return levelds.NewDatastore(path, &levelds.Options{
+		Compression: ldbopts.NoCompression,
+		NoSync:      false,
+		Strict:      ldbopts.StrictAll,
+		ReadOnly:    readonly,
+	})
 }

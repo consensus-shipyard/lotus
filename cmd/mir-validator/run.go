@@ -120,7 +120,8 @@ var runCmd = &cli.Command{
 			log.Info(a)
 		}
 
+		datastoreCfg := filepath.Join(cctx.String("repo"), LevelDSPath)
 		log.Infow("Starting mining with validator", "validator", validator)
-		return mir.Mine(ctx, validator, h, nodeApi, membershipCfg)
+		return mir.Mine(ctx, validator, h, nodeApi, mir.NewConfig(membershipCfg, datastoreCfg))
 	},
 }

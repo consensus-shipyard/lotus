@@ -21,6 +21,15 @@ const (
 	ReconfigurationType = 1
 )
 
+type Cfg struct {
+	MembershipCfg string
+	DatastorePath string
+}
+
+func NewConfig(membership string, datastore string) *Cfg {
+	return &Cfg{membership, datastore}
+}
+
 var log = logging.Logger("mir-consensus")
 
 // MirMessage interface that message types to be used in Mir need to implement.
@@ -69,14 +78,19 @@ func segmentForCheckpointPeriod(desiredPeriod int, membership map[t.NodeID]t.Nod
 	return segment, nil
 }
 
+type ParentMeta struct {
+	Height abi.ChainEpoch
+	Cid    cid.Cid
+}
+
 type Checkpoint struct {
 	// Height of the checkpoint
 	Height abi.ChainEpoch
 	// Cid of the blocks being committed in increasing order.
 	// (index 0 is the first block of the range)
 	BlockCids []cid.Cid
-	// Parent checkpoint, i.e. previous checkpoint committed.
-	Parent cid.Cid
+	// Parent checkpoint, i.e. metadata of previous checkpoint committed.
+	Parent ParentMeta
 }
 
 func (ch *Checkpoint) Bytes() ([]byte, error) {
@@ -85,6 +99,10 @@ func (ch *Checkpoint) Bytes() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (ch *Checkpoint) FromBytes(b []byte) error {
+	return ch.UnmarshalCBOR(bytes.NewReader(b))
 }
 
 func (ch *Checkpoint) Cid() (cid.Cid, error) {
@@ -99,4 +117,10 @@ func (ch *Checkpoint) Cid() (cid.Cid, error) {
 	}
 
 	return cid.NewCidV1(abi.CidBuilder.GetCodec(), h), nil
+}
+
+type CheckpointData struct {
+	Checkpoint *Checkpoint       // checkpoint data
+	Cert       map[string][]byte // checkpoint certificate
+	Sn         uint64
 }

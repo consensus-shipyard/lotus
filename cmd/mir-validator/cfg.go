@@ -17,9 +17,10 @@ const (
 	PrivKeyPath       = "mir.key"
 	MaddrPath         = "mir.maddr"
 	MembershipCfgPath = "mir.validators"
+	LevelDSPath       = "mir.db"
 )
 
-var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath}
+var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath, LevelDSPath}
 
 var cfgCmd = &cli.Command{
 	Name:  "config",

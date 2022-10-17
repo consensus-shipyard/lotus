@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/urfave/cli/v2"
 
@@ -66,6 +67,12 @@ var initCmd = &cli.Command{
 			if _, err := os.Create(mp); err != nil {
 				return fmt.Errorf("error creating empty membership config in %s", mp)
 			}
+		}
+
+		// initialize database path
+		datastoreCfg := filepath.Join(cctx.String("repo"), LevelDSPath)
+		if err := os.MkdirAll(datastoreCfg, 0755); err != nil {
+			return fmt.Errorf("error initializing mir datastore in path %s: %s", LevelDSPath, err)
 		}
 
 		log.Infow("Initialized mir validator. Run ./mir-validator run to start validator process")

@@ -23,6 +23,7 @@ export GOLOG_LOG_LEVEL=$LOG_LEVEL
 # Copy mir config and import keys
 ./lotus wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
 cp ./scripts/mir/mir-config/node$INDEX/* $LOTUS_PATH
+mkdir $LOTUS_PATH/mir.db
 
 # Set interceptor output
 n=$(cat mir-event-logs/counter)

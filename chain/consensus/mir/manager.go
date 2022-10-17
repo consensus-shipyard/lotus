@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"github.com/filecoin-project/go-address"
@@ -36,8 +37,14 @@ const (
 	CheckpointPeriod = 4
 )
 
+var (
+	LasestCheckpointKey = datastore.NewKey("mir/latest-check")
+)
+
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
+	ctx context.Context
+
 	// Lotus related types.
 	NetName dtypes.NetworkName
 	Addr    address.Address
@@ -53,19 +60,26 @@ type Manager struct {
 	interceptor   *eventlog.Recorder
 	ToMir         chan chan []*mirproto.Request
 	segmentLength int // segment length determinint the checkpoint period.
+	ds            datastore.Batching
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
 	reconfigurationNonce uint64
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membershipCfg string) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, mirCfg *Cfg) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	initialValidatorSet, err := GetValidatorsFromCfg(membershipCfg)
+	// initialize mir datastore
+	ds, err := levelDs(mirCfg.DatastorePath, false)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing mir datastore: %w", err)
+	}
+
+	initialValidatorSet, err := GetValidatorsFromCfg(mirCfg.MembershipCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
@@ -125,6 +139,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	var interceptor *eventlog.Recorder
 
 	m := Manager{
+		ctx:                 ctx,
 		Addr:                addr,
 		NetName:             netName,
 		Pool:                fifo.New(),
@@ -132,11 +147,15 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		interceptor:         interceptor,
 		CryptoManager:       cryptoManager,
 		Net:                 netTransport,
+		ds:                  ds,
 		InitialValidatorSet: initialValidatorSet,
 		ToMir:               make(chan chan []*mirproto.Request),
 	}
 
-	m.StateManager = NewStateManager(initialMembership, &m, api)
+	m.StateManager, err = NewStateManager(initialMembership, &m, api)
+	if err != nil {
+		return nil, fmt.Errorf("error starting mir state manager: %w", err)
+	}
 
 	mpool := pool.NewModule(
 		m.ToMir,

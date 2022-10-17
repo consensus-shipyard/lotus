@@ -11,6 +11,7 @@ func main() {
 		mir.Validator{},
 		mir.ValidatorSet{},
 		mir.Checkpoint{},
+		mir.ParentMeta{},
 	); err != nil {
 		panic(err)
 	}
