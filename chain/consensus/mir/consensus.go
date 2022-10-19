@@ -158,10 +158,11 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			if err := bft.cache.rcvCheckpoint(ch); err != nil {
 				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
 			}
-		} else {
-			// if there is no checkpoint receive blocks and add to unverified cache
-			bft.cache.rcvBlock(h)
 		}
+		// we should receive all blocks, including the ones that don't include checkpoints
+		// so they are conveniently verified
+		bft.cache.rcvBlock(h)
+
 		return nil
 	})
 

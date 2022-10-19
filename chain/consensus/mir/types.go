@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
-	t "github.com/filecoin-project/mir/pkg/types"
 	cid "github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-multihash"
 	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
+	t "github.com/filecoin-project/mir/pkg/types"
+
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
@@ -129,9 +130,10 @@ type CheckpointData struct {
 }
 
 type EpochConfig struct {
-	EpochNr     uint64
-	Memberships []Membership
-	Cert        map[string]CertSig // checkpoint certificate
+	EpochNr       uint64
+	Memberships   []Membership
+	Cert          map[string]CertSig // checkpoint certificate
+	SegmentLength uint64
 }
 
 type CertSig struct {
@@ -169,7 +171,7 @@ func membershipToMapSlice(m []Membership) []map[string]string {
 	return out
 }
 
-func NewEpochConfigFromPb(ch *checkpointpb.StableCheckpoint) *EpochConfig {
+func (m *Manager) NewEpochConfigFromPb(ch *checkpointpb.StableCheckpoint) *EpochConfig {
 	ms := make([]Membership, len(ch.Snapshot.Configuration.Memberships))
 	for k, v := range ch.Snapshot.Configuration.Memberships {
 		mmap := make(map[string]MembershipInfo)
@@ -182,6 +184,7 @@ func NewEpochConfigFromPb(ch *checkpointpb.StableCheckpoint) *EpochConfig {
 		ch.Snapshot.Configuration.EpochNr,
 		ms,
 		NewCertSigFromPb(ch),
+		uint64(m.segmentLength),
 	}
 }
 

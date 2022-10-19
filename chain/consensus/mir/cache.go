@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
+
+	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 type blkCache struct {
@@ -22,9 +24,9 @@ func (c *blkCache) rcvCheckpoint(ch *CheckpointData) error {
 	c.lk.Lock()
 	defer c.lk.Unlock()
 	i := ch.Checkpoint.Height
-	fmt.Println("===================", c.m)
+	fmt.Println("xxx===================", c.m)
 	for _, k := range ch.Checkpoint.BlockCids {
-		i++
+		i--
 		// bypass genesis
 		if i == 0 {
 			continue

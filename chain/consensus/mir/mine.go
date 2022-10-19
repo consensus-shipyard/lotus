@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
+	levelds "github.com/ipfs/go-ds-leveldb"
 	"github.com/libp2p/go-libp2p-core/host"
+	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/mir"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
-	levelds "github.com/ipfs/go-ds-leveldb"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -158,7 +158,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 			// TODO: At this point we only support Mir networks with validators
 			// as we are not broadcasting the nodes further. This will come soon.
-			err = api.SyncBlock(ctx, &types.BlockMsg{
+			err = api.SyncSubmitBlock(ctx, &types.BlockMsg{
 				Header:        bh.Header,
 				BlsMessages:   bh.BlsMessages,
 				SecpkMessages: bh.SecpkMessages,

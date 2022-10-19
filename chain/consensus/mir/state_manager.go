@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/types"
+	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	xerrors "golang.org/x/xerrors"
+
 	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	"github.com/filecoin-project/mir/pkg/pb/commonpb"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
-	cid "github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	xerrors "golang.org/x/xerrors"
+
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 var _ smr.AppLogic = &StateManager{}
@@ -251,18 +253,19 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// return genesis checkpoint for the first snapshot.
 
-	i := sm.prevCheckpoint.Height
-	for i <= nextHeight-1 {
+	// put blocks in descending order.
+	i := nextHeight - 1
+	for i >= sm.prevCheckpoint.Height {
 		ts, err := sm.api.ChainGetTipSetByHeight(sm.MirManager.ctx, i, types.EmptyTSK)
 		if err != nil {
 			return nil, xerrors.Errorf("error getting tipset of height: %d: %w", i, err)
 		}
 		fmt.Println(">>>>>>>>>>>>>>>>>> Getting cid for block", i)
-		fmt.Println(">>>> Getting blocks cid for height", i, ts.Blocks())
+		fmt.Println(">>>> Getting blocks cid for height", i, ts.Blocks()[0].Cid())
 		// In Mir tipsets have a single block, so we can access directly the block for
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
-		i++
+		i--
 	}
 
 	return ch.Bytes()
@@ -306,7 +309,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpointpb.StableCheckpoint) er
 	}
 
 	// Send the checkpoint to Lotus and handle it there
-	config := NewEpochConfigFromPb(checkpoint)
+	config := sm.MirManager.NewEpochConfigFromPb(checkpoint)
 	sm.NextCheckpoint <- &CheckpointData{ch, checkpoint.Sn, config}
 	return nil
 }

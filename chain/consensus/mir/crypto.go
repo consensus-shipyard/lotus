@@ -5,13 +5,14 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	xerrors "golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-address"
 	filcrypto "github.com/filecoin-project/go-state-types/crypto"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/serializing"
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
-	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/api"
 )
