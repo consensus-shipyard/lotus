@@ -34,11 +34,11 @@ const (
 // 5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //    they already have it.
 //
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membershipCfg string) error {
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membership interface{}) error {
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 
-	m, err := NewManager(ctx, addr, h, api, membershipCfg)
+	m, err := NewManager(ctx, addr, h, api, membership)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
@@ -81,7 +81,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			if err != nil && !errors.Is(err, mir.ErrStopped) {
 				panic(fmt.Errorf("miner consensus error: %w", err))
 			}
-			log.Debug("Mir miner: Mir node stopped")
+			log.With("addr", addr).Infof("Mir node stopped signal")
 			return nil
 
 		case membership := <-m.StateManager.NewMembership:
@@ -92,7 +92,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := GetValidatorsFromCfg(membershipCfg)
+			newValidatorSet, err := GetValidators(membership)
 			if err != nil {
 				log.With("epoch", nextHeight).Warnf("failed to get subnet validators: %v", err)
 				continue

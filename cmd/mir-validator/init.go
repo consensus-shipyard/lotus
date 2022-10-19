@@ -53,7 +53,7 @@ var initCmd = &cli.Command{
 		// TODO: Pass validator set for initialization
 		mp := path.Join(cctx.String("repo"), MembershipCfgPath)
 		if cctx.String("membership") != "" {
-			validators, err := mir.GetValidatorsFromCfg(cctx.String("membership"))
+			validators, err := mir.GetValidatorsFromFile(cctx.String("membership"))
 			if err != nil {
 				return fmt.Errorf("error importing membership config specified: %s", err)
 			}

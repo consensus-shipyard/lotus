@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -28,6 +29,10 @@ import (
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/go-statestore"
+	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/store"
+	mapi "github.com/filecoin-project/mir"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	power3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/power"
 
@@ -389,6 +394,13 @@ func (n *Ensemble) Start() *Ensemble {
 
 			// upgrades
 			node.Override(new(stmgr.UpgradeSchedule), n.options.upgradeSchedule),
+
+			node.ApplyIf(
+				func(s *node.Settings) bool { return build.IsMirConsensus() },
+				node.Override(new(consensus.Consensus), mir.NewConsensus),
+				node.Override(new(store.WeightFunc), mir.Weight),
+				node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
+			),
 		}
 
 		// append any node builder options.
@@ -796,7 +808,8 @@ func (n *Ensemble) Start() *Ensemble {
 	err = n.mn.LinkAll()
 	require.NoError(n.t, err)
 
-	if !n.bootstrapped && len(n.active.miners) > 0 {
+	if !build.IsMirConsensus() &&
+		!n.bootstrapped && len(n.active.miners) > 0 {
 		// We have *just* bootstrapped, so mine 2 blocks to setup some CE stuff in some actors
 		var wait sync.Mutex
 		wait.Lock()
@@ -927,6 +940,30 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 	}
 
 	return bms
+}
+
+func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
+	var membership string
+	for _, m := range miners {
+		id, err := NodeLibp2pAddr(m.mirHost)
+		require.NoError(n.t, err)
+		membership += fmt.Sprintf("%s@%s,", m.mirAddr, id)
+	}
+	return membership
+}
+
+func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
+	membership := n.mirMembership(miners...)
+
+	for _, m := range miners {
+		go func(m *TestMiner) {
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, mir.MembershipFromStr(membership))
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(m)
+	}
 }
 
 func (n *Ensemble) generateGenesis() *genesis.Template {

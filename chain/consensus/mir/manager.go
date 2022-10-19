@@ -10,6 +10,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/eventlog"
 	"github.com/filecoin-project/mir/pkg/logging"
@@ -19,12 +24,6 @@ import (
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
-
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
@@ -53,13 +52,13 @@ type Manager struct {
 	reconfigurationNonce uint64
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membershipCfg string) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membership interface{}) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	initialValidatorSet, err := GetValidatorsFromCfg(membershipCfg)
+	initialValidatorSet, err := GetValidators(membership)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}

@@ -121,6 +121,6 @@ var runCmd = &cli.Command{
 		}
 
 		log.Infow("Starting mining with validator", "validator", validator)
-		return mir.Mine(ctx, validator, h, nodeApi, membershipCfg)
+		return mir.Mine(ctx, validator, h, nodeApi, mir.MembershipFromFile(membershipCfg))
 	},
 }

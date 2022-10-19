@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
@@ -89,6 +90,10 @@ type TestMiner struct {
 	RemoteListener net.Listener
 
 	options nodeOpts
+
+	// Mir primitives
+	mirHost host.Host
+	mirAddr address.Address
 }
 
 func (tm *TestMiner) PledgeSectors(ctx context.Context, n, existing int, blockNotif <-chan struct{}) {

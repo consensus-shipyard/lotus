@@ -73,11 +73,15 @@ debug: build-devnets
 2k: GOFLAGS+=-tags=2k
 2k: build-devnets
 
-
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: lotus lotus-miner mir-validator
 # FIXME: Uncomment to build everything.
 # spacenet: build lotus lotus-miner mir-validator lotus-seed lotus-shed lotus-wallet lotus-gateway lotus-fountain lotus-stats
+
+spacenet-test: GOFLAGS+=-tags=spacenet
+spacenet-test:
+	go test $(GOFLAGS) -v -count=1 ./itests/mir_test.go
+.PHONY: spacenet-test
 
 calibnet: GOFLAGS+=-tags=calibnet
 calibnet: build-devnets
