@@ -221,6 +221,10 @@ func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 		}
 	}
 
+	// t.Parent (mir.ParentMeta) (struct)
+	if err := t.Parent.MarshalCBOR(cw); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -300,7 +304,662 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		t.BlockCids[i] = c
 	}
 
-	// t.Parent (cid.Cid) (struct)
+	// t.Parent (mir.ParentMeta) (struct)
 
+	{
+
+		if err := t.Parent.UnmarshalCBOR(cr); err != nil {
+			return xerrors.Errorf("unmarshaling t.Parent: %w", err)
+		}
+
+	}
+	return nil
+}
+
+var lengthBufCheckpointData = []byte{131}
+
+func (t *CheckpointData) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufCheckpointData); err != nil {
+		return err
+	}
+
+	// t.Checkpoint (mir.Checkpoint) (struct)
+	if err := t.Checkpoint.MarshalCBOR(cw); err != nil {
+		return err
+	}
+
+	// t.Sn (uint64) (uint64)
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Sn)); err != nil {
+		return err
+	}
+
+	// t.Config (mir.EpochConfig) (struct)
+	if err := t.Config.MarshalCBOR(cw); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *CheckpointData) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = CheckpointData{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 3 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.Checkpoint (mir.Checkpoint) (struct)
+
+	{
+
+		b, err := cr.ReadByte()
+		if err != nil {
+			return err
+		}
+		if b != cbg.CborNull[0] {
+			if err := cr.UnreadByte(); err != nil {
+				return err
+			}
+			t.Checkpoint = new(Checkpoint)
+			if err := t.Checkpoint.UnmarshalCBOR(cr); err != nil {
+				return xerrors.Errorf("unmarshaling t.Checkpoint pointer: %w", err)
+			}
+		}
+
+	}
+	// t.Sn (uint64) (uint64)
+
+	{
+
+		maj, extra, err = cr.ReadHeader()
+		if err != nil {
+			return err
+		}
+		if maj != cbg.MajUnsignedInt {
+			return fmt.Errorf("wrong type for uint64 field")
+		}
+		t.Sn = uint64(extra)
+
+	}
+	// t.Config (mir.EpochConfig) (struct)
+
+	{
+
+		b, err := cr.ReadByte()
+		if err != nil {
+			return err
+		}
+		if b != cbg.CborNull[0] {
+			if err := cr.UnreadByte(); err != nil {
+				return err
+			}
+			t.Config = new(EpochConfig)
+			if err := t.Config.UnmarshalCBOR(cr); err != nil {
+				return xerrors.Errorf("unmarshaling t.Config pointer: %w", err)
+			}
+		}
+
+	}
+	return nil
+}
+
+var lengthBufParentMeta = []byte{130}
+
+func (t *ParentMeta) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufParentMeta); err != nil {
+		return err
+	}
+
+	// t.Height (abi.ChainEpoch) (int64)
+	if t.Height >= 0 {
+		if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Height)); err != nil {
+			return err
+		}
+	} else {
+		if err := cw.WriteMajorTypeHeader(cbg.MajNegativeInt, uint64(-t.Height-1)); err != nil {
+			return err
+		}
+	}
+
+	// t.Cid (cid.Cid) (struct)
+
+	if err := cbg.WriteCid(cw, t.Cid); err != nil {
+		return xerrors.Errorf("failed to write cid field t.Cid: %w", err)
+	}
+
+	return nil
+}
+
+func (t *ParentMeta) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = ParentMeta{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 2 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.Height (abi.ChainEpoch) (int64)
+	{
+		maj, extra, err := cr.ReadHeader()
+		var extraI int64
+		if err != nil {
+			return err
+		}
+		switch maj {
+		case cbg.MajUnsignedInt:
+			extraI = int64(extra)
+			if extraI < 0 {
+				return fmt.Errorf("int64 positive overflow")
+			}
+		case cbg.MajNegativeInt:
+			extraI = int64(extra)
+			if extraI < 0 {
+				return fmt.Errorf("int64 negative oveflow")
+			}
+			extraI = -1 - extraI
+		default:
+			return fmt.Errorf("wrong type for int64 field: %d", maj)
+		}
+
+		t.Height = abi.ChainEpoch(extraI)
+	}
+	// t.Cid (cid.Cid) (struct)
+
+	{
+
+		c, err := cbg.ReadCid(cr)
+		if err != nil {
+			return xerrors.Errorf("failed to read cid field t.Cid: %w", err)
+		}
+
+		t.Cid = c
+
+	}
+	return nil
+}
+
+var lengthBufEpochConfig = []byte{131}
+
+func (t *EpochConfig) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufEpochConfig); err != nil {
+		return err
+	}
+
+	// t.EpochNr (uint64) (uint64)
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.EpochNr)); err != nil {
+		return err
+	}
+
+	// t.Memberships ([]mir.Membership) (slice)
+	if len(t.Memberships) > cbg.MaxLength {
+		return xerrors.Errorf("Slice value in field t.Memberships was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajArray, uint64(len(t.Memberships))); err != nil {
+		return err
+	}
+	for _, v := range t.Memberships {
+		if err := v.MarshalCBOR(cw); err != nil {
+			return err
+		}
+	}
+
+	// t.Cert (map[string]mir.CertSig) (map)
+	{
+		if len(t.Cert) > 4096 {
+			return xerrors.Errorf("cannot marshal t.Cert map too large")
+		}
+
+		if err := cw.WriteMajorTypeHeader(cbg.MajMap, uint64(len(t.Cert))); err != nil {
+			return err
+		}
+
+		keys := make([]string, 0, len(t.Cert))
+		for k := range t.Cert {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := t.Cert[k]
+
+			if len(k) > cbg.MaxLength {
+				return xerrors.Errorf("Value in field k was too long")
+			}
+
+			if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(k))); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(w, string(k)); err != nil {
+				return err
+			}
+
+			if err := v.MarshalCBOR(cw); err != nil {
+				return err
+			}
+
+		}
+	}
+	return nil
+}
+
+func (t *EpochConfig) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = EpochConfig{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 3 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.EpochNr (uint64) (uint64)
+
+	{
+
+		maj, extra, err = cr.ReadHeader()
+		if err != nil {
+			return err
+		}
+		if maj != cbg.MajUnsignedInt {
+			return fmt.Errorf("wrong type for uint64 field")
+		}
+		t.EpochNr = uint64(extra)
+
+	}
+	// t.Memberships ([]mir.Membership) (slice)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("t.Memberships: array too large (%d)", extra)
+	}
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("expected cbor array")
+	}
+
+	if extra > 0 {
+		t.Memberships = make([]Membership, extra)
+	}
+
+	for i := 0; i < int(extra); i++ {
+
+		var v Membership
+		if err := v.UnmarshalCBOR(cr); err != nil {
+			return err
+		}
+
+		t.Memberships[i] = v
+	}
+
+	// t.Cert (map[string]mir.CertSig) (map)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	if maj != cbg.MajMap {
+		return fmt.Errorf("expected a map (major type 5)")
+	}
+	if extra > 4096 {
+		return fmt.Errorf("t.Cert: map too large")
+	}
+
+	t.Cert = make(map[string]CertSig, extra)
+
+	for i, l := 0, int(extra); i < l; i++ {
+
+		var k string
+
+		{
+			sval, err := cbg.ReadString(cr)
+			if err != nil {
+				return err
+			}
+
+			k = string(sval)
+		}
+
+		var v CertSig
+
+		{
+
+			if err := v.UnmarshalCBOR(cr); err != nil {
+				return xerrors.Errorf("unmarshaling v: %w", err)
+			}
+
+		}
+
+		t.Cert[k] = v
+
+	}
+	return nil
+}
+
+var lengthBufCertSig = []byte{129}
+
+func (t *CertSig) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufCertSig); err != nil {
+		return err
+	}
+
+	// t.Sig ([]uint8) (slice)
+	if len(t.Sig) > cbg.ByteArrayMaxLen {
+		return xerrors.Errorf("Byte array in field t.Sig was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajByteString, uint64(len(t.Sig))); err != nil {
+		return err
+	}
+
+	if _, err := cw.Write(t.Sig[:]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *CertSig) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = CertSig{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 1 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.Sig ([]uint8) (slice)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+
+	if extra > cbg.ByteArrayMaxLen {
+		return fmt.Errorf("t.Sig: byte array too large (%d)", extra)
+	}
+	if maj != cbg.MajByteString {
+		return fmt.Errorf("expected byte array")
+	}
+
+	if extra > 0 {
+		t.Sig = make([]uint8, extra)
+	}
+
+	if _, err := io.ReadFull(cr, t.Sig[:]); err != nil {
+		return err
+	}
+	return nil
+}
+
+var lengthBufMembership = []byte{129}
+
+func (t *Membership) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufMembership); err != nil {
+		return err
+	}
+
+	// t.M (map[string]mir.MembershipInfo) (map)
+	{
+		if len(t.M) > 4096 {
+			return xerrors.Errorf("cannot marshal t.M map too large")
+		}
+
+		if err := cw.WriteMajorTypeHeader(cbg.MajMap, uint64(len(t.M))); err != nil {
+			return err
+		}
+
+		keys := make([]string, 0, len(t.M))
+		for k := range t.M {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := t.M[k]
+
+			if len(k) > cbg.MaxLength {
+				return xerrors.Errorf("Value in field k was too long")
+			}
+
+			if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(k))); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(w, string(k)); err != nil {
+				return err
+			}
+
+			if err := v.MarshalCBOR(cw); err != nil {
+				return err
+			}
+
+		}
+	}
+	return nil
+}
+
+func (t *Membership) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = Membership{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 1 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.M (map[string]mir.MembershipInfo) (map)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	if maj != cbg.MajMap {
+		return fmt.Errorf("expected a map (major type 5)")
+	}
+	if extra > 4096 {
+		return fmt.Errorf("t.M: map too large")
+	}
+
+	t.M = make(map[string]MembershipInfo, extra)
+
+	for i, l := 0, int(extra); i < l; i++ {
+
+		var k string
+
+		{
+			sval, err := cbg.ReadString(cr)
+			if err != nil {
+				return err
+			}
+
+			k = string(sval)
+		}
+
+		var v MembershipInfo
+
+		{
+
+			if err := v.UnmarshalCBOR(cr); err != nil {
+				return xerrors.Errorf("unmarshaling v: %w", err)
+			}
+
+		}
+
+		t.M[k] = v
+
+	}
+	return nil
+}
+
+var lengthBufMembershipInfo = []byte{129}
+
+func (t *MembershipInfo) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufMembershipInfo); err != nil {
+		return err
+	}
+
+	// t.I (string) (string)
+	if len(t.I) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.I was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.I))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.I)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *MembershipInfo) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = MembershipInfo{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 1 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.I (string) (string)
+
+	{
+		sval, err := cbg.ReadString(cr)
+		if err != nil {
+			return err
+		}
+
+		t.I = string(sval)
+	}
 	return nil
 }

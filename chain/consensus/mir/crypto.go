@@ -8,7 +8,10 @@ import (
 	"github.com/filecoin-project/go-address"
 	filcrypto "github.com/filecoin-project/go-state-types/crypto"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
+	"github.com/filecoin-project/mir/pkg/serializing"
 	t "github.com/filecoin-project/mir/pkg/types"
+	"github.com/filecoin-project/mir/pkg/util/maputil"
+	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/api"
 )
@@ -71,6 +74,50 @@ func (c *CryptoManager) verifySig(data [][]byte, sigBytes []byte, addr address.A
 
 	_, err := c.api.WalletVerify(context.Background(), addr, hash(data), &sig)
 	return err
+}
+
+func (c *CryptoManager) VerifyCheckpointCert(checkpoint *CheckpointData) error {
+	checkBytes := serializing.CheckpointForSig(
+		t.EpochNr(checkpoint.Config.EpochNr),
+		t.SeqNr(checkpoint.Sn),
+		hash(snapshotForHash(checkpoint)))
+
+	for n, sig := range checkpoint.Config.Cert {
+		err := c.Verify(checkBytes, sig.Sig, t.NodeID(n))
+		if err != nil {
+			return xerrors.Errorf("error verifying signature for node %s: %w", n, err)
+		}
+	}
+	return nil
+}
+
+// borrowing from mir/pkg to accept an alternative input to the protobuf
+func snapshotForHash(ch *CheckpointData) [][]byte {
+
+	// we should add a sanity-check before this function to ensure that
+	// this can't fail, as we are disregarding the error.
+	b, err := ch.Checkpoint.Bytes()
+	if err != nil {
+		xerrors.Errorf("error computing snapshotForHash: %w", err)
+	}
+
+	// Append epoch and app data
+	data := [][]byte{
+		t.EpochNr(ch.Config.EpochNr).Bytes(),
+		b,
+	}
+
+	// Append membership.
+	// Each string representing an ID and an address is explicitly terminated with a zero byte.
+	// This ensures that the last byte of an ID and the first byte of an address are not interchangeable.
+	for _, membership := range membershipToMapSlice(ch.Config.Memberships) {
+		maputil.IterateSorted(membership, func(id string, addr string) bool {
+			data = append(data, []byte(id), []byte{0}, []byte(addr), []byte{0})
+			return true
+		})
+	}
+
+	return data
 }
 
 func hash(data [][]byte) []byte {

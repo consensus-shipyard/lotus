@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	t "github.com/filecoin-project/mir/pkg/types"
 	cid "github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-multihash"
+	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
@@ -120,7 +123,99 @@ func (ch *Checkpoint) Cid() (cid.Cid, error) {
 }
 
 type CheckpointData struct {
-	Checkpoint *Checkpoint       // checkpoint data
-	Cert       map[string][]byte // checkpoint certificate
+	Checkpoint *Checkpoint // checkpoint data
 	Sn         uint64
+	Config     *EpochConfig // mir config information
+}
+
+type EpochConfig struct {
+	EpochNr     uint64
+	Memberships []Membership
+	Cert        map[string]CertSig // checkpoint certificate
+}
+
+type CertSig struct {
+	Sig []byte
+}
+
+func NewCertSigFromPb(ch *checkpointpb.StableCheckpoint) map[string]CertSig {
+	cert := make(map[string]CertSig)
+	for k, v := range ch.Cert {
+		cert[k] = CertSig{v}
+	}
+	return cert
+}
+
+// FIXME: All this struct dance with membership is required due to Mir's protobuf
+// definition and CBOR marshalling type limitations. We should definitely
+// simplify this an make it more efficient.
+type Membership struct {
+	M map[string]MembershipInfo
+}
+
+type MembershipInfo struct {
+	I string
+}
+
+func membershipToMapSlice(m []Membership) []map[string]string {
+	out := make([]map[string]string, len(m))
+	for k := range m {
+		mmap := make(map[string]string)
+		for mkey, mval := range m[k].M {
+			mmap[mkey] = mval.I
+		}
+		out[k] = mmap
+	}
+	return out
+}
+
+func NewEpochConfigFromPb(ch *checkpointpb.StableCheckpoint) *EpochConfig {
+	ms := make([]Membership, len(ch.Snapshot.Configuration.Memberships))
+	for k, v := range ch.Snapshot.Configuration.Memberships {
+		mmap := make(map[string]MembershipInfo)
+		for mk, mv := range v.Membership {
+			mmap[mk] = MembershipInfo{I: mv}
+		}
+		ms[k] = Membership{mmap}
+	}
+	return &EpochConfig{
+		ch.Snapshot.Configuration.EpochNr,
+		ms,
+		NewCertSigFromPb(ch),
+	}
+}
+
+// AsVRFProof serializes the data from CheckpointData
+// that is included for a checkpoint inside a Filecoin block.
+func (cd CheckpointData) AsVRFProof() (*ltypes.Ticket, error) {
+	// we don´t include the certificate as it may be
+	// different for each validator (leading blocks
+	// with checkpoints from different validator to appear
+	// completely different blocks).
+	cd.Config.Cert = nil
+	buf := new(bytes.Buffer)
+	if err := cd.MarshalCBOR(buf); err != nil {
+		return nil, xerrors.Errorf("error serializing checkpoint data: %w", err)
+	}
+	return &ltypes.Ticket{VRFProof: buf.Bytes()}, nil
+}
+
+func CheckpointFromVRFProof(t *ltypes.Ticket) (*CheckpointData, error) {
+	ch := &CheckpointData{}
+	if err := ch.UnmarshalCBOR(bytes.NewReader(t.VRFProof)); err != nil {
+		return nil, xerrors.Errorf("error getting checkpoint data from VRF Proof: %w", err)
+	}
+	return ch, nil
+}
+
+func (cd CheckpointData) ConfigAsElectionProof() (*ltypes.ElectionProof, error) {
+	// passing config as election proof
+	// TODO: We can remove some redundancy and potentially reduce the size of the
+	// block header by uncommenting the following line.
+	// cd.Config.Membership = nil
+	buf := new(bytes.Buffer)
+	if err := cd.Config.MarshalCBOR(buf); err != nil {
+		return nil, xerrors.Errorf("error serializing checkpoint data: %w", err)
+	}
+	return &ltypes.ElectionProof{WinCount: 0, VRFProof: buf.Bytes()}, nil
 }

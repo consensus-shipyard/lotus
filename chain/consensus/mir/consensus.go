@@ -4,7 +4,6 @@
 package mir
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/lib/async"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
@@ -39,6 +39,7 @@ type Mir struct {
 	beacon  beacon.Schedule
 	sm      *stmgr.StateManager
 	genesis *types.TipSet
+	cache   *blkCache
 }
 
 func NewConsensus(
@@ -52,6 +53,7 @@ func NewConsensus(
 		beacon:  b,
 		sm:      sm,
 		genesis: g,
+		cache:   newMirBlkCache(),
 	}, nil
 }
 
@@ -145,18 +147,47 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			b.Header.ParentWeight, pweight)
 	}
 
-	return consensus.RunAsyncChecks(ctx, consensus.CommonBlkChecks(ctx, bft.sm, bft.sm.ChainStore(), b, baseTs))
+	checkpointChk := async.Err(func() error {
+		if h.ElectionProof.VRFProof != nil {
+			// TODO: Get cert from election proof.
+			// TODO: Verify the checkpoint
+			ch, err := CheckpointFromVRFProof(h.Ticket)
+			if err != nil {
+				return xerrors.Errorf("error getting checkpoint from ticket: %w", err)
+			}
+			if err := bft.cache.rcvCheckpoint(ch); err != nil {
+				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
+			}
+		} else {
+			// if there is no checkpoint receive blocks and add to unverified cache
+			bft.cache.rcvBlock(h)
+		}
+		return nil
+	})
+
+	asyncChecks := append(
+		consensus.CommonBlkChecks(ctx, bft.sm, bft.sm.ChainStore(), b, baseTs),
+		checkpointChk,
+	)
+
+	return consensus.RunAsyncChecks(ctx, asyncChecks)
 }
 
 func blockSanityChecks(h *types.BlockHeader) error {
-	// TODO: empty for now, when we include checkpoints for block validation, this may not be the case.
-	empty := types.ElectionProof{}
-	if h.ElectionProof.WinCount != empty.WinCount || !bytes.Equal(h.ElectionProof.VRFProof, empty.VRFProof) {
-		return xerrors.Errorf("mir expects empty election proof")
+	if h.ElectionProof.WinCount != 0 {
+		return xerrors.Errorf("mir expects a zero wincount")
 	}
 
 	if h.Ticket.VRFProof != nil {
-		return xerrors.Errorf("mir block have nil ticket")
+		if h.ElectionProof.VRFProof == nil {
+			return xerrors.Errorf("both VRFProofs should be nil, the block includes a checkpoint")
+		}
+	}
+
+	if h.Ticket.VRFProof == nil {
+		if h.ElectionProof.VRFProof != nil {
+			return xerrors.Errorf("if there is no ticket, then the block doesn't include a checkpoint")
+		}
 	}
 
 	if h.BlockSig != nil {

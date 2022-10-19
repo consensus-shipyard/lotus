@@ -75,7 +75,7 @@ debug: build-devnets
 
 
 spacenet: GOFLAGS+=-tags=spacenet
-spacenet: lotus lotus-miner mir-validator
+spacenet: lotus mir-validator
 # FIXME: Uncomment to build everything.
 # spacenet: build lotus lotus-miner mir-validator lotus-seed lotus-shed lotus-wallet lotus-gateway lotus-fountain lotus-stats
 

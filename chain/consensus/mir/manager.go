@@ -4,6 +4,7 @@ package mir
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"fmt"
 	"os"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
+	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/eventlog"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
@@ -183,7 +185,9 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	if err != nil {
 		return nil, fmt.Errorf("could not create SMR system: %w", err)
 	}
-	smrSystem = smrSystem.WithModule("mempool", mpool)
+	smrSystem = smrSystem.
+		WithModule("mempool", mpool).
+		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
 	if err := smrSystem.Start(ctx); err != nil {
 		return nil, fmt.Errorf("could not start SMR system: %w", err)

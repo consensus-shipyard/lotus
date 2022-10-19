@@ -43,6 +43,10 @@ type StateManager struct {
 	// Channel to send checkpoints to Lotus
 	NextCheckpoint chan *CheckpointData
 
+	// Channel to signal that we need to wait for a checkpoint
+	// before proposing the next block
+	waitCheckpoint chan bool
+
 	// Channel to send a membership.
 	NewMembership chan map[t.NodeID]t.NodeAddress
 
@@ -67,7 +71,8 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 
 	sm := StateManager{
 		NextBatch:            make(chan *Batch),
-		NextCheckpoint:       make(chan *CheckpointData),
+		NextCheckpoint:       make(chan *CheckpointData, 1),
+		waitCheckpoint:       make(chan bool, 1),
 		NewMembership:        make(chan map[t.NodeID]t.NodeAddress, 1),
 		MirManager:           m,
 		memberships:          memberships,
@@ -226,8 +231,15 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // can verify blocks 0,1,2,3 and execute them.
 func (sm *StateManager) Snapshot() ([]byte, error) {
 	if sm.currentEpoch == 0 {
-		return sm.MirManager.ds.Get(sm.MirManager.ctx, datastore.NewKey(sm.prevCheckpoint.Cid.String()))
+		ch, err := sm.firstEpochCheckpoint()
+		if err != nil {
+			return nil, xerrors.Errorf("could not get first epoch checkpoint: %w", err)
+		}
+		return ch.Bytes()
 	}
+
+	// signal to wait for next checkpoint
+	sm.waitCheckpoint <- true
 
 	nextHeight := sm.prevCheckpoint.Height + sm.MirManager.GetCheckpointPeriod()
 	ch := Checkpoint{
@@ -294,8 +306,8 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpointpb.StableCheckpoint) er
 	}
 
 	// Send the checkpoint to Lotus and handle it there
-	fmt.Println(">>>>>>>> Sending checkpoint to channel")
-	sm.NextCheckpoint <- &CheckpointData{ch, checkpoint.Cert, checkpoint.Sn}
+	config := NewEpochConfigFromPb(checkpoint)
+	sm.NextCheckpoint <- &CheckpointData{ch, checkpoint.Sn, config}
 	return nil
 }
 
@@ -313,8 +325,12 @@ func weakQuorum(n int) int {
 
 func (sm *StateManager) pollCheckpoint() *CheckpointData {
 	select {
-	case ch := <-sm.NextCheckpoint:
-		fmt.Println(">>>>>>>>> Receiving from channel check")
+	// signalled that we need to wait for a checkpoint
+	case <-sm.waitCheckpoint:
+		fmt.Println(">>>>>>>>> Waiting for checkpoint")
+		ch := <-sm.NextCheckpoint
+		// sanity-check: verify signature. FIXME: remove from here
+		fmt.Println("===== VERIFYING CERTIFICATE: ", sm.MirManager.CryptoManager.VerifyCheckpointCert(ch))
 		return ch
 	default:
 		return nil

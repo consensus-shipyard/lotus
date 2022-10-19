@@ -118,19 +118,30 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			log.With("epoch", nextHeight).
 				Infof("try to create a block: msgs - %d", len(msgs))
 
-			// TODO: As the chckpoint period is dynamic, how can we be informed
-			// that the next block should include a checkpoint?
-			// TODO: Also, if using Mir consensus the computation of the block should
-			// be performed considering the checkpoint but disregarding the checkpoint
-			// certificate.
+			// include checkpoint in VRF proof field?
+			vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
+			eproofCheckpoint := &ltypes.ElectionProof{}
+			if ch := m.StateManager.pollCheckpoint(); ch != nil {
+				vrfCheckpoint, err = ch.AsVRFProof()
+				if err != nil {
+					log.With("epoch", nextHeight).Errorw("error getting vrfproof from checkpoint:", "error", err)
+					continue
+				}
+				eproofCheckpoint, err = ch.ConfigAsElectionProof()
+				if err != nil {
+					log.With("epoch", nextHeight).Errorw("error getting eproof from checkpoint:", "error", err)
+					continue
+				}
+				log.Infof("Including checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
+			}
 
 			bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
 				// mir blocks are created by all miners. We use system actor as miner of the block
 				Miner:            builtin.SystemActorAddr,
 				Parents:          base.Key(),
 				BeaconValues:     nil,
-				Ticket:           &ltypes.Ticket{VRFProof: nil},
-				Eproof:           &ltypes.ElectionProof{},
+				Ticket:           vrfCheckpoint,
+				Eproof:           eproofCheckpoint,
 				Epoch:            base.Height() + 1,
 				Timestamp:        uint64(time.Now().Unix()),
 				WinningPoStProof: nil,
@@ -143,10 +154,6 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			if bh == nil {
 				log.With("epoch", nextHeight).Debug("created a nil block")
 				continue
-			}
-
-			if ch := m.StateManager.pollCheckpoint(); ch != nil {
-				fmt.Println(">>>>> DETECTED CHECKPOINT FOR EPOCH", ch.Sn)
 			}
 
 			// TODO: At this point we only support Mir networks with validators
@@ -186,9 +193,6 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 // Use levelDB as Mir datastore.
 func levelDs(path string, readonly bool) (datastore.Batching, error) {
-	fmt.Println(">>>>>> ")
-	fmt.Println(">>>>>> RETURNING LEVELDB DATASTORE FOR PATH", path)
-	fmt.Println(">>>>>> ")
 	return levelds.NewDatastore(path, &levelds.Options{
 		Compression: ldbopts.NoCompression,
 		NoSync:      false,
