@@ -57,7 +57,7 @@ func (ts *eudicoConsensusSuite) testMirMiningTwoNodes(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, gen1.String(), gen2.String())
 
-	// Fail if no peers
+	// Fail if nodes have peers
 	p, err := n1.NetPeers(ctx)
 	require.NoError(t, err)
 	require.Empty(t, p, "node one has peers")
@@ -99,7 +99,7 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodes(t *testing.T) {
 	ens.BeginMirMining(ctx, miners...)
 
 	for _, n := range nodes {
-		err := kit.SubnetHeightCheckForBlocks(ctx, 5, n)
+		err := kit.SubnetHeightCheckForBlocks(ctx, 10, n)
 		require.NoError(t, err)
 	}
 
