@@ -22,7 +22,7 @@ const (
 	balanceSleepTime = 3
 )
 
-// SubnetHeightCheckForBlocks checks `n` blocks with correct heights in the subnet will be mined.
+// SubnetHeightCheckForBlocks checks that `n` blocks with correct heights in the subnet will be mined.
 func SubnetHeightCheckForBlocks(ctx context.Context, n int, api napi.FullNode) error {
 	heads, err := api.ChainNotify(ctx)
 	if err != nil {

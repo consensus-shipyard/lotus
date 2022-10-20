@@ -2,14 +2,11 @@ package itests
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/lotus/itests/kit"
-	mapi "github.com/filecoin-project/mir"
 )
 
 func TestMirConsensus(t *testing.T) {
@@ -32,26 +29,23 @@ type eudicoConsensusSuite struct {
 
 func (ts *eudicoConsensusSuite) testMirMiningOneNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+	}()
 
 	full, miner, ens := kit.EnsembleMinimalMir(t, ts.opts...)
 	ens.BeginMirMining(ctx, miner)
 
 	err := kit.SubnetHeightCheckForBlocks(ctx, 10, full)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
-	}
 	require.NoError(t, err)
 }
 
 func (ts *eudicoConsensusSuite) testMirMiningTwoNodes(t *testing.T) {
-	var wg sync.WaitGroup
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
-		t.Log("[*] defer: cancelling test context")
+		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
 	}()
 
 	n1, n2, m1, m2, ens := kit.EnsembleTwoMirNodes(t, ts.opts...)
@@ -77,79 +71,36 @@ func (ts *eudicoConsensusSuite) testMirMiningTwoNodes(t *testing.T) {
 	ens.BeginMirMining(ctx, m1, m2)
 
 	err = kit.SubnetHeightCheckForBlocks(ctx, 10, n1)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
-	}
 	require.NoError(t, err)
 
 	err = kit.SubnetHeightCheckForBlocks(ctx, 10, n2)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
-	}
 	require.NoError(t, err)
-
 }
 
 func (ts *eudicoConsensusSuite) testMirMiningFourNodes(t *testing.T) {
-	var wg sync.WaitGroup
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
-		t.Log("[*] defer: cancelling test context")
+		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
 	}()
 
-	n1, n2, n3, n4, m1, m2, m3, m4, ens := kit.EnsembleFourMirNodes(t, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, 4, ts.opts...)
+	require.Equal(t, 4, len(nodes))
+	require.Equal(t, 4, len(miners))
 
-	// Fail if genesis blocks are different
-	gen1, err := n1.ChainGetGenesis(ctx)
-	require.NoError(t, err)
-	gen2, err := n2.ChainGetGenesis(ctx)
-	require.NoError(t, err)
-	require.Equal(t, gen1.String(), gen2.String())
-
-	// Fail if no peers
-	p, err := n1.NetPeers(ctx)
-	require.NoError(t, err)
-	require.Empty(t, p, "node one has peers")
-
-	p, err = n2.NetPeers(ctx)
-	require.NoError(t, err)
-	require.Empty(t, p, "node two has peers")
-
-	p, err = n3.NetPeers(ctx)
-	require.NoError(t, err)
-	require.Empty(t, p, "node three has peers")
-
-	p, err = n4.NetPeers(ctx)
-	require.NoError(t, err)
-	require.Empty(t, p, "node four has peers")
-
-	ens.Connect(n1, n2, n3, n4)
-
-	ens.BeginMirMining(ctx, m1, m2, m3, m4)
-
-	err = kit.SubnetHeightCheckForBlocks(ctx, 5, n1)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
-	}
-	require.NoError(t, err)
-
-	err = kit.SubnetHeightCheckForBlocks(ctx, 5, n2)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
+	for i, n := range nodes {
+		p, err := n.NetPeers(ctx)
+		require.NoError(t, err)
+		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	err = kit.SubnetHeightCheckForBlocks(ctx, 5, n3)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
-	}
+	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3])
 
-	err = kit.SubnetHeightCheckForBlocks(ctx, 5, n4)
-	if xerrors.Is(mapi.ErrStopped, err) {
-		return
+	ens.BeginMirMining(ctx, miners...)
+
+	for _, n := range nodes {
+		err := kit.SubnetHeightCheckForBlocks(ctx, 5, n)
+		require.NoError(t, err)
 	}
-	require.NoError(t, err)
 
 }

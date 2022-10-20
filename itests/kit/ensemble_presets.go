@@ -126,6 +126,36 @@ func EnsembleFourMirNodes(t *testing.T, opts ...interface{}) (
 	return &n1, &n2, &n3, &n4, &m1, &m2, &m3, &m4, ens
 }
 
+func EnsembleMirNodes(t *testing.T, size int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
+	opts = append(opts, WithAllSubsystems())
+
+	eopts, nopts := siftOptions(t, opts)
+
+	var (
+		nodes  []*TestFullNode
+		miners []*TestMiner
+	)
+
+	ens := NewEnsemble(t, eopts...)
+
+	for i := 0; i < size; i++ {
+		var n TestFullNode
+		var m TestMiner
+		ens.FullNode(&n, nopts...).Miner(&m, &n, nopts...)
+		nodes = append(nodes, &n)
+		miners = append(miners, &m)
+	}
+
+	ens.active.miners = []*TestMiner{}
+	ens.Start()
+
+	for i := 0; i < size; i++ {
+		adaptForMir(t, nodes[i], miners[i])
+	}
+
+	return nodes, miners, ens
+}
+
 func EnsembleWorker(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMiner, *TestWorker, *Ensemble) {
 	opts = append(opts, WithAllSubsystems())
 
