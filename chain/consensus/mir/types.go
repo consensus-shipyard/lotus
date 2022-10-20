@@ -11,6 +11,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
+	"github.com/filecoin-project/mir/pkg/serializing"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/chain/types"
@@ -221,4 +222,36 @@ func (cd CheckpointData) ConfigAsElectionProof() (*ltypes.ElectionProof, error) 
 		return nil, xerrors.Errorf("error serializing checkpoint data: %w", err)
 	}
 	return &ltypes.ElectionProof{WinCount: 0, VRFProof: buf.Bytes()}, nil
+}
+
+func (cd *CheckpointData) Verify() error {
+	membership := cd.Config.Memberships[0].M
+	// Check if there is enough signatures.
+	n := len(membership)
+	f := (n - 1) / 3
+	if len(cd.Config.Cert) < f+1 {
+		return fmt.Errorf("not enough signatures in certificate: got %d, expected more than %d",
+			len(cd.Config.Cert), f+1)
+	}
+
+	// Check whether all signatures are valid.
+	checkBytes := serializing.CheckpointForSig(
+		t.EpochNr(cd.Config.EpochNr),
+		t.SeqNr(cd.Sn),
+		hash(snapshotForHash(cd)))
+	for nodeID, sig := range cd.Config.Cert {
+		// For each signature in the certificate...
+
+		// Check if the signing node is also in the given membership, thus "authorized" to sign.
+		// TODO: Once nodes are identified by more than their ID
+		//   (e.g., if a separate putlic key is part of their identity), adapt the check accordingly.
+		if _, ok := membership[nodeID]; !ok {
+			return fmt.Errorf("node %v not in membership", nodeID)
+		}
+		// Check if the signature is valid.
+		if err := verifySig(checkBytes, sig.Sig, nodeID); err != nil {
+			return fmt.Errorf("signature verification error (node %v): %w", nodeID, err)
+		}
+	}
+	return nil
 }

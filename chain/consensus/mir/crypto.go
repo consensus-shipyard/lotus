@@ -10,11 +10,14 @@ import (
 	"github.com/filecoin-project/go-address"
 	filcrypto "github.com/filecoin-project/go-state-types/crypto"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
-	"github.com/filecoin-project/mir/pkg/serializing"
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/api"
+	// Required for signature verification support
+	"github.com/filecoin-project/lotus/lib/sigs"
+	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
+	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
 )
 
 var MsgMeta = api.MsgMeta{Type: "mir-message"}
@@ -60,36 +63,19 @@ func (c *CryptoManager) Sign(data [][]byte) ([]byte, error) {
 // Note that RegisterNodeKey must be used to register the node's public key before calling Verify,
 // otherwise Verify will fail.
 func (c *CryptoManager) Verify(data [][]byte, sigBytes []byte, nodeID t.NodeID) error {
-	nodeAddr, err := address.NewFromString(nodeID.Pb())
+	return verifySig(data, sigBytes, nodeID.Pb())
+}
+
+func verifySig(data [][]byte, sigBytes []byte, nodeID string) error {
+	addr, err := address.NewFromString(nodeID)
 	if err != nil {
 		return err
 	}
-	return c.verifySig(data, sigBytes, nodeAddr)
-}
-
-func (c *CryptoManager) verifySig(data [][]byte, sigBytes []byte, addr address.Address) error {
 	var sig filcrypto.Signature
 	if err := sig.UnmarshalBinary(sigBytes); err != nil {
 		return err
 	}
-
-	_, err := c.api.WalletVerify(context.Background(), addr, hash(data), &sig)
-	return err
-}
-
-func (c *CryptoManager) VerifyCheckpointCert(checkpoint *CheckpointData) error {
-	checkBytes := serializing.CheckpointForSig(
-		t.EpochNr(checkpoint.Config.EpochNr),
-		t.SeqNr(checkpoint.Sn),
-		hash(snapshotForHash(checkpoint)))
-
-	for n, sig := range checkpoint.Config.Cert {
-		err := c.Verify(checkBytes, sig.Sig, t.NodeID(n))
-		if err != nil {
-			return xerrors.Errorf("error verifying signature for node %s: %w", n, err)
-		}
-	}
-	return nil
+	return sigs.Verify(&sig, addr, hash(data))
 }
 
 // borrowing from mir/pkg to accept an alternative input to the protobuf

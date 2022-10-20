@@ -39,7 +39,7 @@ type Mir struct {
 	beacon  beacon.Schedule
 	sm      *stmgr.StateManager
 	genesis *types.TipSet
-	cache   *blkCache
+	cache   blkCache
 }
 
 func NewConsensus(
@@ -53,7 +53,7 @@ func NewConsensus(
 		beacon:  b,
 		sm:      sm,
 		genesis: g,
-		cache:   newMirBlkCache(),
+		cache:   newMemBlkCache(),
 	}, nil
 }
 
@@ -161,7 +161,9 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 		}
 		// we should receive all blocks, including the ones that don't include checkpoints
 		// so they are conveniently verified
-		bft.cache.rcvBlock(h)
+		if err := bft.cache.rcvBlock(h); err != nil {
+			return xerrors.Errorf("error receiving block in cache: %w", err)
+		}
 
 		return nil
 	})

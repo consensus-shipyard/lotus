@@ -330,10 +330,7 @@ func (sm *StateManager) pollCheckpoint() *CheckpointData {
 	select {
 	// signalled that we need to wait for a checkpoint
 	case <-sm.waitCheckpoint:
-		fmt.Println(">>>>>>>>> Waiting for checkpoint")
 		ch := <-sm.NextCheckpoint
-		// sanity-check: verify signature. FIXME: remove from here
-		fmt.Println("===== VERIFYING CERTIFICATE: ", sm.MirManager.CryptoManager.VerifyCheckpointCert(ch))
 		return ch
 	default:
 		return nil
