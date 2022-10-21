@@ -45,6 +45,7 @@ type Mir struct {
 func NewConsensus(
 	ctx context.Context,
 	sm *stmgr.StateManager,
+	ds dtypes.MetadataDS,
 	b beacon.Schedule,
 	g chain.Genesis,
 	netName dtypes.NetworkName,
@@ -53,7 +54,7 @@ func NewConsensus(
 		beacon:  b,
 		sm:      sm,
 		genesis: g,
-		cache:   newMemBlkCache(),
+		cache:   newDsBlkCache(ds),
 	}, nil
 }
 
@@ -105,6 +106,7 @@ func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (
 	// bock through pubsub, e.g.
 	// - Check that the epoch is in the expected range.
 	// - Validate that the checkpoint siganture is valid if there is a checkpoint.
+	// - Check that the new checkpoints points to the previous one known.
 	// - Any other Mir-specific check that we can perform.
 	log.Warn("oh oh! No specific block header validation implemented for Mir yet")
 	return "", nil

@@ -8,7 +8,9 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/peer"
 	xerrors "golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -114,7 +116,32 @@ func (sm *StateManager) RestoreState(snapshot []byte, config *commonpb.EpochConf
 	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
 	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
 
-	// TODO FIXME: Return only after we have received a signal by the syncer that we are fully synced.
+	// if mir provides a snapshot
+	if len(snapshot) > 0 {
+		// TODO:
+		// - Get checkpoint from snapshot
+		// - Point to the rest of the validators as peerID to get the tipset.
+		// - Inform incoming block to the syncer like in hello protocol
+		// - Wait for block until the chain head is the one received in the snapshot.
+		ch := Checkpoint{}
+		err := ch.FromBytes(snapshot)
+		if err != nil {
+			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
+		}
+		// - Get the cid of the latest block in the checkpoint and get TipSetKey.
+		for id, addr := range parseMultiAddrFromMembership(sm.memberships[sm.currentEpoch]) {
+			// do not try to fetch from self
+			if id == sm.MirManager.MirNode.ID {
+				continue
+			}
+			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.MirManager.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
+			err = sm.waitNextBlock(ts.Height())
+			if err != nil {
+				return xerrors.Errorf("error waiting for next block %d: %w", ts.Height(), err)
+			}
+
+		}
+	}
 
 	return nil
 }
@@ -282,7 +309,17 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	log.Debugf("Mir generated new checkpoint for height: %d", ch.Height)
 
 	// if we deserialized it correctly, we can persist it directly in the data store.
-	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LasestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
+	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LatestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
+		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+	}
+
+	// persist the protobuf of the snapshot to initialize mir from
+	// snapshot if needed.
+	b, err := proto.Marshal(checkpoint.Snapshot)
+	if err != nil {
+		return xerrors.Errorf("error marshaling stablecheckpoint", err)
+	}
+	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LatestCheckpointPbKey, b); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
 
@@ -328,6 +365,10 @@ func (sm *StateManager) pollCheckpoint() *CheckpointData {
 }
 
 func (sm *StateManager) waitNextBlock(height abi.ChainEpoch) error {
+	// FIXME: DO NOT MERGE UNTIL YOU MAKE THIS TIMEOUT CONFIGURABLE.
+	// REVIEWER, PLEASE FLAG THIS IF YOU SEE THIS COMMENT.
+	// WAITNEXTBLOCK SHOULD NOW BE CALLED WAITFORBLOCK AND TARGET A
+	// HEIGHT, IF THIS IS NOT THE CASE... SHOUT!!! AND GIT BLAME.
 	ctx, cancel := context.WithTimeout(sm.MirManager.ctx, 5*time.Second)
 	defer cancel()
 	out := make(chan bool, 1)
@@ -355,7 +396,7 @@ func (sm *StateManager) waitNextBlock(height abi.ChainEpoch) error {
 func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 	// if we are restarting the peer we may have something in the
 	// mir database, if not let's return the genesis one.
-	chb, err := sm.MirManager.ds.Get(sm.MirManager.ctx, LasestCheckpointKey)
+	chb, err := sm.MirManager.ds.Get(sm.MirManager.ctx, LatestCheckpointKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
 			genesis, err := sm.api.ChainGetGenesis(sm.MirManager.ctx)
@@ -376,4 +417,18 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 		return nil, err
 	}
 	return ch, nil
+}
+
+func parseMultiAddrFromMembership(membership map[t.NodeID]t.NodeAddress) map[t.NodeID]*peer.AddrInfo {
+	parsedAddrInfo := make(map[t.NodeID]*peer.AddrInfo)
+	for nodeID, addr := range membership {
+		info, err := peer.AddrInfoFromP2pAddr(addr)
+		if err != nil {
+			// disregard addresses that are not multiaddr.
+			continue
+		}
+		parsedAddrInfo[nodeID] = info
+	}
+	return parsedAddrInfo
+
 }

@@ -457,6 +457,8 @@ type FullNodeStruct struct {
 
 		SyncCheckpoint func(p0 context.Context, p1 types.TipSetKey) error `perm:"admin"`
 
+		SyncFetchTipSetFromPeer func(p0 context.Context, p1 peer.ID, p2 types.TipSetKey) (*types.TipSet, error) `perm:"read"`
+
 		SyncIncomingBlocks func(p0 context.Context) (<-chan *types.BlockHeader, error) `perm:"read"`
 
 		SyncMarkBad func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
@@ -3100,6 +3102,17 @@ func (s *FullNodeStruct) SyncCheckpoint(p0 context.Context, p1 types.TipSetKey) 
 
 func (s *FullNodeStub) SyncCheckpoint(p0 context.Context, p1 types.TipSetKey) error {
 	return ErrNotSupported
+}
+
+func (s *FullNodeStruct) SyncFetchTipSetFromPeer(p0 context.Context, p1 peer.ID, p2 types.TipSetKey) (*types.TipSet, error) {
+	if s.Internal.SyncFetchTipSetFromPeer == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.SyncFetchTipSetFromPeer(p0, p1, p2)
+}
+
+func (s *FullNodeStub) SyncFetchTipSetFromPeer(p0 context.Context, p1 peer.ID, p2 types.TipSetKey) (*types.TipSet, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *FullNodeStruct) SyncIncomingBlocks(p0 context.Context) (<-chan *types.BlockHeader, error) {

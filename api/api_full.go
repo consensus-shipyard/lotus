@@ -235,6 +235,10 @@ type FullNode interface {
 	// SyncValidateTipset indicates whether the provided tipset is valid or not
 	SyncValidateTipset(ctx context.Context, tsk types.TipSetKey) (bool, error) //perm:read
 
+	// SyncFetchTipSet fetches a tipSet from the specific peer (the same way the hello
+	// protocol would do) and informs the syncer if it advances our view of the chain.
+	SyncFetchTipSetFromPeer(ctx context.Context, p peer.ID, tsk types.TipSetKey) (*types.TipSet, error) //perm:read
+
 	// MethodGroup: Mpool
 	// The Mpool methods are for interacting with the message pool. The message pool
 	// manages all incoming and outgoing 'messages' going over the network.

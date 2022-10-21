@@ -10,6 +10,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
+	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -42,7 +43,8 @@ const (
 )
 
 var (
-	LasestCheckpointKey = datastore.NewKey("mir/latest-check")
+	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
+	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
@@ -177,11 +179,15 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 
 	// TODO FIXME: Start from the latest checkpoint snapshot persisted
 	// by the peer.
-	initialSnapshot := []byte{}
+	initSnapshot, err := m.initialSnapshot()
+	if err != nil {
+		return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
+	}
+
 	smrSystem, err := smr.New(
 		t.NodeID(mirID),
 		h,
-		checkpoint.Genesis(iss.InitialStateSnapshot(initialSnapshot, params.Iss)),
+		checkpoint.Genesis(iss.InitialStateSnapshot(initSnapshot, params.Iss)),
 		m.CryptoManager,
 		m.StateManager,
 		params,
@@ -400,4 +406,15 @@ func (m *Manager) ID() string {
 // segment length.
 func (m *Manager) GetCheckpointPeriod() abi.ChainEpoch {
 	return abi.ChainEpoch(m.segmentLength * len(m.StateManager.memberships[m.StateManager.currentEpoch]))
+}
+
+func (m *Manager) initialSnapshot() ([]byte, error) {
+	b, err := m.ds.Get(m.ctx, LatestCheckpointPbKey)
+	if err != nil {
+		if err == datastore.ErrNotFound {
+			return []byte{}, nil
+		}
+		return nil, xerrors.Errorf("error getting latest snapshot")
+	}
+	return b, nil
 }

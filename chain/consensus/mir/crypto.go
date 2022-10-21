@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/api"
+
 	// Required for signature verification support
 	"github.com/filecoin-project/lotus/lib/sigs"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"

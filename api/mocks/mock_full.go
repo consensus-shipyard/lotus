@@ -3155,6 +3155,21 @@ func (mr *MockFullNodeMockRecorder) SyncCheckpoint(arg0, arg1 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncCheckpoint", reflect.TypeOf((*MockFullNode)(nil).SyncCheckpoint), arg0, arg1)
 }
 
+// SyncFetchTipSetFromPeer mocks base method.
+func (m *MockFullNode) SyncFetchTipSetFromPeer(arg0 context.Context, arg1 peer.ID, arg2 types.TipSetKey) (*types.TipSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncFetchTipSetFromPeer", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*types.TipSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SyncFetchTipSetFromPeer indicates an expected call of SyncFetchTipSetFromPeer.
+func (mr *MockFullNodeMockRecorder) SyncFetchTipSetFromPeer(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncFetchTipSetFromPeer", reflect.TypeOf((*MockFullNode)(nil).SyncFetchTipSetFromPeer), arg0, arg1, arg2)
+}
+
 // SyncIncomingBlocks mocks base method.
 func (m *MockFullNode) SyncIncomingBlocks(arg0 context.Context) (<-chan *types.BlockHeader, error) {
 	m.ctrl.T.Helper()
