@@ -153,6 +153,9 @@ func EnsembleMirNodes(t *testing.T, size int, opts ...interface{}) ([]*TestFullN
 		adaptForMir(t, nodes[i], miners[i])
 	}
 
+	require.Equal(t, size, len(nodes))
+	require.Equal(t, size, len(miners))
+
 	return nodes, miners, ens
 }
 

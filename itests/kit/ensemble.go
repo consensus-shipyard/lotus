@@ -869,6 +869,18 @@ func (n *Ensemble) Connect(from api.Net, to ...api.Net) *Ensemble {
 	return n
 }
 
+// Disconnect disconnects one full from the provided full nodes.
+func (n *Ensemble) Disconnect(from api.Net, to ...api.Net) *Ensemble {
+	addr, err := from.NetAddrsListen(context.Background())
+	require.NoError(n.t, err)
+
+	for _, other := range to {
+		err = other.NetDisconnect(context.Background(), addr.ID)
+		require.NoError(n.t, err)
+	}
+	return n
+}
+
 func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestMiner) []*BlockMiner {
 	ctx := context.Background()
 

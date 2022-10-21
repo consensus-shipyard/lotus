@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -13,7 +14,8 @@ import (
 
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/big"
-	napi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/go-state-types/exitcode"
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -23,7 +25,7 @@ const (
 )
 
 // SubnetHeightCheckForBlocks checks that `n` blocks with correct heights in the subnet will be mined.
-func SubnetHeightCheckForBlocks(ctx context.Context, n int, api napi.FullNode) error {
+func SubnetHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
 	heads, err := api.ChainNotify(ctx)
 	if err != nil {
 		return err
@@ -64,7 +66,20 @@ func SubnetHeightCheckForBlocks(ctx context.Context, n int, api napi.FullNode) e
 	return nil
 }
 
-func WaitForBalance(ctx context.Context, addr addr.Address, balance uint64, api napi.FullNode) error {
+func MirNodesWaitMsg(ctx context.Context, msg cid.Cid, nodes ...*TestFullNode) error {
+	for _, node := range nodes {
+		res, err := node.StateWaitMsg(ctx, msg, 1, lapi.LookbackNoLimit, true)
+		if err != nil {
+			return err
+		}
+		if res.Receipt.ExitCode != exitcode.Ok {
+			return fmt.Errorf("wrong exit code: %v", res.Receipt.ExitCode)
+		}
+	}
+	return nil
+}
+
+func WaitForBalance(ctx context.Context, addr addr.Address, balance uint64, api lapi.FullNode) error {
 	currentBalance, err := api.WalletBalance(ctx, addr)
 	if err != nil {
 		return err
