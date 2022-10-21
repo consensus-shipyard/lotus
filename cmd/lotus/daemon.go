@@ -125,6 +125,10 @@ var DaemonCmd = &cli.Command{
 			Name:  "lite",
 			Usage: "start lotus in lite mode",
 		},
+		&cli.BoolFlag{
+			Name:  "mir-validator",
+			Usage: "start lotus in mir-validator mode",
+		},
 		&cli.StringFlag{
 			Name:  "pprof",
 			Usage: "specify name of file for writing cpu profile to",
@@ -161,6 +165,7 @@ var DaemonCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		isLite := cctx.Bool("lite")
+		isMirValidator := cctx.Bool("mir-validator")
 
 		err := runmetrics.Enable(runmetrics.RunMetricOptions{
 			EnableCPU:    true,
@@ -317,7 +322,7 @@ var DaemonCmd = &cli.Command{
 
 		var api lapi.FullNode
 		stop, err := node.New(ctx,
-			node.FullAPI(&api, node.Lite(isLite)),
+			node.FullAPI(&api, node.Lite(isLite), node.MirValidator(isMirValidator)),
 
 			node.Base(),
 			node.Repo(r),

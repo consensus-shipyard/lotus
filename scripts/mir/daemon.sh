@@ -26,7 +26,7 @@ rm -rf $LOTUS_PATH
 if [ $INDEX -eq 0 ]
 then
 # The first node generates the genesis and the others consume it. 
-    ./lotus daemon --lotus-make-genesis=devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
+    ./lotus daemon --lotus-make-genesis=devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX --mir-validator
 else
-    ./lotus daemon --genesis=devgen.car --bootstrap=false --api=123$INDEX
+    ./lotus daemon --genesis=devgen.car --bootstrap=false --api=123$INDEX --mir-validator
 fi

@@ -10,14 +10,20 @@ import (
 )
 
 func TestCacheLen(t *testing.T) {
-	c := newDsBlkCache(datastore.NewMapDatastore())
+	mc := newDsBlkCache(datastore.NewMapDatastore())
+	dc := newMemBlkCache()
+	testCacheLen(t, mc)
+	testCacheLen(t, dc)
 
+}
+
+func testCacheLen(t *testing.T, c blkCache) {
 	err := c.put(10, cid.NewCidV0(u.Hash([]byte("req1"))))
 	require.NoError(t, err)
 	err = c.put(11, cid.NewCidV0(u.Hash([]byte("req2"))))
 	require.NoError(t, err)
 	require.Equal(t, 2, c.length())
-	err = c.delete(11)
+	err = c.rm(11)
 	require.NoError(t, err)
 	require.Equal(t, 1, c.length())
 }

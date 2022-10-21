@@ -8,11 +8,10 @@ import (
 	"math"
 	"sort"
 
+	abi "github.com/filecoin-project/go-state-types/abi"
 	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	xerrors "golang.org/x/xerrors"
-
-	abi "github.com/filecoin-project/go-state-types/abi"
 )
 
 var _ = xerrors.Errorf
@@ -376,18 +375,8 @@ func (t *CheckpointData) UnmarshalCBOR(r io.Reader) (err error) {
 
 	{
 
-		b, err := cr.ReadByte()
-		if err != nil {
-			return err
-		}
-		if b != cbg.CborNull[0] {
-			if err := cr.UnreadByte(); err != nil {
-				return err
-			}
-			t.Checkpoint = new(Checkpoint)
-			if err := t.Checkpoint.UnmarshalCBOR(cr); err != nil {
-				return xerrors.Errorf("unmarshaling t.Checkpoint pointer: %w", err)
-			}
+		if err := t.Checkpoint.UnmarshalCBOR(cr); err != nil {
+			return xerrors.Errorf("unmarshaling t.Checkpoint: %w", err)
 		}
 
 	}
@@ -409,18 +398,8 @@ func (t *CheckpointData) UnmarshalCBOR(r io.Reader) (err error) {
 
 	{
 
-		b, err := cr.ReadByte()
-		if err != nil {
-			return err
-		}
-		if b != cbg.CborNull[0] {
-			if err := cr.UnreadByte(); err != nil {
-				return err
-			}
-			t.Config = new(EpochConfig)
-			if err := t.Config.UnmarshalCBOR(cr); err != nil {
-				return xerrors.Errorf("unmarshaling t.Config pointer: %w", err)
-			}
+		if err := t.Config.UnmarshalCBOR(cr); err != nil {
+			return xerrors.Errorf("unmarshaling t.Config: %w", err)
 		}
 
 	}

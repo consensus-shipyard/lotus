@@ -161,6 +161,7 @@ func (c *memBlkCache) length() int {
 }
 
 func (c *memBlkCache) rcvCheckpoint(ch *CheckpointData) error {
+	fmt.Println("===== CACHE:", c.m)
 	return rcvCheckpoint(c, ch)
 }
 

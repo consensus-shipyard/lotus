@@ -10,7 +10,7 @@ import (
 	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/serializing"
 	t "github.com/filecoin-project/mir/pkg/types"
 
@@ -125,9 +125,9 @@ func (ch *Checkpoint) Cid() (cid.Cid, error) {
 }
 
 type CheckpointData struct {
-	Checkpoint *Checkpoint // checkpoint data
+	Checkpoint Checkpoint // checkpoint data
 	Sn         uint64
-	Config     *EpochConfig // mir config information
+	Config     EpochConfig // mir config information
 }
 
 type EpochConfig struct {
@@ -141,7 +141,7 @@ type CertSig struct {
 	Sig []byte
 }
 
-func NewCertSigFromPb(ch *checkpointpb.StableCheckpoint) map[string]CertSig {
+func NewCertSigFromPb(ch *checkpoint.StableCheckpoint) map[string]CertSig {
 	cert := make(map[string]CertSig)
 	for k, v := range ch.Cert {
 		cert[k] = CertSig{v}
@@ -172,7 +172,7 @@ func membershipToMapSlice(m []Membership) []map[string]string {
 	return out
 }
 
-func (m *Manager) NewEpochConfigFromPb(ch *checkpointpb.StableCheckpoint) *EpochConfig {
+func (m *Manager) NewEpochConfigFromPb(ch *checkpoint.StableCheckpoint) *EpochConfig {
 	ms := make([]Membership, len(ch.Snapshot.Configuration.Memberships))
 	for k, v := range ch.Snapshot.Configuration.Memberships {
 		mmap := make(map[string]MembershipInfo)
@@ -213,15 +213,22 @@ func CheckpointFromVRFProof(t *ltypes.Ticket) (*CheckpointData, error) {
 }
 
 func (cd CheckpointData) ConfigAsElectionProof() (*ltypes.ElectionProof, error) {
-	// passing config as election proof
-	// TODO: We can remove some redundancy and potentially reduce the size of the
-	// block header by uncommenting the following line.
-	// cd.Config.Membership = nil
+	// deleting membership to reduce the size of the proof
+	// we are only interested in the cert here.
+	cd.Config.Memberships = nil
 	buf := new(bytes.Buffer)
 	if err := cd.Config.MarshalCBOR(buf); err != nil {
 		return nil, xerrors.Errorf("error serializing checkpoint data: %w", err)
 	}
 	return &ltypes.ElectionProof{WinCount: 0, VRFProof: buf.Bytes()}, nil
+}
+
+func ConfigFromElectionProof(t *ltypes.ElectionProof) (*EpochConfig, error) {
+	cfg := &EpochConfig{}
+	if err := cfg.UnmarshalCBOR(bytes.NewReader(t.VRFProof)); err != nil {
+		return nil, xerrors.Errorf("error getting checkpoint config from ElectionProof: %w", err)
+	}
+	return cfg, nil
 }
 
 func (cd *CheckpointData) Verify() error {

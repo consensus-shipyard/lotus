@@ -132,7 +132,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 					log.With("epoch", nextHeight).Errorw("error getting eproof from checkpoint:", "error", err)
 					continue
 				}
-				log.Infof("Including checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
+				log.Infof("Including Mir checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
 			}
 
 			bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{

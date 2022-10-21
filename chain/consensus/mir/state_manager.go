@@ -2,13 +2,16 @@ package mir
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"time"
 
 	cid "github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	xerrors "golang.org/x/xerrors"
 
-	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/commonpb"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
@@ -39,16 +42,6 @@ type StateManager struct {
 	// For each epoch number, stores the corresponding membership.
 	memberships map[t.EpochNr]map[t.NodeID]t.NodeAddress
 
-	// Channel to send batches to Lotus.
-	NextBatch chan *Batch
-
-	// Channel to send checkpoints to Lotus
-	NextCheckpoint chan *CheckpointData
-
-	// Channel to signal that we need to wait for a checkpoint
-	// before proposing the next block
-	waitCheckpoint chan bool
-
 	// Channel to send a membership.
 	NewMembership chan map[t.NodeID]t.NodeAddress
 
@@ -57,6 +50,12 @@ type StateManager struct {
 	reconfigurationVotes map[t.EpochNr]map[string]int
 
 	prevCheckpoint ParentMeta
+
+	// Channel to send batches to Lotus.
+	NextBatch chan *Batch
+
+	// Channel to send checkpoints to Lotus
+	NextCheckpoint chan *CheckpointData
 }
 
 func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
@@ -74,7 +73,6 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 	sm := StateManager{
 		NextBatch:            make(chan *Batch),
 		NextCheckpoint:       make(chan *CheckpointData, 1),
-		waitCheckpoint:       make(chan bool, 1),
 		NewMembership:        make(chan map[t.NodeID]t.NodeAddress, 1),
 		MirManager:           m,
 		memberships:          memberships,
@@ -104,6 +102,7 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 // RestoreState expects a checkpoint and only returns when it is fully sync. We can have here
 // WaitSync function. It should also recover the configuration.
 func (sm *StateManager) RestoreState(snapshot []byte, config *commonpb.EpochConfig) error {
+	fmt.Println("====XXXXX== RESTORE STATE BEING CALLED")
 	sm.currentEpoch = t.EpochNr(config.EpochNr)
 	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
 
@@ -137,6 +136,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		}
 	}
 
+	log.Debug("Sending new batch to assemble a lotus block")
 	// Send a batch to the Lotus node.
 	sm.NextBatch <- &Batch{
 		Messages:   msgs,
@@ -218,20 +218,13 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 	return true, nil
 }
 
-// TODO: Snapshot is called by Mir to get the content for the state
-// from the application included in a checkpoint.
-// The snapshot is assigned the height of the next coming block, or the number
-// of blocks is committing.
-// Thus, Snapshot for height n, includes blocks 0... n-1.
-// This snapshot info is what is included serialized in the checkpoint
-// This data structure should include height, cid, BlockHash, ParentHash,
-// and any other information used to validate blocks and restore the state.
-//
-// In the mir-validator syncing process, for a checkpoint period of 4 blocks, we
-// deliver without checkpoints block 0,1,2,3 and then we wait for a checkpoint
-// and include it in block 4. When block 4 is delivered with the checkpoint, we
-// can verify blocks 0,1,2,3 and execute them.
+// Snapshot is called by Mir every time a checkpoint period has
+// passed and is time to create a new checkpoint. This function waits
+// for the latest batch before the checkpoint to be synced and committed
+// in our local state, and it collects the cids for all the blocks verified
+// by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
+	// return genesis checkpoint for the first snapshot.
 	if sm.currentEpoch == 0 {
 		ch, err := sm.firstEpochCheckpoint()
 		if err != nil {
@@ -240,56 +233,53 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		return ch.Bytes()
 	}
 
-	// signal to wait for next checkpoint
-	sm.waitCheckpoint <- true
-
 	nextHeight := sm.prevCheckpoint.Height + sm.MirManager.GetCheckpointPeriod()
+	log.Debugf("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
 	ch := Checkpoint{
 		Height:    nextHeight,
 		Parent:    sm.prevCheckpoint,
 		BlockCids: make([]cid.Cid, 0),
 	}
-	fmt.Println(">>>>>>>>>>>>>>>>>> Requesting snapshot for epoch", sm.currentEpoch)
-
-	// return genesis checkpoint for the first snapshot.
 
 	// put blocks in descending order.
 	i := nextHeight - 1
+
+	// wait the last block to sync for the snapshot before
+	// populating snapshot.
+	log.Debugf("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
+	err := sm.waitNextBlock(i)
+	if err != nil {
+		return nil, xerrors.Errorf("error waiting for next block %d: %w", i, err)
+	}
+
 	for i >= sm.prevCheckpoint.Height {
 		ts, err := sm.api.ChainGetTipSetByHeight(sm.MirManager.ctx, i, types.EmptyTSK)
 		if err != nil {
 			return nil, xerrors.Errorf("error getting tipset of height: %d: %w", i, err)
 		}
-		fmt.Println(">>>>>>>>>>>>>>>>>> Getting cid for block", i)
-		fmt.Println(">>>> Getting blocks cid for height", i, ts.Blocks()[0].Cid())
 		// In Mir tipsets have a single block, so we can access directly the block for
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
 		i--
+		log.Debugf("Getting Cid for block %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
+	log.Debugf("Returning snapshot for epoch: %d", ch.Height)
 	return ch.Bytes()
 }
 
-// This is called after check_period blocks have been produced, Mir creates a new
-// checkpoint from these blocks and calls this. It will call Checkpoint immediately
-// after snapshot to provide you with the certificate before creating new blocks.
-// StableCheckpoint includes the snapshot agreed upon by all validators and the corresponding
-// certificate.
-//
-// To verify a checkpoint we need:
-// Instance of the cryptomodule and verify the signatures of the certificate.
-// This can be used for the consensus validation.
-// Verify that there are f+1 signature in the certificate.
-// From there, we iterate and verify all signatures.
-// 3f+1 number of nodes to tolerate f failures. f+1 for the signature to be correct.
-func (sm *StateManager) Checkpoint(checkpoint *checkpointpb.StableCheckpoint) error {
+// Checkpoint is triggered by Mir when the committee agrees on the next checkpoint.
+// We persist the checkpoint locally so we can restore from it after a restart
+// or a crash and delivers it to the mining process to include it in the next
+// block
+func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) error {
 	// deserialize checkpoint data from Mir checkpoint to check that is the
 	// right format.
 	ch := &Checkpoint{}
 	if err := ch.FromBytes(checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error getting checkpoint data from mir checkpoint: %w", err)
 	}
+	log.Debugf("Mir generated new checkpoint for height: %d", ch.Height)
 
 	// if we deserialized it correctly, we can persist it directly in the data store.
 	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LasestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
@@ -310,7 +300,8 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpointpb.StableCheckpoint) er
 
 	// Send the checkpoint to Lotus and handle it there
 	config := sm.MirManager.NewEpochConfigFromPb(checkpoint)
-	sm.NextCheckpoint <- &CheckpointData{ch, checkpoint.Sn, config}
+	log.Debug("Sending checkpoint to mining process to include in block")
+	sm.NextCheckpoint <- &CheckpointData{*ch, checkpoint.Sn, *config}
 	return nil
 }
 
@@ -328,12 +319,36 @@ func weakQuorum(n int) int {
 
 func (sm *StateManager) pollCheckpoint() *CheckpointData {
 	select {
-	// signalled that we need to wait for a checkpoint
-	case <-sm.waitCheckpoint:
-		ch := <-sm.NextCheckpoint
+	case ch := <-sm.NextCheckpoint:
+		log.Debugf("Polling checkpoint successful. Sending checkpoint for inclusion in block.")
 		return ch
 	default:
 		return nil
+	}
+}
+
+func (sm *StateManager) waitNextBlock(height abi.ChainEpoch) error {
+	ctx, cancel := context.WithTimeout(sm.MirManager.ctx, 5*time.Second)
+	defer cancel()
+	out := make(chan bool, 1)
+	go func() {
+		head := abi.ChainEpoch(0)
+		for head != height {
+			base, err := sm.api.ChainHead(sm.MirManager.ctx)
+			if err != nil {
+				log.Errorf("failed to get chain head: %w", err)
+				return
+			}
+			head = base.Height()
+		}
+		out <- true
+	}()
+
+	select {
+	case <-out:
+		return nil
+	case <-ctx.Done():
+		return xerrors.Errorf("target block for checkpoint not reached after deadline")
 	}
 }
 
@@ -349,7 +364,7 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 			}
 			// return genesis checkpoint
 			return &Checkpoint{
-				Height:    0,
+				Height:    1,                                                     // we assume the genesis has been verified, we start from 1
 				Parent:    ParentMeta{Height: 0, Cid: genesis.Blocks()[0].Cid()}, // genesis checkpoint
 				BlockCids: make([]cid.Cid, 0),
 			}, nil

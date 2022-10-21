@@ -164,6 +164,24 @@ var ChainNode = Options(
 		Override(HandleIncomingMessagesKey, modules.HandleIncomingMessages),
 		Override(HandleIncomingBlocksKey, modules.HandleIncomingBlocks),
 	),
+
+	// Mir validators don't handle incoming blocks through pubsub.
+	// all that is handled by Mir.
+	ApplyIf(isMirvalidator,
+		Override(new(messagepool.Provider), messagepool.NewProvider),
+		Override(new(messagesigner.MpoolNonceAPI), From(new(*messagepool.MessagePool))),
+		Override(new(full.ChainModuleAPI), From(new(full.ChainModule))),
+		Override(new(full.GasModuleAPI), From(new(full.GasModule))),
+		Override(new(full.MpoolModuleAPI), From(new(full.MpoolModule))),
+		Override(new(full.StateModuleAPI), From(new(full.StateModule))),
+		Override(new(stmgr.StateManagerAPI), From(new(*stmgr.StateManager))),
+
+		Override(RunHelloKey, modules.RunHello),
+		Override(RunChainExchangeKey, modules.RunChainExchange),
+		Override(RunPeerMgrKey, modules.RunPeerMgr),
+		Override(HandleIncomingMessagesKey, modules.HandleIncomingMessages),
+		// Override(HandleIncomingBlocksKey, modules.HandleIncomingBlocks),
+	),
 )
 
 func ConfigFullNode(c interface{}) Option {
@@ -244,6 +262,13 @@ type FullOption = Option
 func Lite(enable bool) FullOption {
 	return func(s *Settings) error {
 		s.Lite = enable
+		return nil
+	}
+}
+
+func MirValidator(enable bool) FullOption {
+	return func(s *Settings) error {
+		s.MirValidator = enable
 		return nil
 	}
 }

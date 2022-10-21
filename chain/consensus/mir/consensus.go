@@ -101,7 +101,11 @@ func (bft *Mir) CreateBlock(ctx context.Context, w lapi.Wallet, bt *lapi.BlockTe
 }
 
 func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (rejectReason string, err error) {
-	// TODO: This is missing.
+	// TODO: Perform basic checks that can be performed when a peer receives a new
+	// bock through pubsub, e.g.
+	// - Check that the epoch is in the expected range.
+	// - Validate that the checkpoint siganture is valid if there is a checkpoint.
+	// - Any other Mir-specific check that we can perform.
 	log.Warn("oh oh! No specific block header validation implemented for Mir yet")
 	return "", nil
 }
@@ -149,20 +153,35 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 
 	checkpointChk := async.Err(func() error {
 		if h.ElectionProof.VRFProof != nil {
-			// TODO: Get cert from election proof.
-			// TODO: Verify the checkpoint
 			ch, err := CheckpointFromVRFProof(h.Ticket)
 			if err != nil {
 				return xerrors.Errorf("error getting checkpoint from ticket: %w", err)
+			}
+			cfg, err := ConfigFromElectionProof(h.ElectionProof)
+			if err != nil {
+				return xerrors.Errorf("error getting checkpoint config from election proof: %w", err)
+			}
+			ch.Config.Cert = cfg.Cert
+			// verify checkpoint
+			if err := ch.Verify(); err != nil {
+				return xerrors.Errorf("error verifying checkpoint signature: %w", err)
 			}
 			if err := bft.cache.rcvCheckpoint(ch); err != nil {
 				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
 			}
 		}
-		// we should receive all blocks, including the ones that don't include checkpoints
-		// so they are conveniently verified
-		if err := bft.cache.rcvBlock(h); err != nil {
-			return xerrors.Errorf("error receiving block in cache: %w", err)
+
+		// the genesis block can be considered as verified already.
+		if h.Height != 0 {
+			// we should receive all blocks, including the ones that don't include checkpoints
+			// so they are conveniently verified
+			// TODO: There is an attack surface here, what if a malicious peer sends two
+			// blocks for the same epoch? This needs to be handled here in rcvBlock
+			// so a new block for the same epoch doesn't overwrite or mess up with our view
+			// of the chain.
+			if err := bft.cache.rcvBlock(h); err != nil {
+				return xerrors.Errorf("error receiving block in cache: %w", err)
+			}
 		}
 
 		return nil

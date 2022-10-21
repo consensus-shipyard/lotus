@@ -14,8 +14,10 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/eventlog"
+	"github.com/filecoin-project/mir/pkg/iss"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
@@ -123,14 +125,14 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	logger := newManagerLogger()
 
 	// Create Mir modules.
-	netTransport, err := mirlibp2p.NewTransport(h, t.NodeID(mirID), logger)
+	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport: %w", err)
 	}
 	if err := netTransport.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
-	netTransport.Connect(ctx, initialMembership)
+	netTransport.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
@@ -173,10 +175,13 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	}
 	params.Iss.SegmentLength = m.segmentLength
 
+	// TODO FIXME: Start from the latest checkpoint snapshot persisted
+	// by the peer.
+	initialSnapshot := []byte{}
 	smrSystem, err := smr.New(
 		t.NodeID(mirID),
 		h,
-		initialMembership,
+		checkpoint.Genesis(iss.InitialStateSnapshot(initialSnapshot, params.Iss)),
 		m.CryptoManager,
 		m.StateManager,
 		params,
@@ -189,7 +194,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		WithModule("mempool", mpool).
 		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
-	if err := smrSystem.Start(ctx); err != nil {
+	if err := smrSystem.Start(); err != nil {
 		return nil, fmt.Errorf("could not start SMR system: %w", err)
 	}
 
@@ -220,6 +225,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 // Start starts the manager.
 func (m *Manager) Start(ctx context.Context) chan error {
 	log.Infof("Mir manager %s starting", m.MirID)
+	log.Info("Mir initial checkpointing period: ", m.GetCheckpointPeriod())
 
 	errChan := make(chan error, 1)
 
@@ -260,7 +266,7 @@ func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.N
 		return fmt.Errorf("empty validator set")
 	}
 
-	go m.Net.Connect(ctx, nodes)
+	go m.Net.Connect(nodes)
 	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
 	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
 	// (as there is where we have the config information). This functions should be called
