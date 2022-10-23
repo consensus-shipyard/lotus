@@ -24,7 +24,8 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	// t.Run("testMirMiningTwoNodes", ts.testMirMiningTwoNodes)
 	// t.Run("testMirMiningFourNodes", ts.testMirMiningFourNodes)
 	t.Run("testMirMiningFourNodesSending", ts.testMirMiningFourNodesSending)
-	// t.Run("testMirMiningFourNodesWithOneFaulty", ts.testMirMiningFourNodesWithOneFaulty)
+	// t.Run("testMirMiningFourNodesWithOneOmission", ts.testMirMiningFourNodesWithOneOmissionNode)
+	// t.Run("testMirMiningFourNodesWithOneFaulty", ts.testMirMiningFourNodesWithOneFaultyNode)
 }
 
 type eudicoConsensusSuite struct {
@@ -146,7 +147,7 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodesSending(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (ts *eudicoConsensusSuite) testMirMiningFourNodesWithOneFaulty(t *testing.T) {
+func (ts *eudicoConsensusSuite) testMirMiningFourNodesWithOneOmissionNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
@@ -173,6 +174,43 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodesWithOneFaulty(t *testing.T
 	ens.Disconnect(nodes[0], nodes[1], nodes[2], nodes[3])
 
 	for _, n := range nodes[1:] {
+		err := kit.SubnetHeightCheckForBlocks(ctx, 10, n)
+		require.NoError(t, err)
+	}
+
+}
+
+func (ts *eudicoConsensusSuite) testMirMiningFourNodesWithOneFaultyNode(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+	}()
+
+	faultyCtx, crashNode := context.WithCancel(ctx)
+
+	faultyNode, faultyMiner, faultyEns := kit.EnsembleMinimalMir(t, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, 3, ts.opts...)
+
+	for i, n := range append(nodes, faultyNode) {
+		p, err := n.NetPeers(ctx)
+		require.NoError(t, err)
+		require.Empty(t, p, "node has peers", "nodeID", i)
+	}
+
+	ens.Connect(faultyNode, nodes[0], nodes[1], nodes[2])
+
+	faultyEns.BeginMirMining(faultyCtx, faultyMiner)
+	ens.BeginMirMining(ctx, miners...)
+
+	for _, n := range append(nodes, faultyNode) {
+		err := kit.SubnetHeightCheckForBlocks(ctx, 10, n)
+		require.NoError(t, err)
+	}
+
+	crashNode()
+
+	for _, n := range nodes {
 		err := kit.SubnetHeightCheckForBlocks(ctx, 10, n)
 		require.NoError(t, err)
 	}
