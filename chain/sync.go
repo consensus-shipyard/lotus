@@ -1245,3 +1245,23 @@ func (syncer *Syncer) CheckBadBlockCache(blk cid.Cid) (string, bool) {
 	bbr, ok := syncer.bad.Has(blk)
 	return bbr.String(), ok
 }
+
+// FetchTipSet get a tipSet from the specific peer if not present locally (the same way the hello
+// protocol would do) and informs the syncer if it advances our view of the chain.
+func (syncer *Syncer) FetchTipSetFromPeer(ctx context.Context, p peer.ID, tsk types.TipSetKey) (*store.FullTipSet, error) {
+	ts, err := syncer.FetchTipSet(context.Background(), p, tsk)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to fetch tipset from peer during hello: %+v", err)
+	}
+
+	// if it advances our view of the change inform the syncer.
+	heaviest := syncer.ChainStore().GetHeaviestTipSet()
+	if ts.TipSet().Height() > heaviest.Height() {
+		syncer.connmgr.TagPeer(p, "fcpeer", 10)
+
+		// don't bother informing about genesis
+		log.Debugf("Got new tipset through ForceSync: %s from %s", ts.Cids(), p)
+		syncer.InformNewHead(p, ts)
+	}
+	return ts, nil
+}

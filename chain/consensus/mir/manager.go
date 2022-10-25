@@ -4,19 +4,26 @@ package mir
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"fmt"
 	"os"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/eventlog"
+	"github.com/filecoin-project/mir/pkg/iss"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
@@ -28,10 +35,21 @@ import (
 
 const (
 	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
+
+	// CheckpointPeriod is a desired checkpoint period
+	// TODO: Pass it as an Option to NewManager. Allow NewManager to receive cfg as an option also.
+	CheckpointPeriod = 4
+)
+
+var (
+	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
+	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
+	ctx context.Context
+
 	// Lotus related types.
 	NetName dtypes.NetworkName
 	Addr    address.Address
@@ -46,19 +64,27 @@ type Manager struct {
 	StateManager  *StateManager
 	interceptor   *eventlog.Recorder
 	ToMir         chan chan []*mirproto.Request
+	segmentLength int // segment length determinint the checkpoint period.
+	ds            datastore.Batching
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
 	reconfigurationNonce uint64
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membership interface{}) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	initialValidatorSet, err := GetValidators(membership)
+	// initialize mir datastore
+	ds, err := levelDs(cfg.DatastorePath, false)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing mir datastore: %w", err)
+	}
+
+	initialValidatorSet, err := GetValidators(cfg.MembershipCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
@@ -100,14 +126,14 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	logger := newManagerLogger()
 
 	// Create Mir modules.
-	netTransport, err := mirlibp2p.NewTransport(h, t.NodeID(mirID), logger)
+	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport: %w", err)
 	}
 	if err := netTransport.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
-	netTransport.Connect(ctx, initialMembership)
+	netTransport.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
@@ -118,6 +144,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	var interceptor *eventlog.Recorder
 
 	m := Manager{
+		ctx:                 ctx,
 		Addr:                addr,
 		NetName:             netName,
 		Pool:                fifo.New(),
@@ -125,11 +152,15 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		interceptor:         interceptor,
 		CryptoManager:       cryptoManager,
 		Net:                 netTransport,
+		ds:                  ds,
 		InitialValidatorSet: initialValidatorSet,
 		ToMir:               make(chan chan []*mirproto.Request),
 	}
 
-	m.StateManager = NewStateManager(initialMembership, &m)
+	m.StateManager, err = NewStateManager(initialMembership, &m, api)
+	if err != nil {
+		return nil, fmt.Errorf("error starting mir state manager: %w", err)
+	}
 
 	mpool := pool.NewModule(
 		m.ToMir,
@@ -137,24 +168,42 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		pool.DefaultModuleParams(),
 	)
 
+	params := smr.DefaultParams(initialMembership)
+	// configure SegmentLength for specific checkpoint period.
+	m.segmentLength, err = segmentForCheckpointPeriod(CheckpointPeriod, initialMembership)
+	if err != nil {
+		return nil, fmt.Errorf("error getting segment lengt: %w", err)
+	}
+	params.Iss.SegmentLength = m.segmentLength
+
+	// TODO FIXME: Start from the latest checkpoint snapshot persisted
+	// by the peer.
+	initSnapshot, err := m.initialSnapshot()
+	if err != nil {
+		return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
+	}
+
 	smrSystem, err := smr.New(
 		t.NodeID(mirID),
 		h,
-		initialMembership,
+		checkpoint.Genesis(iss.InitialStateSnapshot(initSnapshot, params.Iss)),
 		m.CryptoManager,
 		m.StateManager,
+		params,
 		logger,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create SMR system: %w", err)
 	}
-	smrSystem = smrSystem.WithModule("mempool", mpool)
+	smrSystem = smrSystem.
+		WithModule("mempool", mpool).
+		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
-	if err := smrSystem.Start(ctx); err != nil {
+	if err := smrSystem.Start(); err != nil {
 		return nil, fmt.Errorf("could not start SMR system: %w", err)
 	}
 
-	cfg := mir.DefaultNodeConfig().WithLogger(logger)
+	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
 
 	interceptorOutput := os.Getenv(InterceptorOutputEnv)
 	if interceptorOutput != "" {
@@ -167,9 +216,9 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		if err != nil {
 			return nil, fmt.Errorf("failed to create interceptor: %w", err)
 		}
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), cfg, smrSystem.Modules(), nil, m.interceptor)
+		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
 	} else {
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), cfg, smrSystem.Modules(), nil, nil)
+		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, nil)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Mir node: %w", err)
@@ -181,6 +230,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 // Start starts the manager.
 func (m *Manager) Start(ctx context.Context) chan error {
 	log.Infof("Mir manager %s starting", m.MirID)
+	log.Info("Mir initial checkpointing period: ", m.GetCheckpointPeriod())
 
 	errChan := make(chan error, 1)
 
@@ -221,7 +271,7 @@ func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.N
 		return fmt.Errorf("empty validator set")
 	}
 
-	go m.Net.Connect(ctx, nodes)
+	go m.Net.Connect(nodes)
 	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
 	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
 	// (as there is where we have the config information). This functions should be called
@@ -347,4 +397,23 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 // ID prints Manager ID.
 func (m *Manager) ID() string {
 	return m.Addr.String()
+}
+
+// GetCheckpointPeriod returns the checkpoint period for the current epoch.
+//
+// The checkpoint period is computed as the number of validator times the
+// segment length.
+func (m *Manager) GetCheckpointPeriod() abi.ChainEpoch {
+	return abi.ChainEpoch(m.segmentLength * len(m.StateManager.memberships[m.StateManager.currentEpoch]))
+}
+
+func (m *Manager) initialSnapshot() ([]byte, error) {
+	b, err := m.ds.Get(m.ctx, LatestCheckpointPbKey)
+	if err != nil {
+		if err == datastore.ErrNotFound {
+			return []byte{}, nil
+		}
+		return nil, xerrors.Errorf("error getting latest snapshot")
+	}
+	return b, nil
 }

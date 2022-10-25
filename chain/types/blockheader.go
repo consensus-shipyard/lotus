@@ -71,6 +71,23 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 		return nil, err
 	}
 
+	if build.Consensus == build.Mir {
+		// make a copy
+		bblk := *blk
+		cidData, err := bblk.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		// for mir ElectionProof gets out of the
+		// Cid computation.
+		c, err := abi.CidBuilder.Sum(cidData)
+		if err != nil {
+			return nil, err
+		}
+
+		return block.NewBlockWithCid(data, c)
+	}
+
 	c, err := abi.CidBuilder.Sum(data)
 	if err != nil {
 		return nil, err

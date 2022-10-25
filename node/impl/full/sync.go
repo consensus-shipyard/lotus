@@ -6,6 +6,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
@@ -162,4 +163,13 @@ func (a *SyncAPI) SyncValidateTipset(ctx context.Context, tsk types.TipSetKey) (
 	}
 
 	return true, nil
+}
+
+func (a *SyncAPI) SyncFetchTipSetFromPeer(ctx context.Context, p peer.ID, tsk types.TipSetKey) (*types.TipSet, error) {
+	fts, err := a.Syncer.FetchTipSetFromPeer(ctx, p, tsk)
+	if err != nil {
+		return nil, err
+	}
+
+	return fts.TipSet(), nil
 }

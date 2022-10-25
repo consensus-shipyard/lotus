@@ -141,9 +141,10 @@ type Settings struct {
 
 	nodeType repo.RepoType
 
-	Base   bool // Base option applied
-	Config bool // Config option applied
-	Lite   bool // Start node in "lite" mode
+	Base         bool // Base option applied
+	Config       bool // Config option applied
+	Lite         bool // Start node in "lite" mode
+	MirValidator bool // Start full node for mir validator.
 
 	enableLibp2pNode bool
 }
@@ -233,10 +234,13 @@ func IsType(t repo.RepoType) func(s *Settings) bool {
 
 func isFullOrLiteNode(s *Settings) bool { return s.nodeType == repo.FullNode }
 func isFullNode(s *Settings) bool {
-	return s.nodeType == repo.FullNode && !s.Lite
+	return s.nodeType == repo.FullNode && !s.Lite && !s.MirValidator
 }
 func isLiteNode(s *Settings) bool {
 	return s.nodeType == repo.FullNode && s.Lite
+}
+func isMirvalidator(s *Settings) bool {
+	return s.nodeType == repo.FullNode && s.MirValidator
 }
 
 func Base() Option {

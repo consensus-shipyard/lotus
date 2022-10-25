@@ -226,6 +226,7 @@
   * [SyncBlock](#SyncBlock)
   * [SyncCheckBad](#SyncCheckBad)
   * [SyncCheckpoint](#SyncCheckpoint)
+  * [SyncFetchTipSetFromPeer](#SyncFetchTipSetFromPeer)
   * [SyncIncomingBlocks](#SyncIncomingBlocks)
   * [SyncMarkBad](#SyncMarkBad)
   * [SyncState](#SyncState)
@@ -7432,6 +7433,37 @@ Inputs:
 ```
 
 Response: `{}`
+
+### SyncFetchTipSetFromPeer
+SyncFetchTipSet fetches a tipSet from the specific peer (the same way the hello
+protocol would do) and informs the syncer if it advances our view of the chain.
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf",
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ]
+]
+```
+
+Response:
+```json
+{
+  "Cids": null,
+  "Blocks": null,
+  "Height": 0
+}
+```
 
 ### SyncIncomingBlocks
 SyncIncomingBlocks returns a channel streaming incoming, potentially not

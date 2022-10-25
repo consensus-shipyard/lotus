@@ -5,12 +5,20 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	xerrors "golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-address"
 	filcrypto "github.com/filecoin-project/go-state-types/crypto"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	t "github.com/filecoin-project/mir/pkg/types"
+	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/api"
+
+	// Required for signature verification support
+	"github.com/filecoin-project/lotus/lib/sigs"
+	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
+	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
 )
 
 var MsgMeta = api.MsgMeta{Type: "mir-message"}
@@ -56,21 +64,48 @@ func (c *CryptoManager) Sign(data [][]byte) ([]byte, error) {
 // Note that RegisterNodeKey must be used to register the node's public key before calling Verify,
 // otherwise Verify will fail.
 func (c *CryptoManager) Verify(data [][]byte, sigBytes []byte, nodeID t.NodeID) error {
-	nodeAddr, err := address.NewFromString(nodeID.Pb())
+	return verifySig(data, sigBytes, nodeID.Pb())
+}
+
+func verifySig(data [][]byte, sigBytes []byte, nodeID string) error {
+	addr, err := address.NewFromString(nodeID)
 	if err != nil {
 		return err
 	}
-	return c.verifySig(data, sigBytes, nodeAddr)
-}
-
-func (c *CryptoManager) verifySig(data [][]byte, sigBytes []byte, addr address.Address) error {
 	var sig filcrypto.Signature
 	if err := sig.UnmarshalBinary(sigBytes); err != nil {
 		return err
 	}
+	return sigs.Verify(&sig, addr, hash(data))
+}
 
-	_, err := c.api.WalletVerify(context.Background(), addr, hash(data), &sig)
-	return err
+// borrowing from mir/pkg to accept an alternative input to the protobuf
+func snapshotForHash(ch *CheckpointData) [][]byte {
+
+	// we should add a sanity-check before this function to ensure that
+	// this can't fail, as we are disregarding the error.
+	b, err := ch.Checkpoint.Bytes()
+	if err != nil {
+		xerrors.Errorf("error computing snapshotForHash: %w", err)
+	}
+
+	// Append epoch and app data
+	data := [][]byte{
+		t.EpochNr(ch.Config.EpochNr).Bytes(),
+		b,
+	}
+
+	// Append membership.
+	// Each string representing an ID and an address is explicitly terminated with a zero byte.
+	// This ensures that the last byte of an ID and the first byte of an address are not interchangeable.
+	for _, membership := range membershipToMapSlice(ch.Config.Memberships) {
+		maputil.IterateSorted(membership, func(id string, addr string) bool {
+			data = append(data, []byte(id), []byte{0}, []byte(addr), []byte{0})
+			return true
+		})
+	}
+
+	return data
 }
 
 func hash(data [][]byte) []byte {

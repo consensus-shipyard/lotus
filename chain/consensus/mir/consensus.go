@@ -4,7 +4,6 @@
 package mir
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/lib/async"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
@@ -39,11 +39,13 @@ type Mir struct {
 	beacon  beacon.Schedule
 	sm      *stmgr.StateManager
 	genesis *types.TipSet
+	cache   blkCache
 }
 
 func NewConsensus(
 	ctx context.Context,
 	sm *stmgr.StateManager,
+	ds dtypes.MetadataDS,
 	b beacon.Schedule,
 	g chain.Genesis,
 	netName dtypes.NetworkName,
@@ -52,6 +54,7 @@ func NewConsensus(
 		beacon:  b,
 		sm:      sm,
 		genesis: g,
+		cache:   newDsBlkCache(ds),
 	}, nil
 }
 
@@ -99,7 +102,12 @@ func (bft *Mir) CreateBlock(ctx context.Context, w lapi.Wallet, bt *lapi.BlockTe
 }
 
 func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (rejectReason string, err error) {
-	// TODO: This is missing.
+	// TODO: Perform basic checks that can be performed when a peer receives a new
+	// bock through pubsub, e.g.
+	// - Check that the epoch is in the expected range.
+	// - Validate that the checkpoint siganture is valid if there is a checkpoint.
+	// - Check that the new checkpoints points to the previous one known.
+	// - Any other Mir-specific check that we can perform.
 	log.Warn("oh oh! No specific block header validation implemented for Mir yet")
 	return "", nil
 }
@@ -145,18 +153,65 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			b.Header.ParentWeight, pweight)
 	}
 
-	return consensus.RunAsyncChecks(ctx, consensus.CommonBlkChecks(ctx, bft.sm, bft.sm.ChainStore(), b, baseTs))
+	checkpointChk := async.Err(func() error {
+		if h.ElectionProof.VRFProof != nil {
+			ch, err := CheckpointFromVRFProof(h.Ticket)
+			if err != nil {
+				return xerrors.Errorf("error getting checkpoint from ticket: %w", err)
+			}
+			cfg, err := ConfigFromElectionProof(h.ElectionProof)
+			if err != nil {
+				return xerrors.Errorf("error getting checkpoint config from election proof: %w", err)
+			}
+			ch.Config.Cert = cfg.Cert
+			// verify checkpoint
+			if err := ch.Verify(); err != nil {
+				return xerrors.Errorf("error verifying checkpoint signature: %w", err)
+			}
+			if err := bft.cache.rcvCheckpoint(ch); err != nil {
+				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
+			}
+		}
+
+		// the genesis block can be considered as verified already.
+		if h.Height != 0 {
+			// we should receive all blocks, including the ones that don't include checkpoints
+			// so they are conveniently verified
+			// TODO: There is an attack surface here, what if a malicious peer sends two
+			// blocks for the same epoch? This needs to be handled here in rcvBlock
+			// so a new block for the same epoch doesn't overwrite or mess up with our view
+			// of the chain.
+			if err := bft.cache.rcvBlock(h); err != nil {
+				return xerrors.Errorf("error receiving block in cache: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	asyncChecks := append(
+		consensus.CommonBlkChecks(ctx, bft.sm, bft.sm.ChainStore(), b, baseTs),
+		checkpointChk,
+	)
+
+	return consensus.RunAsyncChecks(ctx, asyncChecks)
 }
 
 func blockSanityChecks(h *types.BlockHeader) error {
-	// TODO: empty for now, when we include checkpoints for block validation, this may not be the case.
-	empty := types.ElectionProof{}
-	if h.ElectionProof.WinCount != empty.WinCount || !bytes.Equal(h.ElectionProof.VRFProof, empty.VRFProof) {
-		return xerrors.Errorf("mir expects empty election proof")
+	if h.ElectionProof.WinCount != 0 {
+		return xerrors.Errorf("mir expects a zero wincount")
 	}
 
 	if h.Ticket.VRFProof != nil {
-		return xerrors.Errorf("mir block have nil ticket")
+		if h.ElectionProof.VRFProof == nil {
+			return xerrors.Errorf("both VRFProofs should be nil, the block includes a checkpoint")
+		}
+	}
+
+	if h.Ticket.VRFProof == nil {
+		if h.ElectionProof.VRFProof != nil {
+			return xerrors.Errorf("if there is no ticket, then the block doesn't include a checkpoint")
+		}
 	}
 
 	if h.BlockSig != nil {

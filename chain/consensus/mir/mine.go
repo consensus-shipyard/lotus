@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	levelds "github.com/ipfs/go-ds-leveldb"
 	"github.com/libp2p/go-libp2p-core/host"
+	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/mir"
@@ -34,11 +37,12 @@ const (
 // 5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //    they already have it.
 //
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, membership interface{}) error {
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) error {
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 
-	m, err := NewManager(ctx, addr, h, api, membership)
+	// TODO: Initialize manager from a snapshot or checkpoint instead of from scratch
+	m, err := NewManager(ctx, addr, h, api, cfg.MembershipCfg)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
@@ -92,7 +96,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := GetValidators(membership)
+			newValidatorSet, err := GetValidators(cfg.MembershipCfg)
 			if err != nil {
 				log.With("epoch", nextHeight).Warnf("failed to get subnet validators: %v", err)
 				continue
@@ -114,13 +118,30 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			log.With("epoch", nextHeight).
 				Infof("try to create a block: msgs - %d", len(msgs))
 
+			// include checkpoint in VRF proof field?
+			vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
+			eproofCheckpoint := &ltypes.ElectionProof{}
+			if ch := m.StateManager.pollCheckpoint(); ch != nil {
+				vrfCheckpoint, err = ch.AsVRFProof()
+				if err != nil {
+					log.With("epoch", nextHeight).Errorw("error getting vrfproof from checkpoint:", "error", err)
+					continue
+				}
+				eproofCheckpoint, err = ch.ConfigAsElectionProof()
+				if err != nil {
+					log.With("epoch", nextHeight).Errorw("error getting eproof from checkpoint:", "error", err)
+					continue
+				}
+				log.Infof("Including Mir checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
+			}
+
 			bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
 				// mir blocks are created by all miners. We use system actor as miner of the block
 				Miner:            builtin.SystemActorAddr,
 				Parents:          base.Key(),
 				BeaconValues:     nil,
-				Ticket:           &ltypes.Ticket{VRFProof: nil},
-				Eproof:           &ltypes.ElectionProof{},
+				Ticket:           vrfCheckpoint,
+				Eproof:           eproofCheckpoint,
 				Epoch:            base.Height() + 1,
 				Timestamp:        uint64(time.Now().Unix()),
 				WinningPoStProof: nil,
@@ -137,7 +158,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 			// TODO: At this point we only support Mir networks with validators
 			// as we are not broadcasting the nodes further. This will come soon.
-			err = api.SyncBlock(ctx, &types.BlockMsg{
+			err = api.SyncSubmitBlock(ctx, &types.BlockMsg{
 				Header:        bh.Header,
 				BlsMessages:   bh.BlsMessages,
 				SecpkMessages: bh.SecpkMessages,
@@ -168,4 +189,14 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		}
 	}
+}
+
+// Use levelDB as Mir datastore.
+func levelDs(path string, readonly bool) (datastore.Batching, error) {
+	return levelds.NewDatastore(path, &levelds.Options{
+		Compression: ldbopts.NoCompression,
+		NoSync:      false,
+		Strict:      ldbopts.StrictAll,
+		ReadOnly:    readonly,
+	})
 }
