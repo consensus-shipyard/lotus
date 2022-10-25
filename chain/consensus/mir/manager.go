@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -64,24 +65,18 @@ type Manager struct {
 	StateManager  *StateManager
 	interceptor   *eventlog.Recorder
 	ToMir         chan chan []*mirproto.Request
-	segmentLength int // segment length determinint the checkpoint period.
-	ds            datastore.Batching
+	segmentLength int // segment length determining the checkpoint period.
+	ds            db.DB
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
 	reconfigurationNonce uint64
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Cfg) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	// initialize mir datastore
-	ds, err := levelDs(cfg.DatastorePath, false)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing mir datastore: %w", err)
 	}
 
 	initialValidatorSet, err := GetValidators(cfg.MembershipCfg)

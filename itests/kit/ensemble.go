@@ -969,7 +969,11 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 
 	for _, m := range miners {
 		go func(m *TestMiner) {
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, mir.MembershipFromStr(membership))
+			db := NewTestDB()
+			cfg := mir.Cfg{
+				MembershipCfg: mir.MembershipFromStr(membership),
+			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, db, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}

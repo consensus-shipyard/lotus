@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ipfs/go-datastore"
-	levelds "github.com/ipfs/go-ds-leveldb"
 	"github.com/libp2p/go-libp2p-core/host"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/mir"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 
@@ -37,12 +35,12 @@ const (
 // 5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //    they already have it.
 //
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) error {
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB, cfg *Cfg) error {
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 
 	// TODO: Initialize manager from a snapshot or checkpoint instead of from scratch
-	m, err := NewManager(ctx, addr, h, api, cfg.MembershipCfg)
+	m, err := NewManager(ctx, addr, h, api, db, cfg)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
@@ -189,14 +187,4 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		}
 	}
-}
-
-// Use levelDB as Mir datastore.
-func levelDs(path string, readonly bool) (datastore.Batching, error) {
-	return levelds.NewDatastore(path, &levelds.Options{
-		Compression: ldbopts.NoCompression,
-		NoSync:      false,
-		Strict:      ldbopts.StrictAll,
-		ReadOnly:    readonly,
-	})
 }

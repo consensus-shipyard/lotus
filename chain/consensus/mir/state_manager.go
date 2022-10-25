@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/go-state-types/abi"

@@ -21,9 +21,9 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	ts := eudicoConsensusSuite{opts: opts}
 
 	// t.Run("testMirMiningOneNode", ts.testMirMiningOneNode)
-	// t.Run("testMirMiningTwoNodes", ts.testMirMiningTwoNodes)
+	t.Run("testMirMiningTwoNodes", ts.testMirMiningTwoNodes)
 	// t.Run("testMirMiningFourNodes", ts.testMirMiningFourNodes)
-	t.Run("testMirMiningFourNodesSending", ts.testMirMiningFourNodesSending)
+	// t.Run("testMirMiningFourNodesSending", ts.testMirMiningFourNodesSending)
 	// t.Run("testMirMiningFourNodesWithOneOmission", ts.testMirMiningFourNodesWithOneOmissionNode)
 	// t.Run("testMirMiningFourNodesWithOneFaulty", ts.testMirMiningFourNodesWithOneFaultyNode)
 }
