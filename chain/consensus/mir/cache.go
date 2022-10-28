@@ -87,6 +87,7 @@ func rcvCheckpoint(c blkCache, ch *CheckpointData) error {
 		if i == 0 {
 			continue
 		}
+		fmt.Println("Getting block from cache for epoch", i)
 		v, err := c.get(i)
 		if err != nil {
 			return fmt.Errorf("error getting value from datastore: %w", err)

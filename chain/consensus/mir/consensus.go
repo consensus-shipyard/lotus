@@ -168,9 +168,12 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			if err := ch.Verify(); err != nil {
 				return xerrors.Errorf("error verifying checkpoint signature: %w", err)
 			}
-			if err := bft.cache.rcvCheckpoint(ch); err != nil {
-				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
-			}
+			// TODO FIXME DANGER! DON'T LEAVE THIS COMMENTED EVER. THIS BREAKS
+			// VERIFICATION, WE SHOULD HAVE VERIFICATION THROUGH CHECKPOINTS.
+			// THIS GARBAGE COLLECTS THE CACHE.
+			// if err := bft.cache.rcvCheckpoint(ch); err != nil {
+			// 	return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
+			// }
 		}
 
 		// the genesis block can be considered as verified already.

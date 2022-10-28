@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
 	xerrors "golang.org/x/xerrors"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -22,6 +23,7 @@ import (
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
@@ -39,7 +41,7 @@ const (
 	// Desired CheckpointPeriod
 	// TODO: Pass it as an Option to NewManager. Allow
 	// NewManager to receive cfg as an option also.
-	CheckpointPeriod = 4
+	CheckpointPeriod = 12
 )
 
 var (
@@ -177,9 +179,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	}
 	params.Iss.SegmentLength = m.segmentLength
 
-	// TODO FIXME: Start from the latest checkpoint snapshot persisted
-	// by the peer.
-	initSnapshot, err := m.initialSnapshot()
+	latestCh, err := m.latestCheckpoint(params)
 	if err != nil {
 		return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
 	}
@@ -187,7 +187,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	smrSystem, err := smr.New(
 		t.NodeID(mirID),
 		h,
-		checkpoint.Genesis(iss.InitialStateSnapshot(initSnapshot, params.Iss)),
+		latestCh,
 		m.CryptoManager,
 		m.StateManager,
 		params,
@@ -408,13 +408,18 @@ func (m *Manager) GetCheckpointPeriod() abi.ChainEpoch {
 	return abi.ChainEpoch(m.segmentLength * len(m.StateManager.memberships[m.StateManager.currentEpoch]))
 }
 
-func (m *Manager) initialSnapshot() ([]byte, error) {
+func (m *Manager) latestCheckpoint(params smr.Params) (*checkpoint.StableCheckpoint, error) {
 	b, err := m.ds.Get(m.ctx, LatestCheckpointPbKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
-			return []byte{}, nil
+			return checkpoint.Genesis(iss.InitialStateSnapshot([]byte{}, params.Iss)), nil
 		}
 		return nil, xerrors.Errorf("error getting latest snapshot")
 	}
-	return b, nil
+	ch := &checkpointpb.StableCheckpoint{}
+	err = proto.Unmarshal(b, ch)
+	if err != nil {
+		return nil, err
+	}
+	return (*checkpoint.StableCheckpoint)(ch), nil
 }

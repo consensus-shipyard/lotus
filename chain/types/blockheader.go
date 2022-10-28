@@ -74,6 +74,7 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 	if build.Consensus == build.Mir {
 		// make a copy
 		bblk := *blk
+		bblk.ElectionProof = &ElectionProof{}
 		cidData, err := bblk.Serialize()
 		if err != nil {
 			return nil, err

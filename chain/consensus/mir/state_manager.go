@@ -14,6 +14,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	"github.com/filecoin-project/mir/pkg/pb/commonpb"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
@@ -109,9 +110,11 @@ func (sm *StateManager) RestoreState(snapshot []byte, config *commonpb.EpochConf
 	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
 
 	for e, membership := range config.Memberships {
-		sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
-		sm.memberships[t.EpochNr(e)] = t.Membership(membership)
+		// skew membership to current epoch, we are starting from a checkpoint
+		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = make(map[t.NodeID]t.NodeAddress)
+		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
 	}
+	fmt.Println("=== current epoch in RestoreState", sm.currentEpoch)
 
 	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
 	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
@@ -128,20 +131,93 @@ func (sm *StateManager) RestoreState(snapshot []byte, config *commonpb.EpochConf
 		if err != nil {
 			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
 		}
-		// - Get the cid of the latest block in the checkpoint and get TipSetKey.
-		for id, addr := range parseMultiAddrFromMembership(sm.memberships[sm.currentEpoch]) {
-			// do not try to fetch from self
-			if id == sm.MirManager.MirNode.ID {
+
+		synced := false
+		// From all the peers of my daemon try to get the latest tipset.
+		connPeers, err := sm.api.NetPeers(sm.MirManager.ctx)
+		if err != nil {
+			return xerrors.Errorf("error getting list of peers from daemon: %w", err)
+		}
+		if len(connPeers) == 0 {
+			return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
+		}
+		for _, addr := range connPeers {
+			fmt.Println("===== Restoring from checkpoint height", ch.Height)
+			fmt.Println("===== Trying to fetch from peer", addr.ID)
+			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.MirManager.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
+			if err != nil {
+				log.Errorf("error fetching latest tipset from peer %s: %w", addr.ID, err)
 				continue
 			}
-			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.MirManager.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
+			// // TODO: Check if the peer has the latest tipset that we need, if not move to
+			// // the next one.
+			// if ts.Height() < ch.Height {
+			// 	// the peero doesn't have the latest tipset I need, keep looking
+			// 	continue
+			// }
 			err = sm.waitNextBlock(ts.Height())
 			if err != nil {
 				return xerrors.Errorf("error waiting for next block %d: %w", ts.Height(), err)
 			}
+			synced = true
 
 		}
+		// TODO: If I couldn't find the latst peers just kill.
+		if !synced {
+			return xerrors.Errorf("couldn't find any good peers to sync from")
+		}
+
+		// FIXME: Here we need to recover the previous checkpoint so that we can generate
+		// in the next snapshot the previous checkpoint.
+		// TODO: Clean this and de-duplicate from RestoreState
+		fmt.Println("===== ")
+		// if we deserialized it correctly, we can persist it directly in the data store.
+		if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LatestCheckpointKey, snapshot); err != nil {
+			return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+		}
+
+		// FIXME: Create checkpoint protobuf and persist it?
+		// persist the protobuf of the snapshot to initialize mir from
+		// snapshot if needed.
+		// b, err := proto.Marshal((*checkpointpb.StableCheckpoint)(ch))
+		// if err != nil {
+		// 	return xerrors.Errorf("error marshaling stablecheckpoint", err)
+		// }
+		// if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LatestCheckpointPbKey, b); err != nil {
+		// 	return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+		// }
+
+		fmt.Println(" ==== Flushing CID and persisting prev checkpoint")
+		// flush checkpoint by cid
+		c, err := ch.Cid()
+		if err != nil {
+			return xerrors.Errorf("error computing cid for checkpoint", err)
+		}
+
+		// store metadata for previous checkpoint in datastore and manager
+		sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
+		if err := sm.MirManager.ds.Put(sm.MirManager.ctx, datastore.NewKey(c.String()), snapshot); err != nil {
+			return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+		}
+		// // - Get the cid of the latest block in the checkpoint and get TipSetKey if we don't have it.
+		// for id, addr := range parseMultiAddrFromMembership(sm.memberships[sm.currentEpoch]) {
+		// 	fmt.Println("===== ids I have in RestoreState", id, sm.MirManager.MirNode.ID)
+		// 	// do not try to fetch from self
+		// 	if id == sm.MirManager.MirNode.ID {
+		// 		continue
+		// 	}
+		// 	ts, err := sm.api.SyncFetchTipSetFromPeer(sm.MirManager.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
+		// 	if err != nil {
+		// 		return xerrors.Errorf("error fetching latest tipset from peer %s: %w", addr.ID, err)
+		// 	}
+		// 	err = sm.waitNextBlock(ts.Height())
+		// 	if err != nil {
+		// 		return xerrors.Errorf("error waiting for next block %d: %w", ts.Height(), err)
+		// 	}
+
+		// }
 	}
+	fmt.Println("==== leaving restoreState")
 
 	return nil
 }
@@ -192,6 +268,7 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
+	fmt.Println("=== current epoch in new epoch", sm.currentEpoch)
 	// Sanity check.
 	if nr != sm.currentEpoch+1 {
 		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
@@ -252,16 +329,23 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
 	// return genesis checkpoint for the first snapshot.
-	if sm.currentEpoch == 0 {
-		ch, err := sm.firstEpochCheckpoint()
-		if err != nil {
-			return nil, xerrors.Errorf("could not get first epoch checkpoint: %w", err)
-		}
-		return ch.Bytes()
-	}
+	// if sm.currentEpoch == 0 {
+	// 	fmt.Println("===== first checkpoint being called")
+	// 	ch, err := sm.firstEpochCheckpoint()
+	// 	if err != nil {
+	// 		return nil, xerrors.Errorf("could not get first epoch checkpoint: %w", err)
+	// 	}
+	// 	return ch.Bytes()
+	// }
+	fmt.Println("=== current epoch in snapshot", sm.currentEpoch)
+	fmt.Println("=== previous checkpoint height", sm.prevCheckpoint.Height)
 
 	nextHeight := sm.prevCheckpoint.Height + sm.MirManager.GetCheckpointPeriod()
 	log.Debugf("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
+	fmt.Println("=== previous checkpoint in snapshot", sm.prevCheckpoint)
+	// TODO: The previous checkpoint should be the same even after restart. If this is not the case
+	// mir reaches a different snapshot when recovering and it gets stuck. Maybe we should remove the sm.prevcheckpoint
+	// all along? Why do we need it? Ok! because we are chaining.
 	ch := Checkpoint{
 		Height:    nextHeight,
 		Parent:    sm.prevCheckpoint,
@@ -291,8 +375,10 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		log.Debugf("Getting Cid for block %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
-	log.Debugf("Returning snapshot for epoch: %d", ch.Height)
-	return ch.Bytes()
+	b, err := ch.Bytes()
+	c, _ := ch.Cid()
+	fmt.Println("==== leaving snapshot", c)
+	return b, err
 }
 
 // Checkpoint is triggered by Mir when the committee agrees on the next checkpoint.
@@ -307,6 +393,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 		return xerrors.Errorf("error getting checkpoint data from mir checkpoint: %w", err)
 	}
 	log.Debugf("Mir generated new checkpoint for height: %d", ch.Height)
+	fmt.Println("==== calling checkpoint for height ch", ch.Height)
 
 	// if we deserialized it correctly, we can persist it directly in the data store.
 	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LatestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
@@ -315,7 +402,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 
 	// persist the protobuf of the snapshot to initialize mir from
 	// snapshot if needed.
-	b, err := proto.Marshal(checkpoint.Snapshot)
+	b, err := proto.Marshal((*checkpointpb.StableCheckpoint)(checkpoint))
 	if err != nil {
 		return xerrors.Errorf("error marshaling stablecheckpoint", err)
 	}
@@ -339,6 +426,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	config := sm.MirManager.NewEpochConfigFromPb(checkpoint)
 	log.Debug("Sending checkpoint to mining process to include in block")
 	sm.NextCheckpoint <- &CheckpointData{*ch, checkpoint.Sn, *config}
+	fmt.Println("==== leaving checkpoint", c)
 	return nil
 }
 
@@ -369,9 +457,11 @@ func (sm *StateManager) waitNextBlock(height abi.ChainEpoch) error {
 	// REVIEWER, PLEASE FLAG THIS IF YOU SEE THIS COMMENT.
 	// WAITNEXTBLOCK SHOULD NOW BE CALLED WAITFORBLOCK AND TARGET A
 	// HEIGHT, IF THIS IS NOT THE CASE... SHOUT!!! AND GIT BLAME.
-	ctx, cancel := context.WithTimeout(sm.MirManager.ctx, 5*time.Second)
+	fmt.Println(">>>> Waiting for block", height)
+	ctx, cancel := context.WithTimeout(sm.MirManager.ctx, 60*time.Second)
 	defer cancel()
 	out := make(chan bool, 1)
+	errCh := make(chan error, 1)
 	go func() {
 		head := abi.ChainEpoch(0)
 		for head != height {
@@ -381,6 +471,10 @@ func (sm *StateManager) waitNextBlock(height abi.ChainEpoch) error {
 				return
 			}
 			head = base.Height()
+			if head > height {
+				log.Warnf("we already have a larger head. waiting %d, head %d", height, head)
+				break
+			}
 		}
 		out <- true
 	}()
@@ -388,6 +482,8 @@ func (sm *StateManager) waitNextBlock(height abi.ChainEpoch) error {
 	select {
 	case <-out:
 		return nil
+	case err := <-errCh:
+		return err
 	case <-ctx.Done():
 		return xerrors.Errorf("target block for checkpoint not reached after deadline")
 	}
