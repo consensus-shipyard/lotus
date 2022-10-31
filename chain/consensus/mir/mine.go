@@ -36,6 +36,7 @@ const (
 // 4. Create the next Filecoin block.
 // 5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //    they already have it.
+// 6. Sync and restore from state whenever needed.
 //
 func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) error {
 	log.With("addr", addr).Infof("Mir miner started")
@@ -72,11 +73,13 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			log.Errorw("failed to get chain head", "error", err)
 			continue
 		}
+		log.Debugf("Trying to mine new block over base: %s", base.Key())
 
 		nextHeight := base.Height() + 1
 
 		select {
 
+		// first catch potential errors when mining
 		case err := <-mirErrors:
 			// return fmt.Errorf("miner consensus error: %w", err)
 			//
@@ -88,105 +91,118 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			log.Debug("Mir miner: Mir node stopped")
 			return nil
 
-		case membership := <-m.StateManager.NewMembership:
-			if err := m.ReconfigureMirNode(ctx, membership); err != nil {
-				log.With("epoch", nextHeight).Errorw("reconfiguring Mir failed", "error", err)
+			// then jump to main loop
+		default:
+			// if not synced we are not ready to mine, this could lead to
+			// races, so we need to wait.
+			if !m.StateManager.synced {
+				log.Warnf("Mir not synced yet, waiting to sync before we start mining.")
+				// add some delay for the case that next batch comes right after returning
+				// this.
+				time.Sleep(500 * time.Millisecond)
 				continue
 			}
 
-		case <-reconfigure.C:
-			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := GetValidatorsFromCfg(cfg.MembershipCfg)
-			if err != nil {
-				log.With("epoch", nextHeight).Warnf("failed to get subnet validators: %v", err)
-				continue
-			}
-
-			if lastValidatorSet.Equal(newValidatorSet) {
-				continue
-			}
-
-			log.With("epoch", nextHeight).Info("new validator set - size: %d", newValidatorSet.Size())
-			lastValidatorSet = newValidatorSet
-
-			if req := m.ReconfigurationRequest(newValidatorSet); req != nil {
-				configRequests = append(configRequests, req)
-			}
-
-		case batch := <-m.StateManager.NextBatch:
-			msgs := m.GetMessages(batch)
-			log.With("epoch", nextHeight).
-				Infof("try to create a block: msgs - %d", len(msgs))
-
-			// include checkpoint in VRF proof field?
-			vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
-			eproofCheckpoint := &ltypes.ElectionProof{}
-			if ch := m.StateManager.pollCheckpoint(); ch != nil {
-				vrfCheckpoint, err = ch.AsVRFProof()
-				if err != nil {
-					log.With("epoch", nextHeight).Errorw("error getting vrfproof from checkpoint:", "error", err)
+			select {
+			case membership := <-m.StateManager.NewMembership:
+				if err := m.ReconfigureMirNode(ctx, membership); err != nil {
+					log.With("epoch", nextHeight).Errorw("reconfiguring Mir failed", "error", err)
 					continue
 				}
-				eproofCheckpoint, err = ch.ConfigAsElectionProof()
+
+			case <-reconfigure.C:
+				// Send a reconfiguration transaction if the validator set in the actor has been changed.
+				newValidatorSet, err := GetValidatorsFromCfg(cfg.MembershipCfg)
 				if err != nil {
-					log.With("epoch", nextHeight).Errorw("error getting eproof from checkpoint:", "error", err)
+					log.With("epoch", nextHeight).Warnf("failed to get subnet validators: %v", err)
 					continue
 				}
-				log.Infof("Including Mir checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
-			}
 
-			bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
-				// mir blocks are created by all miners. We use system actor as miner of the block
-				Miner:            builtin.SystemActorAddr,
-				Parents:          base.Key(),
-				BeaconValues:     nil,
-				Ticket:           vrfCheckpoint,
-				Eproof:           eproofCheckpoint,
-				Epoch:            base.Height() + 1,
-				Timestamp:        uint64(time.Now().Unix()),
-				WinningPoStProof: nil,
-				Messages:         msgs,
-			})
-			if err != nil {
-				log.With("epoch", nextHeight).Errorw("creating a block failed", "error", err)
-				continue
-			}
-			if bh == nil {
-				log.With("epoch", nextHeight).Debug("created a nil block")
-				continue
-			}
+				if lastValidatorSet.Equal(newValidatorSet) {
+					continue
+				}
 
-			// TODO: At this point we only support Mir networks with validators
-			// as we are not broadcasting the nodes further. This will come soon.
-			err = api.SyncSubmitBlock(ctx, &types.BlockMsg{
-				Header:        bh.Header,
-				BlsMessages:   bh.BlsMessages,
-				SecpkMessages: bh.SecpkMessages,
-			})
-			if err != nil {
-				log.With("epoch", nextHeight).Errorw("unable to sync a block", "error", err)
-				continue
-			}
+				log.With("epoch", nextHeight).Info("new validator set - size: %d", newValidatorSet.Size())
+				lastValidatorSet = newValidatorSet
 
-			log.With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
+				if req := m.ReconfigurationRequest(newValidatorSet); req != nil {
+					configRequests = append(configRequests, req)
+				}
 
-		case toMir := <-m.ToMir:
-			msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
-			if err != nil {
+			case batch := <-m.StateManager.NextBatch:
+				log.Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
+				msgs := m.GetMessages(batch)
 				log.With("epoch", nextHeight).
-					Errorw("unable to select messages from mempool", "error", err)
+					Infof("try to create a block: msgs - %d", len(msgs))
+
+				// include checkpoint in VRF proof field?
+				vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
+				eproofCheckpoint := &ltypes.ElectionProof{}
+				if ch := m.StateManager.pollCheckpoint(); ch != nil {
+					vrfCheckpoint, err = ch.AsVRFProof()
+					if err != nil {
+						log.With("epoch", nextHeight).Errorw("error getting vrfproof from checkpoint:", "error", err)
+						continue
+					}
+					eproofCheckpoint, err = ch.ConfigAsElectionProof()
+					if err != nil {
+						log.With("epoch", nextHeight).Errorw("error getting eproof from checkpoint:", "error", err)
+						continue
+					}
+					log.Infof("Including Mir checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
+				}
+
+				bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
+					// mir blocks are created by all miners. We use system actor as miner of the block
+					Miner:            builtin.SystemActorAddr,
+					Parents:          base.Key(),
+					BeaconValues:     nil,
+					Ticket:           vrfCheckpoint,
+					Eproof:           eproofCheckpoint,
+					Epoch:            base.Height() + 1,
+					Timestamp:        uint64(time.Now().Unix()),
+					WinningPoStProof: nil,
+					Messages:         msgs,
+				})
+				if err != nil {
+					log.With("epoch", nextHeight).Errorw("creating a block failed", "error", err)
+					continue
+				}
+				if bh == nil {
+					log.With("epoch", nextHeight).Debug("created a nil block")
+					continue
+				}
+
+				err = api.SyncSubmitBlock(ctx, &types.BlockMsg{
+					Header:        bh.Header,
+					BlsMessages:   bh.BlsMessages,
+					SecpkMessages: bh.SecpkMessages,
+				})
+				if err != nil {
+					log.With("epoch", nextHeight).Errorw("unable to sync a block", "error", err)
+					continue
+				}
+
+				log.With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
+
+			case toMir := <-m.ToMir:
+				msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
+				if err != nil {
+					log.With("epoch", nextHeight).
+						Errorw("unable to select messages from mempool", "error", err)
+				}
+
+				requests := m.TransportRequests(msgs)
+
+				if len(configRequests) > 0 {
+					requests = append(requests, configRequests...)
+					configRequests = nil
+				}
+
+				// We send requests via the channel instead of calling m.SubmitRequests(ctx, requests) explicitly.
+				toMir <- requests
+
 			}
-
-			requests := m.TransportRequests(msgs)
-
-			if len(configRequests) > 0 {
-				requests = append(requests, configRequests...)
-				configRequests = nil
-			}
-
-			// We send requests via the channel instead of calling m.SubmitRequests(ctx, requests) explicitly.
-			toMir <- requests
-
 		}
 	}
 }

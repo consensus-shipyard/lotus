@@ -41,7 +41,7 @@ const (
 	// Desired CheckpointPeriod
 	// TODO: Pass it as an Option to NewManager. Allow
 	// NewManager to receive cfg as an option also.
-	CheckpointPeriod = 12
+	CheckpointPeriod = 8
 )
 
 var (
