@@ -3,17 +3,14 @@ package mir
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"time"
 
 	cid "github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	xerrors "golang.org/x/xerrors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
@@ -238,7 +235,7 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	fmt.Println("=== current epoch in new epoch", sm.currentEpoch)
+	log.Debugf("current epoch triggered in new epoch: %d", sm.currentEpoch)
 	// Sanity check.
 	if nr != sm.currentEpoch+1 {
 		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
@@ -329,8 +326,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
 		i--
-		log.Debugf("Getting Cid for block %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
-		fmt.Println("=== Getting block cid for height and cid", ts.Height(), ts.Blocks()[0].Cid())
+		log.Debugf("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
 	return ch.Bytes()
@@ -364,7 +360,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 
 	// persist the protobuf of the snapshot to initialize mir from
 	// snapshot if needed.
-	b, err := proto.Marshal((*checkpointpb.StableCheckpoint)(checkpoint))
+	b, err := checkpoint.Serialize()
 	if err != nil {
 		return xerrors.Errorf("error marshaling stablecheckpoint", err)
 	}
@@ -440,10 +436,12 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 		return xerrors.Errorf("failed to get chain head: %w", err)
 	}
 
-	// compute timeout for sync.
-	// 30 seconds base timeout and an extra for the length of the gap.
-	// TODO: we should probably make it more configurable.
-	timeout := time.Duration(height-base.Height())*time.Second + 30*time.Second
+	// one minute baseline timeout
+	timeout := 60 * time.Second
+	// add extra if the gap is big.
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
 	log.Debugf("waiting for block on height %d with timeout %v", height, timeout)
 	ctx, cancel := context.WithTimeout(sm.MirManager.ctx, timeout)
 	defer cancel()

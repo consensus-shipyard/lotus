@@ -186,6 +186,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 				log.With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
 
 			case toMir := <-m.ToMir:
+				log.Debugf("selecting messages from mempool from base: %v", base.Key())
 				msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
 				if err != nil {
 					log.With("epoch", nextHeight).

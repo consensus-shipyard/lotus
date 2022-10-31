@@ -23,10 +23,12 @@ rm -rf $LOTUS_PATH
 # ./lotus-seed pre-seal --sector-size 2KiB --num-sectors 2
 # ./lotus-seed genesis add-miner localnet.json ~/.genesis-sectors/pre-seal-t01000.json
 
-if [ $INDEX -eq 0 ]
-then
-# The first node generates the genesis and the others consume it. 
-    ./lotus daemon --lotus-make-genesis=devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX --mir-validator
-else
-    ./lotus daemon --genesis=devgen.car --bootstrap=false --api=123$INDEX --mir-validator
-fi
+# Uncomment this if you want the first daemon to generate a new genesis.
+# if [ $INDEX -eq 0 ]
+# then
+#   # Remove the previous genesis so we don´t get a race if we try to start a daemon before generating the genesis from daemon 0.
+#    rm ./scripts/mir/devgen.car
+#    ./lotus daemon --lotus-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX --mir-validator
+# else
+./lotus daemon --genesis=./scripts/mir/devgen.car --bootstrap=false --api=123$INDEX --mir-validator
+# fi

@@ -11,7 +11,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
 	xerrors "golang.org/x/xerrors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -19,11 +18,9 @@ import (
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/eventlog"
-	"github.com/filecoin-project/mir/pkg/iss"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
-	"github.com/filecoin-project/mir/pkg/pb/checkpointpb"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
@@ -412,14 +409,9 @@ func (m *Manager) latestCheckpoint(params smr.Params) (*checkpoint.StableCheckpo
 	b, err := m.ds.Get(m.ctx, LatestCheckpointPbKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
-			return checkpoint.Genesis(iss.InitialStateSnapshot([]byte{}, params.Iss)), nil
+			return smr.GenesisCheckpoint([]byte{}, params), nil
 		}
-		return nil, xerrors.Errorf("error getting latest snapshot")
+		return nil, xerrors.Errorf("error getting latest snapshot: %w", err)
 	}
-	ch := &checkpointpb.StableCheckpoint{}
-	err = proto.Unmarshal(b, ch)
-	if err != nil {
-		return nil, err
-	}
-	return (*checkpoint.StableCheckpoint)(ch), nil
+	return checkpoint.DeserializeStableCheckpoint(b)
 }
