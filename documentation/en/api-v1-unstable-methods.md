@@ -223,7 +223,6 @@
   * [StateVerifierStatus](#StateVerifierStatus)
   * [StateWaitMsg](#StateWaitMsg)
 * [Sync](#Sync)
-  * [SyncBlock](#SyncBlock)
   * [SyncCheckBad](#SyncCheckBad)
   * [SyncCheckpoint](#SyncCheckpoint)
   * [SyncFetchTipSetFromPeer](#SyncFetchTipSetFromPeer)
@@ -7317,82 +7316,6 @@ Response:
 The Sync method group contains methods for interacting with and
 observing the lotus sync service.
 
-
-### SyncBlock
-SyncBlock can be used to deliver a block to the syncer without
-broadcasting it to the rest of the network.
-
-
-Perms: write
-
-Inputs:
-```json
-[
-  {
-    "Header": {
-      "Miner": "f01234",
-      "Ticket": {
-        "VRFProof": "Ynl0ZSBhcnJheQ=="
-      },
-      "ElectionProof": {
-        "WinCount": 9,
-        "VRFProof": "Ynl0ZSBhcnJheQ=="
-      },
-      "BeaconEntries": [
-        {
-          "Round": 42,
-          "Data": "Ynl0ZSBhcnJheQ=="
-        }
-      ],
-      "WinPoStProof": [
-        {
-          "PoStProof": 8,
-          "ProofBytes": "Ynl0ZSBhcnJheQ=="
-        }
-      ],
-      "Parents": [
-        {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        }
-      ],
-      "ParentWeight": "0",
-      "Height": 10101,
-      "ParentStateRoot": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "ParentMessageReceipts": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "Messages": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "BLSAggregate": {
-        "Type": 2,
-        "Data": "Ynl0ZSBhcnJheQ=="
-      },
-      "Timestamp": 42,
-      "BlockSig": {
-        "Type": 2,
-        "Data": "Ynl0ZSBhcnJheQ=="
-      },
-      "ForkSignaling": 42,
-      "ParentBaseFee": "0"
-    },
-    "BlsMessages": [
-      {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
-    ],
-    "SecpkMessages": [
-      {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
-    ]
-  }
-]
-```
-
-Response: `{}`
 
 ### SyncCheckBad
 SyncCheckBad checks if a block was marked as bad, and if it was, returns
