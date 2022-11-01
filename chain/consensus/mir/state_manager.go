@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	cid "github.com/ipfs/go-cid"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	xerrors "golang.org/x/xerrors"
 

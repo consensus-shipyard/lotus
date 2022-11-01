@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ipfs/go-datastore"
-	levelds "github.com/ipfs/go-ds-leveldb"
 	"github.com/libp2p/go-libp2p-core/host"
-	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/mir"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 
@@ -29,21 +27,20 @@ const (
 // Mine implements "block mining" using the Mir framework.
 //
 // Mine implements the following main algorithm:
-// 1. Retrieve messages and cross-messages from the mempool.
-//    Note that messages can be added into mempool via the libp2p and CLI mechanism.
-// 2. Send messages and cross messages to the Mir node through the request pool implementing FIFO.
-// 3. Receive ordered messages from the Mir node and parse them.
-// 4. Create the next Filecoin block.
-// 5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
-//    they already have it.
-// 6. Sync and restore from state whenever needed.
-//
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, cfg *Cfg) error {
+//  1. Retrieve messages and cross-messages from the mempool.
+//     Note that messages can be added into mempool via the libp2p and CLI mechanism.
+//  2. Send messages and cross messages to the Mir node through the request pool implementing FIFO.
+//  3. Receive ordered messages from the Mir node and parse them.
+//  4. Create the next Filecoin block.
+//  5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
+//     they already have it.
+//  6. Sync and restore from state whenever needed.
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB, cfg *Cfg) error {
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 
 	// TODO: Initialize manager from a snapshot or checkpoint instead of from scratch
-	m, err := NewManager(ctx, addr, h, api, cfg)
+	m, err := NewManager(ctx, addr, h, api, db, cfg)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
@@ -88,7 +85,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			if err != nil && !errors.Is(err, mir.ErrStopped) {
 				panic(fmt.Errorf("miner consensus error: %w", err))
 			}
-			log.Debug("Mir miner: Mir node stopped")
+			log.With("addr", addr).Infof("Mir node stopped signal")
 			return nil
 
 			// then jump to main loop
@@ -112,7 +109,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 			case <-reconfigure.C:
 				// Send a reconfiguration transaction if the validator set in the actor has been changed.
-				newValidatorSet, err := GetValidatorsFromCfg(cfg.MembershipCfg)
+				newValidatorSet, err := GetValidators(cfg.MembershipCfg)
 				if err != nil {
 					log.With("epoch", nextHeight).Warnf("failed to get subnet validators: %v", err)
 					continue
@@ -206,14 +203,4 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			}
 		}
 	}
-}
-
-// Use levelDB as Mir datastore.
-func levelDs(path string, readonly bool) (datastore.Batching, error) {
-	return levelds.NewDatastore(path, &levelds.Options{
-		Compression: ldbopts.NoCompression,
-		NoSync:      false,
-		Strict:      ldbopts.StrictAll,
-		ReadOnly:    readonly,
-	})
 }

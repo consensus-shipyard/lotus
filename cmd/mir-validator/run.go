@@ -11,11 +11,11 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
@@ -120,8 +120,15 @@ var runCmd = &cli.Command{
 			log.Info(a)
 		}
 
-		datastoreCfg := filepath.Join(cctx.String("repo"), LevelDSPath)
+		// Initialize Mir's DB.
+		dbPath := filepath.Join(cctx.String("repo"), LevelDSPath)
+		ds, err := mirkv.NewLevelDB(dbPath, false)
+		if err != nil {
+			log.Fatalf("error initializing mir datastore: %w", err)
+		}
+
 		log.Infow("Starting mining with validator", "validator", validator)
-		return mir.Mine(ctx, validator, h, nodeApi, mir.NewConfig(membershipCfg, datastoreCfg))
+		cfg := mir.NewConfig(mir.MembershipFromFile(membershipCfg), dbPath)
+		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
 	},
 }

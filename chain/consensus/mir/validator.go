@@ -17,6 +17,10 @@ import (
 	t "github.com/filecoin-project/mir/pkg/types"
 )
 
+type MembershipFromFile string
+type MembershipFromEnv string
+type MembershipFromStr string
+
 type Validator struct {
 	Addr addr.Address
 	// FIXME: Consider using a multiaddr
@@ -77,6 +81,18 @@ func NewValidatorSet(vals []Validator) *ValidatorSet {
 	return &ValidatorSet{Validators: vals}
 }
 
+func NewValidatorSetFromFile(path string) (*ValidatorSet, error) {
+	return GetValidatorsFromFile(path)
+}
+
+func NewValidatorSetFromEnv(v string) (*ValidatorSet, error) {
+	return GetValidatorsFromEnv(v)
+}
+
+func NewValidatorSetFromStr(s string) (*ValidatorSet, error) {
+	return GetValidatorsFromStr(s)
+}
+
 func (set *ValidatorSet) Size() int {
 	return len(set.Validators)
 }
@@ -131,19 +147,88 @@ func (set *ValidatorSet) BlockMiner(epoch abi.ChainEpoch) addr.Address {
 	return set.Validators[i].Addr
 }
 
-// GetValidatorsFromCfg gets the membership config from a file.
-func GetValidatorsFromCfg(config string) (*ValidatorSet, error) {
+func GetValidators(from interface{}) (*ValidatorSet, error) {
+	switch v := from.(type) {
+	case MembershipFromFile:
+		return GetValidatorsFromFile(string(v))
+	case MembershipFromEnv:
+		return GetValidatorsFromEnv(string(v))
+	case MembershipFromStr:
+		return GetValidatorsFromStr(string(v))
+	default:
+		return nil, fmt.Errorf("unknown membership type")
+	}
+}
 
+// GetValidatorsFromEnv gets the membership config from the environment variable.
+func GetValidatorsFromEnv(env string) (*ValidatorSet, error) {
+	var validators []Validator
+	input := os.Getenv(env)
+	if input == "" {
+		return nil, fmt.Errorf("empty validator string")
+	}
+
+	for _, next := range splitAndTrimEmpty(input, ",", " ") {
+		v, err := ValidatorFromString(next)
+		if err != nil {
+			return nil, err
+		}
+
+		validators = append(validators, v)
+	}
+
+	return NewValidatorSet(validators), nil
+}
+
+// GetValidatorsFromStr gets the membership config from the environment variable.
+func GetValidatorsFromStr(input string) (*ValidatorSet, error) {
+	var validators []Validator
+	if input == "" {
+		return nil, fmt.Errorf("empty validator string")
+	}
+
+	for _, next := range splitAndTrimEmpty(input, ",", " ") {
+		v, err := ValidatorFromString(next)
+		if err != nil {
+			return nil, err
+		}
+
+		validators = append(validators, v)
+	}
+
+	return NewValidatorSet(validators), nil
+}
+
+func splitAndTrimEmpty(s, sep, cutset string) []string {
+	if s == "" {
+		return []string{}
+	}
+
+	spl := strings.Split(s, sep)
+	nonEmptyStrings := make([]string, 0, len(spl))
+
+	for i := 0; i < len(spl); i++ {
+		element := strings.Trim(spl[i], cutset)
+		if element != "" {
+			nonEmptyStrings = append(nonEmptyStrings, element)
+		}
+	}
+
+	return nonEmptyStrings
+}
+
+// GetValidatorsFromFile gets the membership config from a file.
+func GetValidatorsFromFile(path string) (*ValidatorSet, error) {
 	var validators []Validator
 
-	_, err := os.Stat(config)
+	_, err := os.Stat(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("no membership config found in path: %s", config)
+		return nil, fmt.Errorf("no membership config found in path: %s", path)
 	}
-	readFile, err := os.Open(config)
+	readFile, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}

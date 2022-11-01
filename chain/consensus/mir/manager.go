@@ -10,10 +10,16 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -25,12 +31,6 @@ import (
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
-
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
@@ -64,27 +64,21 @@ type Manager struct {
 	StateManager  *StateManager
 	interceptor   *eventlog.Recorder
 	ToMir         chan chan []*mirproto.Request
-	segmentLength int // segment length determinint the checkpoint period.
-	ds            datastore.Batching
+	segmentLength int // segment length determining the checkpoint period.
+	ds            db.DB
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
 	reconfigurationNonce uint64
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, mirCfg *Cfg) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Cfg) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// initialize mir datastore
-	ds, err := levelDs(mirCfg.DatastorePath, false)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing mir datastore: %w", err)
-	}
-
-	initialValidatorSet, err := GetValidatorsFromCfg(mirCfg.MembershipCfg)
+	initialValidatorSet, err := GetValidators(cfg.MembershipCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
@@ -201,7 +195,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("could not start SMR system: %w", err)
 	}
 
-	cfg := mir.DefaultNodeConfig().WithLogger(logger)
+	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
 
 	interceptorOutput := os.Getenv(InterceptorOutputEnv)
 	if interceptorOutput != "" {
@@ -214,9 +208,9 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		if err != nil {
 			return nil, fmt.Errorf("failed to create interceptor: %w", err)
 		}
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), cfg, smrSystem.Modules(), nil, m.interceptor)
+		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
 	} else {
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), cfg, smrSystem.Modules(), nil, nil)
+		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, nil)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Mir node: %w", err)
