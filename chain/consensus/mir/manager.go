@@ -318,7 +318,7 @@ func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
 		switch msg := input.(type) {
 		case *types.SignedMessage:
 			// batch being processed, remove from mpool
-			found := m.Pool.DeleteRequest(msg.Cid())
+			found := m.Pool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
 			if !found {
 				log.Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
 				// TODO: If we try to remove something from the pool, we should remember that
@@ -365,7 +365,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 	for _, msg := range msgs {
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
-		if !m.Pool.IsTargetRequest(clientID) {
+		if !m.Pool.IsTargetRequest(clientID, nonce) {
 			log.Warnf("batchSignedMessage: target request not found for client ID")
 			continue
 		}
