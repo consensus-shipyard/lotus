@@ -15,31 +15,40 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
-const BlkCachePrefix = "mir-cache/"
+const (
+	MirCachePrefix = "mir-cache/"
+	BlkCachePrefix = MirCachePrefix + "blk/"
+)
+
+var (
+	latestCheckKey = datastore.NewKey(MirCachePrefix + "latestCheck")
+)
 
 func cacheKey(e abi.ChainEpoch) datastore.Key {
 	return datastore.NewKey(BlkCachePrefix + strconv.FormatUint(uint64(e), 10))
 }
 
+type mirCache struct {
+	cache blkCache
+}
+
 // blkCache used to track Mir unverified blocks,
 // and verify them in bulk when a checkpoint is received.
 type blkCache interface {
-	rcvCheckpoint(ch *CheckpointData) error
-	rcvBlock(b *types.BlockHeader) error
-	// basic operations
 	get(e abi.ChainEpoch) (cid.Cid, error)
 	put(e abi.ChainEpoch, v cid.Cid) error
 	rm(e abi.ChainEpoch) error
 	length() int
+	setLatestCheckpoint(ch *CheckpointData) error
+	getLatestCheckpoint() (*CheckpointData, error)
 }
 
-//
 type dsBlkCache struct {
 	ds datastore.Batching
 }
 
-func newDsBlkCache(ds datastore.Batching) *dsBlkCache {
-	return &dsBlkCache{ds: ds}
+func newDsBlkCache(ds datastore.Batching) *mirCache {
+	return &mirCache{&dsBlkCache{ds: ds}}
 }
 
 func (c *dsBlkCache) get(e abi.ChainEpoch) (cid.Cid, error) {
@@ -75,11 +84,28 @@ func (c *dsBlkCache) length() int {
 	return i
 }
 
-func (c *dsBlkCache) rcvCheckpoint(ch *CheckpointData) error {
-	return rcvCheckpoint(c, ch)
+func (c *dsBlkCache) setLatestCheckpoint(ch *CheckpointData) error {
+	b, err := ch.Bytes()
+	if err != nil {
+		return fmt.Errorf("error serializing checkpoint data: %w", err)
+	}
+	return c.ds.Put(context.Background(), latestCheckKey, b)
 }
 
-func rcvCheckpoint(c blkCache, ch *CheckpointData) error {
+func (c *dsBlkCache) getLatestCheckpoint() (*CheckpointData, error) {
+	b, err := c.ds.Get(context.Background(), latestCheckKey)
+	if err != nil {
+		if err == datastore.ErrNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("error getting latest checkpoint from Mir cache: %w", err)
+	}
+	ch := &CheckpointData{}
+	err = ch.FromBytes(b)
+	return ch, err
+}
+
+func (c mirCache) rcvCheckpoint(ch *CheckpointData) error {
 	i := ch.Checkpoint.Height
 	for _, k := range ch.Checkpoint.BlockCids {
 		i--
@@ -88,13 +114,13 @@ func rcvCheckpoint(c blkCache, ch *CheckpointData) error {
 			continue
 		}
 		log.Debugf("Getting block from mir cache for epoch: %d", i)
-		v, err := c.get(i)
+		v, err := c.cache.get(i)
 		if err != nil {
 			return fmt.Errorf("error getting value from datastore: %w", err)
 		}
 		if v == k {
 			// delete from cache if verified by checkpoint
-			if err := c.rm(i); err != nil {
+			if err := c.cache.rm(i); err != nil {
 				return fmt.Errorf("error deleting value from datastore: %w", err)
 			}
 		} else {
@@ -102,21 +128,36 @@ func rcvCheckpoint(c blkCache, ch *CheckpointData) error {
 		}
 	}
 
-	l := c.length()
+	l := c.cache.length()
 	// checkpoint doesn't verify all previous blocks.
 	if l != 0 && l != -1 {
 		return fmt.Errorf("checkpoint in block doesn't verify all previous unverified blocks in cache")
 	}
 
+	// update the latest checkpoint received.
+	if err := c.cache.setLatestCheckpoint(ch); err != nil {
+		if err != nil {
+			return fmt.Errorf("couldn't persist latest checkpoint in cache: %w", err)
+		}
+	}
+
 	return nil
 }
 
-func (c *dsBlkCache) rcvBlock(b *types.BlockHeader) error {
-	return rcvBlock(c, b)
+func (c *mirCache) rcvBlock(b *types.BlockHeader) error {
+	return c.cache.put(b.Height, b.Cid())
 }
 
-func rcvBlock(c blkCache, b *types.BlockHeader) error {
-	return c.put(b.Height, b.Cid())
+func (c *mirCache) latestCheckpoint() (*CheckpointData, error) {
+	ch, err := c.cache.getLatestCheckpoint()
+	if err != nil {
+		return nil, err
+	}
+	if ch == nil {
+		// if not found return empty CheckpointData
+		return &CheckpointData{}, nil
+	}
+	return ch, nil
 }
 
 // thread-safe memory blockchain. It has low-overhead
@@ -127,12 +168,13 @@ func rcvBlock(c blkCache, b *types.BlockHeader) error {
 // persist their cache between restarts if they don't want to
 // crash and get out of sync.
 type memBlkCache struct {
-	lk sync.RWMutex
-	m  map[abi.ChainEpoch]cid.Cid
+	lk               sync.RWMutex
+	m                map[abi.ChainEpoch]cid.Cid
+	latestCheckpoint *CheckpointData
 }
 
-func newMemBlkCache() *memBlkCache {
-	return &memBlkCache{m: make(map[abi.ChainEpoch]cid.Cid)}
+func newMemBlkCache() *mirCache {
+	return &mirCache{&memBlkCache{m: make(map[abi.ChainEpoch]cid.Cid)}}
 }
 
 func (c *memBlkCache) get(e abi.ChainEpoch) (cid.Cid, error) {
@@ -160,14 +202,18 @@ func (c *memBlkCache) length() int {
 	defer c.lk.RUnlock()
 	return len(c.m)
 }
+func (c *memBlkCache) setLatestCheckpoint(ch *CheckpointData) error {
+	c.lk.Lock()
+	defer c.lk.Unlock()
+	c.latestCheckpoint = ch
+	return nil
 
-func (c *memBlkCache) rcvCheckpoint(ch *CheckpointData) error {
-	fmt.Println("===== CACHE:", c.m)
-	return rcvCheckpoint(c, ch)
 }
 
-func (c *memBlkCache) rcvBlock(b *types.BlockHeader) error {
-	return rcvBlock(c, b)
+func (c *memBlkCache) getLatestCheckpoint() (*CheckpointData, error) {
+	c.lk.RLock()
+	defer c.lk.RUnlock()
+	return c.latestCheckpoint, nil
 }
 
 var (

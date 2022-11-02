@@ -320,8 +320,11 @@ func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
 			// batch being processed, remove from mpool
 			found := m.Pool.DeleteRequest(msg.Cid())
 			if !found {
-				log.Errorf("unable to find a message with %v hash", msg.Cid())
-				continue
+				log.Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
+				// TODO: If we try to remove something from the pool, we should remember that
+				// we already tried to remove that to avoid adding as it may lead to a dead-lock.
+				// FIFO should be updated because we don't have the support for in-flight supports.
+				// continue
 			}
 			msgs = append(msgs, msg)
 			log.Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
@@ -363,12 +366,13 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
 		if !m.Pool.IsTargetRequest(clientID) {
+			log.Warnf("batchSignedMessage: target request not found for client ID")
 			continue
 		}
 
 		data, err := MessageBytes(msg)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("error in message bytes in batchSignedMessage: %s", err)
 			continue
 		}
 

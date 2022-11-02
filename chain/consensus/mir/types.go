@@ -98,6 +98,13 @@ type Checkpoint struct {
 	Parent ParentMeta
 }
 
+func (ch *Checkpoint) isEmpty() bool {
+	if ch.Height == 0 && ch.BlockCids == nil && (ch.Parent == ParentMeta{}) {
+		return true
+	}
+	return false
+}
+
 func (ch *Checkpoint) Bytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := ch.MarshalCBOR(buf); err != nil {
@@ -111,6 +118,9 @@ func (ch *Checkpoint) FromBytes(b []byte) error {
 }
 
 func (ch *Checkpoint) Cid() (cid.Cid, error) {
+	if ch.isEmpty() {
+		return cid.Undef, nil
+	}
 	b, err := ch.Bytes()
 	if err != nil {
 		return cid.Undef, err
@@ -139,6 +149,20 @@ type EpochConfig struct {
 
 type CertSig struct {
 	Sig []byte
+}
+
+// TODO: Use generics to deduplicate these methods
+// for Checkpoint and CheckpointData.
+func (ch *CheckpointData) Bytes() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := ch.MarshalCBOR(buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (ch *CheckpointData) FromBytes(b []byte) error {
+	return ch.UnmarshalCBOR(bytes.NewReader(b))
 }
 
 func NewCertSigFromPb(ch *checkpoint.StableCheckpoint) map[string]CertSig {
@@ -197,16 +221,17 @@ func (cd CheckpointData) AsVRFProof() (*ltypes.Ticket, error) {
 	// with checkpoints from different validator to appear
 	// completely different blocks).
 	cd.Config.Cert = nil
-	buf := new(bytes.Buffer)
-	if err := cd.MarshalCBOR(buf); err != nil {
+	b, err := cd.Bytes()
+	if err != nil {
 		return nil, xerrors.Errorf("error serializing checkpoint data: %w", err)
 	}
-	return &ltypes.Ticket{VRFProof: buf.Bytes()}, nil
+	return &ltypes.Ticket{VRFProof: b}, nil
 }
 
 func CheckpointFromVRFProof(t *ltypes.Ticket) (*CheckpointData, error) {
 	ch := &CheckpointData{}
-	if err := ch.UnmarshalCBOR(bytes.NewReader(t.VRFProof)); err != nil {
+	err := ch.FromBytes(t.VRFProof)
+	if err != nil {
 		return nil, xerrors.Errorf("error getting checkpoint data from VRF Proof: %w", err)
 	}
 	return ch, nil

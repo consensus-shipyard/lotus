@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/ipfs/go-cid"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	bstore "github.com/filecoin-project/lotus/blockstore"
@@ -39,7 +40,7 @@ type Mir struct {
 	beacon  beacon.Schedule
 	sm      *stmgr.StateManager
 	genesis *types.TipSet
-	cache   blkCache
+	cache   *mirCache
 }
 
 func NewConsensus(
@@ -102,13 +103,29 @@ func (bft *Mir) CreateBlock(ctx context.Context, w lapi.Wallet, bt *lapi.BlockTe
 }
 
 func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (rejectReason string, err error) {
-	// TODO: Perform basic checks that can be performed when a peer receives a new
-	// bock through pubsub, e.g.
-	// - Check that the epoch is in the expected range.
-	// - Validate that the checkpoint siganture is valid if there is a checkpoint.
-	// - Check that the new checkpoints points to the previous one known.
-	// - Any other Mir-specific check that we can perform.
-	log.Warn("oh oh! No specific block header validation implemented for Mir yet")
+	if b.IsValidated() {
+		return "", nil
+	}
+
+	// get the latest checkpoint in cache
+	prev, err := bft.cache.latestCheckpoint()
+	if err != nil {
+		return "err_latest_checkpoint", xerrors.Errorf("couldn't get latests checkpoint: %w", err)
+	}
+
+	// if there is a checkpoint, verify it before accepting the block.
+	if hasCheckpoint(b) {
+		if _, err := bft.verifyCheckpointInHeader(b, prev); err != nil {
+			log.Warnf("checkpoint validation failed in block: %s", err)
+			return "checkpoint_verification_failed", err
+		}
+	}
+	// check that the block is in the right range.
+	if b.Height < prev.Checkpoint.Height {
+		return "block_out_of_range", xerrors.Errorf("the height of the received block is over the latest checkpoint received")
+	}
+	b.SetValidated()
+
 	return "", nil
 }
 
@@ -154,23 +171,26 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 	}
 
 	checkpointChk := async.Err(func() error {
-		if h.ElectionProof.VRFProof != nil {
-			ch, err := CheckpointFromVRFProof(h.Ticket)
+		// get the latest checkpoint in cache
+		prev, err := bft.cache.latestCheckpoint()
+		if err != nil {
+			return xerrors.Errorf("couldn't get latests checkpoint: %w", err)
+		}
+		// check that the block is in the right range.
+		if h.Height < prev.Checkpoint.Height {
+			return xerrors.Errorf("the height of the received block is over the latest checkpoint received")
+		}
+		if hasCheckpoint(h) {
+			ch, err := bft.verifyCheckpointInHeader(h, prev)
 			if err != nil {
-				return xerrors.Errorf("error getting checkpoint from ticket: %w", err)
-			}
-			cfg, err := ConfigFromElectionProof(h.ElectionProof)
-			if err != nil {
-				return xerrors.Errorf("error getting checkpoint config from election proof: %w", err)
-			}
-			ch.Config.Cert = cfg.Cert
-			// verify checkpoint
-			if err := ch.Verify(); err != nil {
-				return xerrors.Errorf("error verifying checkpoint signature: %w", err)
+				return xerrors.Errorf("error verifying checkpoint: %w", err)
 			}
 			if err := bft.cache.rcvCheckpoint(ch); err != nil {
 				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
 			}
+			// TODO: If the checkpoint is valid we could consider setting this tipset as a
+			// checkpoint locally so we can't fork from it.
+			// bft.sm.ChainStore().SetCheckpoint(ctx, ts*types.TipSet)
 		}
 
 		// the genesis block can be considered as verified already.
@@ -235,6 +255,41 @@ func blockSanityChecks(h *types.BlockHeader) error {
 	}
 
 	return nil
+}
+
+func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *CheckpointData) (*CheckpointData, error) {
+	ch, err := CheckpointFromVRFProof(h.Ticket)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting checkpoint from ticket: %w", err)
+	}
+	cfg, err := ConfigFromElectionProof(h.ElectionProof)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting checkpoint config from election proof: %w", err)
+	}
+	ch.Config.Cert = cfg.Cert
+	// verify checkpoint signature
+	if err := ch.Verify(); err != nil {
+		return nil, xerrors.Errorf("error verifying checkpoint signature: %w", err)
+	}
+	c, err := prev.Checkpoint.Cid()
+	if err != nil {
+		return nil, xerrors.Errorf("error computing cid for latest checkpoint: %w", err)
+	}
+	// if cid.Undef this is the first checkpoint, nothing to do here.
+	if c != cid.Undef {
+		if ch.Checkpoint.Parent.Cid != c || ch.Checkpoint.Parent.Height != prev.Checkpoint.Height {
+			return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, ch.Checkpoint.Parent.Cid)
+		}
+	}
+
+	// TODO: Right now we assume static membership and the membership is received off-chain.
+	// Once we support reconfiguration (and especially if we track membership online), we should
+	// check that the membership expected for the checkpoint is correct as part of the verification.
+	return ch, nil
+}
+
+func hasCheckpoint(h *types.BlockHeader) bool {
+	return h.ElectionProof.VRFProof != nil
 }
 
 // IsEpochBeyondCurrMax is used in Filcns to detect delayed blocks.
