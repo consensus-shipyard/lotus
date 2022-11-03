@@ -54,7 +54,7 @@ type nodeOpts struct {
 
 // DefaultNodeOpts are the default options that will be applied to test nodes.
 var DefaultNodeOpts = nodeOpts{
-	balance:    big.Mul(big.NewInt(100000000), types.NewInt(build.FilecoinPrecision)),
+	balance:    big.Mul(big.NewInt(1_000_000), types.NewInt(build.FilecoinPrecision)),
 	sectors:    DefaultPresealsPerBootstrapMiner,
 	sectorSize: abi.SectorSize(2 << 10), // 2KiB.
 
@@ -256,9 +256,9 @@ type CfgOption func(cfg *config.FullNode) error
 
 func SplitstoreDiscard() NodeOpt {
 	return WithCfgOpt(func(cfg *config.FullNode) error {
-		//cfg.Chainstore.Splitstore.HotStoreType = "badger" // default
-		//cfg.Chainstore.Splitstore.MarkSetType = "badger" // default
-		//cfg.Chainstore.Splitstore.HotStoreMessageRetention = 0 // default
+		// cfg.Chainstore.Splitstore.HotStoreType = "badger" // default
+		// cfg.Chainstore.Splitstore.MarkSetType = "badger" // default
+		// cfg.Chainstore.Splitstore.HotStoreMessageRetention = 0 // default
 		cfg.Chainstore.EnableSplitstore = true
 		cfg.Chainstore.Splitstore.HotStoreFullGCFrequency = 0 // turn off full gc
 		cfg.Chainstore.Splitstore.ColdStoreType = "discard"   // no cold store
@@ -268,9 +268,9 @@ func SplitstoreDiscard() NodeOpt {
 
 func SplitstoreUniversal() NodeOpt {
 	return WithCfgOpt(func(cfg *config.FullNode) error {
-		//cfg.Chainstore.Splitstore.HotStoreType = "badger" // default
-		//cfg.Chainstore.Splitstore.MarkSetType = "badger" // default
-		//cfg.Chainstore.Splitstore.HotStoreMessageRetention = 0 // default
+		// cfg.Chainstore.Splitstore.HotStoreType = "badger" // default
+		// cfg.Chainstore.Splitstore.MarkSetType = "badger" // default
+		// cfg.Chainstore.Splitstore.HotStoreMessageRetention = 0 // default
 		cfg.Chainstore.EnableSplitstore = true
 		cfg.Chainstore.Splitstore.HotStoreFullGCFrequency = 0 // turn off full gc
 		cfg.Chainstore.Splitstore.ColdStoreType = "universal" // universal bs is coldstore

@@ -123,7 +123,7 @@ func (ts *eudicoConsensusSuite) testMirMiningSevenNodes(t *testing.T) {
 		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3], nodes[4], nodes[5], nodes[6], nodes[7])
+	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3], nodes[4], nodes[5], nodes[6])
 
 	ens.BeginMirMining(ctx, miners...)
 
