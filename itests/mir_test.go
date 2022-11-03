@@ -237,6 +237,11 @@ func (ts *eudicoConsensusSuite) testMirFourNodesMiningWithMessaging(t *testing.T
 	require.NoError(t, err)
 }
 
+// We need to wrap `StateWaitMsg` in this function in case the `GetCMessage` inside `StateWaitMsg` fails.
+// In Mir this can be the case. A node may not receive a message until it received the validated batch
+// (because the consensus goes so fast) so it doesn´t have the message yet in its local ChainStore and
+// `StateWaitMsg` fails. This wrapper in `strict=false` disregards errors from `StateWaitMsg` for a
+// specific timeout.
 func WaitForMessageWithAvailable(ctx context.Context, n *kit.TestFullNode, c cid.Cid, strict bool) error {
 	// TODO: Add a timeout
 	for {
