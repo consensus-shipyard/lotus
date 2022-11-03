@@ -26,8 +26,8 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	// t.Run("testMirFourNodesMining", ts.testmirFournodesmining)
 	// t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
 	// t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
-	// t.Run("testMirSevenNodesMining", ts.testMirSevenNodesMining)
-	t.Run("testMirFourNodesMiningWithMessaging", ts.testMirFourNodesMiningWithMessaging)
+	t.Run("testMirSevenNodesMining", ts.testMirSevenNodesMining)
+	// t.Run("testMirFourNodesMiningWithMessaging", ts.testMirFourNodesMiningWithMessaging)
 	// t.Run("testMirFourNodesWithOneOmissionNode", ts.testMirFourNodesWithOneOmissionNode)
 	// t.Run("testMirFourNodesWithOneCrashedNode", ts.testMirFourNodesWithOneCrashedNode)
 	// t.Run("testMir_FNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
@@ -192,7 +192,7 @@ func (ts *eudicoConsensusSuite) testMirSevenNodesMining(t *testing.T) {
 	ens.BeginMirMining(ctx, miners...)
 
 	for _, n := range nodes {
-		err := kit.SubnetHeightCheckForBlocks(ctx, 30, n)
+		err := kit.SubnetHeightCheckForBlocks(ctx, 20, n)
 		require.NoError(t, err)
 	}
 }
