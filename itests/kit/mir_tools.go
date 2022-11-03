@@ -3,6 +3,7 @@ package kit
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"time"
 
@@ -172,5 +173,10 @@ func NodeLibp2pAddr(h host.Host) (m multiaddr.Multiaddr, err error) {
 	}
 
 	return addrs[0], nil
+}
 
+func Delay(sec int) {
+	rand.Seed(time.Now().UnixNano())
+	n := rand.Intn(sec)
+	time.Sleep(time.Duration(n) * time.Second)
 }
