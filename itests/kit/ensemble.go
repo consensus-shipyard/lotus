@@ -857,6 +857,21 @@ func (n *Ensemble) InterconnectAll() *Ensemble {
 	return n
 }
 
+// InterconnectFullNodes connects full nodes to one another.
+func (n *Ensemble) InterconnectFullNodes() *Ensemble {
+	// connect full nodes between each other, skipping ourselves.
+	last := len(n.active.fullnodes) - 1
+	for i, from := range n.active.fullnodes {
+		if i == last {
+			continue
+		}
+		for _, to := range n.active.fullnodes[i+1:] {
+			n.Connect(from, to)
+		}
+	}
+	return n
+}
+
 // Connect connects one full node to the provided full nodes.
 func (n *Ensemble) Connect(from api.Net, to ...api.Net) *Ensemble {
 	addr, err := from.NetAddrsListen(context.Background())

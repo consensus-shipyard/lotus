@@ -22,8 +22,8 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 
 	// t.Run("testMirMiningOneNode", ts.testMirMiningOneNode)
 	// t.Run("testMirMiningTwoNodes", ts.testMirMiningTwoNodes)
-	// t.Run("testMirMiningFourNodes", ts.testMirMiningFourNodes)
-	t.Run("testMirMiningSevenNodes", ts.testMirMiningSevenNodes)
+	t.Run("testMirMiningFourNodes", ts.testMirMiningFourNodes)
+	// t.Run("testMirMiningSevenNodes", ts.testMirMiningSevenNodes)
 	// t.Run("testMirMiningFourNodesSending", ts.testMirMiningFourNodesSending)
 	// t.Run("testMirMiningFourNodesWithOneOmission", ts.testMirMiningFourNodesWithOneOmissionNode)
 	// t.Run("testMirMiningFourNodesWithOneCrashedNode", ts.testMirMiningFourNodesWithOneCrashedNode)
@@ -98,7 +98,7 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodes(t *testing.T) {
 		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3])
+	ens.InterconnectFullNodes()
 
 	ens.BeginMirMining(ctx, miners...)
 
@@ -123,7 +123,7 @@ func (ts *eudicoConsensusSuite) testMirMiningSevenNodes(t *testing.T) {
 		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3], nodes[4], nodes[5], nodes[6])
+	ens.InterconnectFullNodes()
 
 	ens.BeginMirMining(ctx, miners...)
 
@@ -148,7 +148,7 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodesSending(t *testing.T) {
 		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3])
+	ens.InterconnectFullNodes()
 
 	ens.BeginMirMining(ctx, miners...)
 
@@ -188,7 +188,7 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodesWithOneOmissionNode(t *tes
 		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	ens.Connect(nodes[0], nodes[1], nodes[2], nodes[3])
+	ens.InterconnectFullNodes()
 
 	ens.BeginMirMining(ctx, miners...)
 
@@ -227,6 +227,7 @@ func (ts *eudicoConsensusSuite) testMirMiningFourNodesWithOneCrashedNode(t *test
 	ens.Connect(crashedNode, nodes[0], nodes[1], nodes[2])
 
 	crashedEns.BeginMirMining(crashedCtx, crashedMiner)
+	
 	ens.BeginMirMining(ctx, miners...)
 
 	for _, n := range append(nodes, crashedNode) {
