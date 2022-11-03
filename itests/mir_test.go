@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-state-types/big"
@@ -25,8 +26,8 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	// t.Run("testMirFourNodesMining", ts.testmirFournodesmining)
 	// t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
 	// t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
-	t.Run("testMirSevenNodesMining", ts.testMirSevenNodesMining)
-	// t.Run("testMirFourNodesMiningWithMessaging", ts.testMirFourNodesMiningWithMessaging)
+	// t.Run("testMirSevenNodesMining", ts.testMirSevenNodesMining)
+	t.Run("testMirFourNodesMiningWithMessaging", ts.testMirFourNodesMiningWithMessaging)
 	// t.Run("testMirFourNodesWithOneOmissionNode", ts.testMirFourNodesWithOneOmissionNode)
 	// t.Run("testMirFourNodesWithOneCrashedNode", ts.testMirFourNodesWithOneCrashedNode)
 	// t.Run("testMir_FNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
@@ -230,10 +231,27 @@ func (ts *eudicoConsensusSuite) testMirFourNodesMiningWithMessaging(t *testing.T
 	smsg1, err := nodes[1].MpoolPushMessage(ctx, msg1, nil)
 	require.NoError(t, err)
 
-	nodes[2].WaitMsg(ctx, smsg1.Cid())
+	WaitForMessageWithAvailable(ctx, nodes[2], smsg1.Cid(), false)
 
 	err = kit.MirNodesWaitMsg(ctx, smsg1.Cid(), nodes...)
 	require.NoError(t, err)
+}
+
+func WaitForMessageWithAvailable(ctx context.Context, n *kit.TestFullNode, c cid.Cid, strict bool) error {
+	// TODO: Add a timeout
+	for {
+		_, err := n.StateWaitMsg(ctx, c, 5, 100, true)
+		if err != nil {
+			if !strict {
+				continue
+			}
+			return err
+		}
+		if err == nil {
+			return nil
+		}
+	}
+	return nil
 }
 
 func (ts *eudicoConsensusSuite) testMirFourNodesWithOneOmissionNode(t *testing.T) {
