@@ -32,8 +32,15 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		runMirConsensusTests(t, kit.ThroughRPC())
+		runTestDraft(t, kit.ThroughRPC())
+		// runMirConsensusTests(t, kit.ThroughRPC())
 	})
+}
+
+func runTestDraft(t *testing.T, opts ...interface{}) {
+	ts := eudicoConsensusSuite{opts: opts}
+
+	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
 }
 
 func runMirConsensusTests(t *testing.T, opts ...interface{}) {
@@ -49,6 +56,7 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
 	t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
 	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
+	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
 }
 
 type eudicoConsensusSuite struct {
@@ -239,7 +247,7 @@ func (ts *eudicoConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 		ens.DisconnectNodes(nodes[i], nodes[i+1:]...)
 	}
 
-	err = kit.SubnetHeightCheck(ctx, TestedBlockNumber, nodes[2:]...)
+	err = kit.SubnetHeightCheck(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 }
 
@@ -291,4 +299,35 @@ func (ts *eudicoConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 
 	err = kit.SubnetHeightCheck(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
+}
+
+func (ts *eudicoConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
+
+	err := kit.SubnetHeightCheck(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
+	t.Logf(">>> disconnecting %d nodes", MirFaultyValidatorNumber)
+	for i := 0; i < MirFaultyValidatorNumber; i++ {
+		ens.DisconnectNodes(nodes[i], nodes[i+1:]...)
+	}
+
+	err = kit.SubnetHeightCheck(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
+	require.NoError(t, err)
+
+	kit.RandomDelay(MaxDelay)
+
+	t.Log(">>> restoring network connections")
+	ens.InterconnectFullNodes()
+
+	err = kit.SubnetHeightCheck(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
 }
