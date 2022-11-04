@@ -80,7 +80,7 @@ spacenet: lotus mir-validator
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
-	go test $(GOFLAGS) -v -count=1 ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -race -v -count=1 -timeout 20m ./itests/mir_test.go
 .PHONY: spacenet-test
 
 calibnet: GOFLAGS+=-tags=calibnet

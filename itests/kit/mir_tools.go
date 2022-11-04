@@ -137,7 +137,7 @@ func NodeLibp2pAddr(h host.Host) (m multiaddr.Multiaddr, err error) {
 	return addrs[0], nil
 }
 
-func Delay(seconds int) {
+func RandomDelay(seconds int) {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
 }

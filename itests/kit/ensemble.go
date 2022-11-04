@@ -896,6 +896,18 @@ func (n *Ensemble) Disconnect(from api.Net, to ...api.Net) *Ensemble {
 	return n
 }
 
+// DisconnectNodes disconnects one full from the provided full nodes.
+func (n *Ensemble) DisconnectNodes(from api.Net, to ...*TestFullNode) *Ensemble {
+	addr, err := from.NetAddrsListen(context.Background())
+	require.NoError(n.t, err)
+
+	for _, other := range to {
+		err = other.NetDisconnect(context.Background(), addr.ID)
+		require.NoError(n.t, err)
+	}
+	return n
+}
+
 func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestMiner) []*BlockMiner {
 	ctx := context.Background()
 
@@ -995,6 +1007,30 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 			require.NoError(n.t, err)
 		}(m)
 	}
+}
+
+func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*TestMiner) []context.CancelFunc {
+	membership := n.mirMembership(miners...)
+
+	var cancels []context.CancelFunc
+
+	for _, m := range miners {
+		ctx, cancel := context.WithCancel(ctx)
+		cancels = append(cancels, cancel)
+
+		go func(ctx context.Context, m *TestMiner) {
+			db := NewTestDB()
+			cfg := mir.Cfg{
+				MembershipCfg: mir.MembershipFromStr(membership),
+			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, db, &cfg)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(ctx, m)
+	}
+	return cancels
 }
 
 func (n *Ensemble) generateGenesis() *genesis.Template {
