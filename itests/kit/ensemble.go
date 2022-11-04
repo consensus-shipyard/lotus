@@ -383,10 +383,7 @@ func (n *Ensemble) Start() *Ensemble {
 		require.NoError(n.t, err)
 
 		opts := []node.Option{
-			// FIXME: We consider all nodes running MIR as validators for now, but if we
-			// want to use learners we will need to make node.Validator(false) so their
-			// Block pubsub topic is enabled.
-			node.FullAPI(&full.FullNode, node.Lite(full.options.lite), node.MirValidator(build.IsMirConsensus())),
+			node.FullAPI(&full.FullNode, node.Lite(full.options.lite), node.MirValidator(!full.options.learner)),
 			node.Base(),
 			node.Repo(r),
 			node.If(full.options.disableLibp2p, node.MockHost(n.mn)),

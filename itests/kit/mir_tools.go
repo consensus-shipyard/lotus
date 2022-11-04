@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	finalityTimeout = 1200
+	testTimeout = 1200
 )
 
 // SubnetHeightCheckForBlocks checks that `n` blocks with correct heights in the subnet will be mined.
@@ -87,7 +87,7 @@ func SubnetHeightCheck(ctx context.Context, n int, nodes ...*TestFullNode) error
 func WaitForMessageWithAvailable(ctx context.Context, n *TestFullNode, c cid.Cid, strict bool) error {
 	for {
 		select {
-		case <-time.After(finalityTimeout * time.Second):
+		case <-time.After(testTimeout * time.Second):
 			return fmt.Errorf("WaitForMessageWithAvailable timeout expired")
 		default:
 
@@ -137,8 +137,7 @@ func NodeLibp2pAddr(h host.Host) (m multiaddr.Multiaddr, err error) {
 	return addrs[0], nil
 }
 
-func Delay(sec int) {
+func Delay(seconds int) {
 	rand.Seed(time.Now().UnixNano())
-	n := rand.Intn(sec)
-	time.Sleep(time.Duration(n) * time.Second)
+	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
 }

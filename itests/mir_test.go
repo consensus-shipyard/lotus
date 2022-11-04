@@ -24,12 +24,13 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	// t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 	// t.Run("testMirFourNodesMining", ts.testMirFourNodesMining)
 	// t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
+	t.Run("testMirWhenLearnerJoins", ts.testMirWhenLearnerJoins)
 	// t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
 	// t.Run("testMirSevenNodesMining", ts.testMirSevenNodesMining)
 	// t.Run("testMirFourNodesMiningWithMessaging", ts.testMirFourNodesMiningWithMessaging)
 	// t.Run("testMirWithOneOmissionNode", ts.testMirWithOmissionNodes)
 	// t.Run("testMirWithCrashedNodes", ts.testMirWithCrashedNodes)
-	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
+	// t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
 }
 
 type eudicoConsensusSuite struct {
@@ -50,6 +51,9 @@ func (ts *eudicoConsensusSuite) testMirOneNodeMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirTwoNodesMining tests that two Mir nodes can mine blocks.
+//
+// Its peculiarity is that it uses other mechanisms to instantiate testing comparing to the main tests here.
 func (ts *eudicoConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -75,9 +79,7 @@ func (ts *eudicoConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, p, "node two has peers")
 
-	ens.Connect(n1, n2)
-
-	ens.BeginMirMining(ctx, m1, m2)
+	ens.Connect(n1, n2).BeginMirMining(ctx, m1, m2)
 
 	err = kit.SubnetHeightCheck(ctx, 10, n1, n2)
 	require.NoError(t, err)
@@ -98,9 +100,7 @@ func (ts *eudicoConsensusSuite) testMirFourNodesMining(t *testing.T) {
 		require.Empty(t, p, "node has peers", "nodeID", i)
 	}
 
-	ens.InterconnectFullNodes()
-
-	ens.BeginMirMining(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.SubnetHeightCheck(ctx, 10, nodes...)
 	require.NoError(t, err)
@@ -115,17 +115,31 @@ func (ts *eudicoConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, 3, ts.opts...)
 
-	for i, n := range nodes {
-		p, err := n.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Empty(t, p, "node has peers", "nodeID", i)
-	}
-
-	ens.InterconnectFullNodes()
-
-	ens.BeginMirMining(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.SubnetHeightCheck(ctx, 10, nodes...)
+	require.NoError(t, err)
+}
+
+func (ts *eudicoConsensusSuite) testMirWhenLearnerJoins(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, 7, ts.opts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
+
+	err := kit.SubnetHeightCheck(ctx, 10, nodes...)
+	require.NoError(t, err)
+
+	t.Log(">>> learner joins")
+	var learner kit.TestFullNode
+	ens.FullNode(&learner, kit.LearnerNode()).Start().InterconnectFullNodes()
+	require.Equal(t, true, learner.IsLearner())
+
+	err = kit.SubnetHeightCheck(ctx, 10, &learner)
 	require.NoError(t, err)
 }
 
@@ -137,13 +151,6 @@ func (ts *eudicoConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, 7, ts.opts...)
-
-	for i, n := range nodes {
-		p, err := n.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Empty(t, p, "node has peers", "nodeID", i)
-	}
-
 	ens.InterconnectFullNodes()
 
 	ens.BeginMirMining(ctx, miners[2:]...)
@@ -170,16 +177,7 @@ func (ts *eudicoConsensusSuite) testMirSevenNodesMining(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, 7, ts.opts...)
-
-	for i, n := range nodes {
-		p, err := n.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Empty(t, p, "node has peers", "nodeID", i)
-	}
-
-	ens.InterconnectFullNodes()
-
-	ens.BeginMirMining(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.SubnetHeightCheck(ctx, 10, nodes...)
 	require.NoError(t, err)
@@ -193,49 +191,25 @@ func (ts *eudicoConsensusSuite) testMirFourNodesMiningWithMessaging(t *testing.T
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, 4, ts.opts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
-	for i, n := range nodes {
-		p, err := n.NetPeers(ctx)
+	for i := range nodes {
+		src, err := nodes[i].WalletDefaultAddress(ctx)
 		require.NoError(t, err)
-		require.Empty(t, p, "node has peers", "nodeID", i)
+
+		dst, err := nodes[(i+1)%len(nodes)].WalletDefaultAddress(ctx)
+		require.NoError(t, err)
+
+		smsg, err := nodes[0].MpoolPushMessage(ctx, &types.Message{
+			From:  src,
+			To:    dst,
+			Value: big.Zero(),
+		}, nil)
+		require.NoError(t, err)
+
+		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
+		require.NoError(t, err)
 	}
-
-	ens.InterconnectFullNodes()
-
-	ens.BeginMirMining(ctx, miners...)
-
-	addr1, err := nodes[1].WalletDefaultAddress(ctx)
-	require.NoError(t, err)
-
-	addr2, err := nodes[2].WalletDefaultAddress(ctx)
-	require.NoError(t, err)
-
-	msg := &types.Message{
-		From:  addr1,
-		To:    addr2,
-		Value: big.Zero(),
-	}
-
-	smsg, err := nodes[1].MpoolPushMessage(ctx, msg, nil)
-	require.NoError(t, err)
-
-	err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
-	require.NoError(t, err)
-
-	addr3, err := nodes[3].WalletDefaultAddress(ctx)
-	require.NoError(t, err)
-
-	msg = &types.Message{
-		From:  addr2,
-		To:    addr3,
-		Value: big.Zero(),
-	}
-
-	smsg, err = nodes[2].MpoolPushMessage(ctx, msg, nil)
-	require.NoError(t, err)
-
-	err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
-	require.NoError(t, err)
 }
 
 func (ts *eudicoConsensusSuite) testMirWithOmissionNodes(t *testing.T) {
@@ -246,18 +220,10 @@ func (ts *eudicoConsensusSuite) testMirWithOmissionNodes(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, 7, ts.opts...)
-
-	for i, n := range nodes {
-		p, err := n.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Empty(t, p, "node has peers", "nodeID", i)
-	}
-
-	ens.InterconnectFullNodes()
-
-	ens.BeginMirMining(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.SubnetHeightCheck(ctx, 10, nodes...)
+	require.NoError(t, err)
 
 	ens.Disconnect(nodes[0], nodes[1], nodes[2], nodes[3], nodes[4], nodes[5], nodes[6])
 	ens.Disconnect(nodes[1], nodes[2], nodes[3], nodes[4], nodes[5], nodes[6])
@@ -277,12 +243,6 @@ func (ts *eudicoConsensusSuite) testMirWithCrashedNodes(t *testing.T) {
 
 	crashedNode, crashedMiner, crashedEns := kit.EnsembleMinimalMir(t, ts.opts...)
 	nodes, miners, ens := kit.EnsembleMirNodes(t, 3, ts.opts...)
-
-	for i, n := range append(nodes, crashedNode) {
-		p, err := n.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Empty(t, p, "node has peers", "nodeID", i)
-	}
 
 	ens.Connect(crashedNode, nodes[0], nodes[1], nodes[2])
 

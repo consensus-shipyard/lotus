@@ -126,7 +126,7 @@ func EnsembleFourMirNodes(t *testing.T, opts ...interface{}) (
 	return &n1, &n2, &n3, &n4, &m1, &m2, &m3, &m4, ens
 }
 
-func EnsembleMirNodes(t *testing.T, size int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
+func EnsembleMirNodes(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
 	opts = append(opts, WithAllSubsystems())
 
 	eopts, nopts := siftOptions(t, opts)
@@ -138,25 +138,33 @@ func EnsembleMirNodes(t *testing.T, size int, opts ...interface{}) ([]*TestFullN
 
 	ens := NewEnsemble(t, eopts...)
 
-	for i := 0; i < size; i++ {
-		var n TestFullNode
-		var m TestMiner
-		ens.FullNode(&n, nopts...).Miner(&m, &n, nopts...)
-		nodes = append(nodes, &n)
-		miners = append(miners, &m)
+	for i := 0; i < n; i++ {
+		var node TestFullNode
+		var miner TestMiner
+		ens.FullNode(&node, nopts...).Miner(&miner, &node, nopts...)
+		nodes = append(nodes, &node)
+		miners = append(miners, &miner)
 	}
 
 	ens.active.miners = []*TestMiner{}
 	ens.Start()
 
-	for i := 0; i < size; i++ {
+	for i := 0; i < n; i++ {
 		adaptForMir(t, nodes[i], miners[i])
 	}
 
-	require.Equal(t, size, len(nodes))
-	require.Equal(t, size, len(miners))
+	require.Equal(t, n, len(nodes))
+	require.Equal(t, n, len(miners))
 
 	return nodes, miners, ens
+}
+
+func EnsembleMirNodesWithLearner(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *TestFullNode, *Ensemble) {
+	var learner TestFullNode
+	nodes, miners, ens := EnsembleMirNodes(t, n, opts)
+	ens.FullNode(&learner, LearnerNode()).Start()
+
+	return nodes, miners, &learner, ens
 }
 
 func EnsembleWorker(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMiner, *TestWorker, *Ensemble) {

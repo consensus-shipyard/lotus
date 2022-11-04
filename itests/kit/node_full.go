@@ -39,6 +39,10 @@ func (f *TestFullNode) ClientImportCARFile(ctx context.Context, rseed int, size 
 	return res, carv1FilePath, origFilePath
 }
 
+func (f *TestFullNode) IsLearner() bool {
+	return f.options.learner == true
+}
+
 // CreateImportFile creates a random file with the specified seed and size, and
 // imports it into the full node.
 func (f *TestFullNode) CreateImportFile(ctx context.Context, rseed int, size int) (res *api.ImportRes, path string) {

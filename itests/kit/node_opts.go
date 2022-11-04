@@ -29,6 +29,7 @@ const TestSpt = abi.RegisteredSealProof_StackedDrg2KiBV1_1
 type nodeOpts struct {
 	balance       abi.TokenAmount
 	lite          bool
+	learner       bool
 	sectors       int
 	rpc           bool
 	ownerKey      *key.Key
@@ -145,6 +146,15 @@ func OwnerBalance(balance abi.TokenAmount) NodeOpt {
 func LiteNode() NodeOpt {
 	return func(opts *nodeOpts) error {
 		opts.lite = true
+		return nil
+	}
+}
+
+// LearnerNode specifies that this node will be a learner node. Only relevant when
+// creating a fullnode.
+func LearnerNode() NodeOpt {
+	return func(opts *nodeOpts) error {
+		opts.learner = true
 		return nil
 	}
 }
