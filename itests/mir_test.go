@@ -22,16 +22,12 @@ const (
 	MaxDelay                 = 30
 )
 
-// func TestMain(m *testing.M) {
-// 	 goleak.VerifyTestMain(m)
-// }
-
 func TestMirConsensus(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		runTestDraft(t, kit.ThroughRPC())
+		// runTestDraft(t, kit.ThroughRPC())
 		runMirConsensusTests(t, kit.ThroughRPC())
 	})
 }
@@ -50,13 +46,13 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
-	t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
-	t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
-	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
-	t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
-	t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
-	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
-	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
+	// t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
+	// t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
+	// t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
+	// t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
+	// t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
+	// t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
+	// t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
 }
 
 type eudicoConsensusSuite struct {

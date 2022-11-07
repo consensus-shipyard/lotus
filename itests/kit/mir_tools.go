@@ -56,7 +56,7 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, base *TestFullNo
 
 			// wait for tipset in height (if it arrives)
 			errCh := make(chan error, 1)
-			go func() {
+			go func(node *TestFullNode) {
 				i := from
 				for {
 					ts, err := node.ChainGetTipSetByHeight(ctx, i, types.EmptyTSK)
@@ -80,9 +80,9 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, base *TestFullNo
 						return
 					}
 					errCh <- nil
-
+					return
 				}
-			}()
+			}(node)
 
 			select {
 			case err := <-errCh:

@@ -998,9 +998,9 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 	n.dbs = make([]*testDB, len(miners))
 
 	for i, m := range miners {
-		go func(m *TestMiner) {
-			db := NewTestDB()
-			n.dbs[i] = db
+		db := NewTestDB()
+		n.dbs[i] = db
+		go func(m *TestMiner, db *testDB) {
 			cfg := mir.Cfg{
 				MembershipCfg: mir.MembershipFromStr(membership),
 			}
@@ -1009,7 +1009,7 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 				return
 			}
 			require.NoError(n.t, err)
-		}(m)
+		}(m, db)
 	}
 }
 
