@@ -1019,6 +1019,9 @@ func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*Tes
 		cancels = append(cancels, cancel)
 
 		go func(ctx context.Context, m *TestMiner) {
+			// TODO: In order to support the restart of nodes after a crash
+			// we need to persist somewhere the database and config so we can
+			// restart with `mir.Mine` from the previous state.
 			db := NewTestDB()
 			cfg := mir.Cfg{
 				MembershipCfg: mir.MembershipFromStr(membership),

@@ -12,12 +12,88 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
 	testTimeout = 1200
 )
+
+// CheckNodesInSync checks that all the nodes are in sync up till certain
+// height, if for some reason any of the nodes haven't seen a block
+// for certain height yet, the check waits up to a timeout to see if
+// the node not synced receives the block for that height, and if this
+// is not the case it returns an error.
+//
+// NOTE: This function takes as the base for the comparison the tipset for
+// node 0. Assume node 0 in the argument array as the one that has the most up-to-date
+// chain (we can probably make this configurable).
+func CheckNodesInSync(ctx context.Context, from, height abi.ChainEpoch, nodes ...*TestFullNode) error {
+	if len(nodes) < 2 {
+		return fmt.Errorf("function only supported for more than one node")
+	}
+	for from <= height {
+		base, err := nodes[0].ChainGetTipSetByHeight(ctx, from, types.EmptyTSK)
+		if err != nil {
+			return err
+		}
+		if base.Height() != from {
+			return fmt.Errorf("couldn't find tipset for height in base node")
+		}
+
+		// TODO: We can probably parallelize the check for each node?
+		for ni, node := range nodes[1:] {
+			// 20 seconds baseline timeout
+			timeout := 20 * time.Second
+			ctx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+
+			// wait for tipset in height (if it arrives)
+			errCh := make(chan error, 1)
+			go func() {
+				i := from
+				for {
+					ts, err := node.ChainGetTipSetByHeight(ctx, i, types.EmptyTSK)
+					if err != nil {
+						// errCh <- err
+						// disregard these errors, you can optionally print them.
+						fmt.Printf("ERROR GETTING TIPSET BY HEIGHT IN NODE: %d: %w", ni, err)
+						continue
+					}
+					if ts.Height() < base.Height() {
+						// we are not synced yet, so continue
+						time.Sleep(500 * time.Second)
+						continue
+					}
+					if ts.Height() != base.Height() {
+						errCh <- fmt.Errorf("something went wrong. we didn´t reach the same height in node %d", i)
+						return
+					}
+					if ts.Key() != base.Key() {
+						errCh <- fmt.Errorf("something went wrong. we didn´t reach the same cid in node %d", i)
+						return
+					}
+					errCh <- nil
+
+				}
+			}()
+
+			select {
+			case err := <-errCh:
+				if err != nil {
+					return nil
+				}
+			case <-ctx.Done():
+				return fmt.Errorf("block for height not found after deadline")
+			}
+			from++
+		}
+	}
+
+	return nil
+}
 
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
 	heads, err := api.ChainNotify(ctx)
@@ -53,6 +129,12 @@ func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) er
 	return nil
 }
 
+// ChainHeightCheck verifies that an amount of arbitrary blocks where added to
+// the chain. This check is used to ensure that the chain keeps advances but
+// performs no deeper check into the blocks created. We don't check if all
+// nodes created the same blocks for the same height. If you need to perform deeper
+// checks (for instance to see if the nodes have forked) you should use some other
+// check.
 func ChainHeightCheck(ctx context.Context, n int, nodes ...*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 

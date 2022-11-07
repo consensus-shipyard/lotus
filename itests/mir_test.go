@@ -31,8 +31,8 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		// runTestDraft(t, kit.ThroughRPC())
-		runMirConsensusTests(t, kit.ThroughRPC())
+		runTestDraft(t, kit.ThroughRPC())
+		// runMirConsensusTests(t, kit.ThroughRPC())
 	})
 }
 
@@ -109,6 +109,12 @@ func (ts *eudicoConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 	ens.Connect(n1, n2).BeginMirMining(ctx, m1, m2)
 
 	err = kit.ChainHeightCheck(ctx, TestedBlockNumber, n1, n2)
+	require.NoError(t, err)
+	// get the head from one of the nodes to use as a base
+	// to check if nodes are in sync.
+	tip, err := n1.ChainHead(ctx)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, tip.Height()-1, n1, n2)
 	require.NoError(t, err)
 }
 
