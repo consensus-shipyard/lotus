@@ -136,6 +136,7 @@ type Ensemble struct {
 		miners   []genesis.Miner
 		accounts []genesis.Actor
 	}
+	dbs []*testDB
 }
 
 // NewEnsemble instantiates a new blank Ensemble.
@@ -148,6 +149,7 @@ func NewEnsemble(t *testing.T, opts ...EnsembleOpt) *Ensemble {
 
 	n := &Ensemble{t: t, options: &options}
 	n.active.bms = make(map[*TestMiner]*BlockMiner)
+	n.dbs = make([]*testDB, 0)
 
 	for _, up := range options.upgradeSchedule {
 		if up.Height < 0 {
@@ -993,10 +995,12 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 	membership := n.mirMembership(miners...)
+	n.dbs = make([]*testDB, len(miners))
 
-	for _, m := range miners {
+	for i, m := range miners {
 		go func(m *TestMiner) {
 			db := NewTestDB()
+			n.dbs[i] = db
 			cfg := mir.Cfg{
 				MembershipCfg: mir.MembershipFromStr(membership),
 			}
@@ -1009,20 +1013,44 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 	}
 }
 
+func (n *Ensemble) RestoreMirMining(ctx context.Context, index int, miners ...*TestMiner) {
+	membership := n.mirMembership(miners...)
+	if 0 > index || index >= len(n.dbs) {
+		n.t.Fatalf("wrong miner database index: %d", index)
+	}
+	db := n.dbs[index]
+	if db == nil {
+		n.t.Fatalf("nil miner database: %d", index)
+	}
+	go func(m *TestMiner) {
+		cfg := mir.Cfg{
+			MembershipCfg: mir.MembershipFromStr(membership),
+		}
+		err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, db, &cfg)
+		if xerrors.Is(mapi.ErrStopped, err) {
+			return
+		}
+		require.NoError(n.t, err)
+	}(miners[index])
+}
+
 func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*TestMiner) []context.CancelFunc {
 	membership := n.mirMembership(miners...)
 
+	n.dbs = make([]*testDB, len(miners))
+
 	var cancels []context.CancelFunc
 
-	for _, m := range miners {
+	for i, m := range miners {
 		ctx, cancel := context.WithCancel(ctx)
 		cancels = append(cancels, cancel)
 
-		go func(ctx context.Context, m *TestMiner) {
+		go func(ctx context.Context, i int, m *TestMiner) {
 			// TODO: In order to support the restart of nodes after a crash
 			// we need to persist somewhere the database and config so we can
 			// restart with `mir.Mine` from the previous state.
 			db := NewTestDB()
+			n.dbs[i] = db
 			cfg := mir.Cfg{
 				MembershipCfg: mir.MembershipFromStr(membership),
 			}
@@ -1031,7 +1059,7 @@ func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*Tes
 				return
 			}
 			require.NoError(n.t, err)
-		}(ctx, m)
+		}(ctx, i, m)
 	}
 	return cancels
 }
