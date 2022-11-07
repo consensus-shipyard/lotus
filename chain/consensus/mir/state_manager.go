@@ -3,6 +3,7 @@ package mir
 import (
 	"bytes"
 	"context"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -56,7 +57,8 @@ type StateManager struct {
 	NextCheckpoint chan *CheckpointData
 
 	// Flag that determines if the mir is syncing.
-	synced bool
+	syncLk sync.Mutex
+	synced bool // avoid accessing it directly, we have a lock and accessor methods
 }
 
 func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
@@ -114,7 +116,7 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
 	log.Debugf("Calling RestoreState from Mir for epoch %d", sm.currentEpoch)
 	// if RestoreState is called is because Mir detected that we are not in sync.
-	sm.synced = false
+	sm.unsetSynced()
 	// release any previous checkpoint delivered and pending
 	// to sync, as we are syncing again. This prevents a deadlock.
 	sm.releaseNextCheckpointChan()
@@ -185,7 +187,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	}
 
 	// flag the mining process that we are synced and we can start accepting new batches.
-	sm.synced = true
+	sm.setSynced()
 	return nil
 }
 
@@ -499,4 +501,22 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 		return nil, err
 	}
 	return ch, nil
+}
+
+func (sm *StateManager) setSynced() {
+	sm.syncLk.Lock()
+	defer sm.syncLk.Unlock()
+	sm.synced = true
+}
+
+func (sm *StateManager) unsetSynced() {
+	sm.syncLk.Lock()
+	defer sm.syncLk.Unlock()
+	sm.synced = true
+}
+
+func (sm *StateManager) isSynced() bool {
+	sm.syncLk.Lock()
+	defer sm.syncLk.Unlock()
+	return sm.synced
 }

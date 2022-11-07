@@ -92,7 +92,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		default:
 			// if not synced we are not ready to mine, this could lead to
 			// races, so we need to wait.
-			if !m.StateManager.synced {
+			if !m.StateManager.isSynced() {
 				log.Warnf("Mir not synced yet, waiting to sync before we start mining.")
 				// add some delay for the case that next batch comes right after returning
 				// this.
