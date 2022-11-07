@@ -19,12 +19,7 @@ const (
 	testTimeout = 1200
 )
 
-// SubnetHeightCheckForBlocks checks that `n` blocks with correct heights in the subnet will be mined.
-// TODO: Ideally we should wait for a specific epoch/height of a block to see that all nodes are
-// able to sync and mine up till there.
-// A way of doing it may be to add a ChainHead listener that blocks until the height is reached
-// in an independent go routine for each node
-func SubnetHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
+func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
 	heads, err := api.ChainNotify(ctx)
 	if err != nil {
 		return err
@@ -58,13 +53,13 @@ func SubnetHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) e
 	return nil
 }
 
-func SubnetHeightCheck(ctx context.Context, n int, nodes ...*TestFullNode) error {
+func ChainHeightCheck(ctx context.Context, n int, nodes ...*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for _, node := range nodes {
 		node := node
 		g.Go(func() error {
-			if err := SubnetHeightCheckForBlocks(ctx, n, node); err != nil {
+			if err := ChainHeightCheckForBlocks(ctx, n, node); err != nil {
 				return err
 			}
 			return nil
