@@ -35,16 +35,17 @@ func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
 	addr, err := full.WalletNew(context.Background(), types.KTSecp256k1)
 	require.NoError(t, err)
 
-	pk, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	priv, _, err := crypto.GenerateEd25519Key(rand.Reader)
 	require.NoError(t, err)
 
 	h, err := libp2p.New(
-		libp2p.Identity(pk),
+		libp2p.Identity(priv),
 		libp2p.DefaultTransports,
 		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
 	)
 	require.NoError(t, err)
 
+	miner.mirPrivKey = priv
 	miner.mirHost = h
 	miner.mirAddr = addr
 }

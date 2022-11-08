@@ -147,7 +147,6 @@ require (
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
 	go.opentelemetry.io/otel/sdk v1.2.0
 	go.uber.org/fx v1.15.0
-	go.uber.org/goleak v1.1.12
 	go.uber.org/multierr v1.8.0
 	go.uber.org/zap v1.22.0
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234

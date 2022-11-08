@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -22,7 +23,6 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
@@ -91,9 +91,13 @@ type TestMiner struct {
 
 	options nodeOpts
 
-	// Mir primitives
-	mirHost host.Host
-	mirAddr address.Address
+	// Mir types
+	mirPrivKey    crypto.PrivKey
+	mirHost       host.Host
+	mirAddr       address.Address
+	stopMir       context.CancelFunc
+	mirDB         *testDB
+	mirMembership string
 }
 
 func (tm *TestMiner) PledgeSectors(ctx context.Context, n, existing int, blockNotif <-chan struct{}) {

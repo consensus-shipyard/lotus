@@ -133,19 +133,19 @@ func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) er
 	return nil
 }
 
-// ChainHeightCheck verifies that an amount of arbitrary blocks where added to
+// ChainHeightCheck verifies that an amount of arbitrary blocks was added to
 // the chain. This check is used to ensure that the chain keeps advances but
 // performs no deeper check into the blocks created. We don't check if all
 // nodes created the same blocks for the same height. If you need to perform deeper
 // checks (for instance to see if the nodes have forked) you should use some other
 // check.
-func ChainHeightCheck(ctx context.Context, n int, nodes ...*TestFullNode) error {
+func ChainHeightCheck(ctx context.Context, blocks int, nodes ...*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for _, node := range nodes {
 		node := node
 		g.Go(func() error {
-			if err := ChainHeightCheckForBlocks(ctx, n, node); err != nil {
+			if err := ChainHeightCheckForBlocks(ctx, blocks, node); err != nil {
 				return err
 			}
 			return nil
@@ -153,6 +153,51 @@ func ChainHeightCheck(ctx context.Context, n int, nodes ...*TestFullNode) error 
 	}
 	if err := g.Wait(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
+	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
+	newHeights := make([]abi.ChainEpoch, len(faultyNodes))
+
+	// Adding an initial buffer for peers to sync their chain head.
+	time.Sleep(500 * time.Millisecond)
+
+	for i, fn := range faultyNodes {
+		ts, err := fn.FullNode.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
+		if ts == nil {
+			return fmt.Errorf("nil tipset for an old block")
+		}
+		oldHeights[i] = ts.Height()
+	}
+
+	err := ChainHeightCheck(ctx, blocks, nodes...)
+	if err != nil {
+		return err
+	}
+
+	for i, fn := range faultyNodes {
+		ts, err := fn.FullNode.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
+		if ts == nil {
+			return fmt.Errorf("nil tipset for an new block")
+		}
+		newHeights[i] = ts.Height()
+	}
+
+	for i := range newHeights {
+		h1 := newHeights[i]
+		h2 := oldHeights[i]
+		if h1 != h2 {
+			return fmt.Errorf("different heights for miner %d: new - %d, old - %d", i, h1, h2)
+		}
 	}
 
 	return nil

@@ -15,6 +15,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
+	"github.com/libp2p/go-libp2p"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
@@ -136,7 +137,6 @@ type Ensemble struct {
 		miners   []genesis.Miner
 		accounts []genesis.Actor
 	}
-	dbs []*testDB
 }
 
 // NewEnsemble instantiates a new blank Ensemble.
@@ -149,7 +149,6 @@ func NewEnsemble(t *testing.T, opts ...EnsembleOpt) *Ensemble {
 
 	n := &Ensemble{t: t, options: &options}
 	n.active.bms = make(map[*TestMiner]*BlockMiner)
-	n.dbs = make([]*testDB, 0)
 
 	for _, up := range options.upgradeSchedule {
 		if up.Height < 0 {
@@ -910,6 +909,25 @@ func (n *Ensemble) DisconnectNodes(from api.Net, to ...*TestFullNode) *Ensemble 
 	return n
 }
 
+// DisconnectMirMiner disconnects a Mir miner.
+func (n *Ensemble) DisconnectMirMiner(miner *TestMiner) *Ensemble {
+	miner.mirHost.Close() // nolint
+	return n
+}
+
+// ReconnectMirMiner disconnects a Mir miner.
+func (n *Ensemble) ReconnectMirMiner(miner *TestMiner) *Ensemble {
+	h, err := libp2p.New(
+		libp2p.Identity(miner.mirPrivKey),
+		libp2p.DefaultTransports,
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+	)
+	require.NoError(n.t, err)
+
+	miner.mirHost = h
+	return n
+}
+
 func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestMiner) []*BlockMiner {
 	ctx := context.Background()
 
@@ -993,75 +1011,86 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
-func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
-	membership := n.mirMembership(miners...)
-	n.dbs = make([]*testDB, len(miners))
+func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
+	membership := n.mirMembership(append(miners, faultyMiners...)...)
 
-	for i, m := range miners {
-		db := NewTestDB()
-		n.dbs[i] = db
-		go func(m *TestMiner, db *testDB) {
+	for i, m := range append(miners, faultyMiners...) {
+		go func(i int, m *TestMiner) {
+			m.mirDB = NewTestDB()
+			m.mirMembership = membership
 			cfg := mir.Cfg{
 				MembershipCfg: mir.MembershipFromStr(membership),
 			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, db, &cfg)
+			if i > len(miners) && delay > 0 {
+				RandomDelay(delay)
+			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
 			require.NoError(n.t, err)
-		}(m, db)
+		}(i, m)
 	}
 }
 
-func (n *Ensemble) RestoreMirMining(ctx context.Context, index int, miners ...*TestMiner) {
-	membership := n.mirMembership(miners...)
-	if 0 > index || index >= len(n.dbs) {
-		n.t.Fatalf("wrong miner database index: %d", index)
-	}
-	db := n.dbs[index]
-	if db == nil {
-		n.t.Fatalf("nil miner database: %d", index)
-	}
-	go func(m *TestMiner) {
-		cfg := mir.Cfg{
-			MembershipCfg: mir.MembershipFromStr(membership),
-		}
-		err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, db, &cfg)
-		if xerrors.Is(mapi.ErrStopped, err) {
-			return
-		}
-		require.NoError(n.t, err)
-	}(miners[index])
+func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, delay int, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelayForFaultyNodes(ctx, delay, miners)
 }
 
-func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*TestMiner) []context.CancelFunc {
+func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelay(ctx, 0, miners...)
+}
+
+func (n *Ensemble) RestoreMirMiners(ctx context.Context, miners ...*TestMiner) {
+	for _, m := range miners {
+		if m.mirDB == nil {
+			n.t.Fatalf("nil miner database: %v", m.mirAddr)
+		}
+		if m.mirMembership == "" {
+			n.t.Fatalf("empty miner membersip: %v", m.mirAddr)
+		}
+		go func(m *TestMiner) {
+			cfg := mir.Cfg{
+				MembershipCfg: mir.MembershipFromStr(m.mirMembership),
+			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(m)
+	}
+}
+
+func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
+	for _, m := range miners {
+		m.stopMir()
+		if delay > 0 {
+			RandomDelay(delay)
+		}
+	}
+}
+
+func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*TestMiner) {
 	membership := n.mirMembership(miners...)
-
-	n.dbs = make([]*testDB, len(miners))
-
-	var cancels []context.CancelFunc
 
 	for i, m := range miners {
 		ctx, cancel := context.WithCancel(ctx)
-		cancels = append(cancels, cancel)
+		m.stopMir = cancel
 
 		go func(ctx context.Context, i int, m *TestMiner) {
-			// TODO: In order to support the restart of nodes after a crash
-			// we need to persist somewhere the database and config so we can
-			// restart with `mir.Mine` from the previous state.
-			db := NewTestDB()
-			n.dbs[i] = db
+			m.mirMembership = membership
+			m.mirDB = NewTestDB()
 			cfg := mir.Cfg{
-				MembershipCfg: mir.MembershipFromStr(membership),
+				MembershipCfg: mir.MembershipFromStr(m.mirMembership),
 			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, db, &cfg)
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
 			require.NoError(n.t, err)
 		}(ctx, i, m)
 	}
-	return cancels
 }
 
 func (n *Ensemble) generateGenesis() *genesis.Template {
