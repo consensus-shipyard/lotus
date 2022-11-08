@@ -1062,6 +1062,25 @@ func (n *Ensemble) RestoreMirMiners(ctx context.Context, miners ...*TestMiner) {
 	}
 }
 
+func (n *Ensemble) RestoreMirMinersFromScratch(ctx context.Context, miners ...*TestMiner) {
+	for _, m := range miners {
+		if m.mirMembership == "" {
+			n.t.Fatalf("empty miner membersip: %v", m.mirAddr)
+		}
+		go func(m *TestMiner) {
+			m.mirDB = NewTestDB()
+			cfg := mir.Cfg{
+				MembershipCfg: mir.MembershipFromStr(m.mirMembership),
+			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(m)
+	}
+}
+
 func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
 	for _, m := range miners {
 		m.stopMir()

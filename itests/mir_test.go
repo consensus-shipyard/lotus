@@ -22,7 +22,7 @@ const (
 	MaxDelay                 = 30
 )
 
-// TestMirConsensus tests that Mir works properly.
+// TestMirConsensus tests that Mir operates normally.
 //
 // Notes:
 // - It is assumed that the first F of N nodes can be byzantine
@@ -41,7 +41,7 @@ func TestMirConsensus(t *testing.T) {
 func runTestDraft(t *testing.T, opts ...interface{}) {
 	ts := eudicoConsensusSuite{opts: opts}
 
-	t.Run("testMirTwoNodesMining", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
+	t.Run("testMirTwoNodesMining", ts.testMirWithFCrashedAndRecoveredNodes)
 	// t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
 }
 
@@ -58,6 +58,7 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
 	t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
 	t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
+	t.Run("testMirWithFCrashedAndRecoveredNodes", ts.testMirWithFCrashedAndRecoveredNodes)
 	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
 	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
 }
@@ -83,7 +84,7 @@ func (ts *eudicoConsensusSuite) testMirOneNodeMining(t *testing.T) {
 
 // testMirTwoNodesMining tests that two Mir nodes can mine blocks.
 //
-// Its peculiarity is that it uses other mechanisms to instantiate testing comparing to the main tests here.
+// NOTE: Its peculiarity is that it uses other mechanisms to instantiate testing comparing to the main tests here.
 func (ts *eudicoConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -117,6 +118,7 @@ func (ts *eudicoConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirAllNodesMining tests that n nodes can mine blocks normally.
 func (ts *eudicoConsensusSuite) testMirAllNodesMining(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -140,6 +142,7 @@ func (ts *eudicoConsensusSuite) testMirAllNodesMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
 func (ts *eudicoConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -156,6 +159,8 @@ func (ts *eudicoConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirWhenLearnersJoin tests that all nodes operate normally
+// if new learner joins when the network is already started and syncs the whole network.
 func (ts *eudicoConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -186,6 +191,8 @@ func (ts *eudicoConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// if all nodes start with large, random delays (1-2 minutes).
 func (ts *eudicoConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -203,6 +210,8 @@ func (ts *eudicoConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// if f nodes start with large, random delays (1-2 minutes).
 func (ts *eudicoConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -220,6 +229,7 @@ func (ts *eudicoConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 	require.NoError(t, err)
 }
 
+// testMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes.
 func (ts *eudicoConsensusSuite) testMirAllNodesMiningWithMessaging(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -253,6 +263,8 @@ func (ts *eudicoConsensusSuite) testMirAllNodesMiningWithMessaging(t *testing.T)
 	}
 }
 
+// testMirWithFOmissionNodes tests that n − f nodes operate normally and can recover
+// if f nodes do not have access to network at the same time.
 func (ts *eudicoConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -283,6 +295,8 @@ func (ts *eudicoConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirWithFCrashedNodes tests that n − f nodes operate normally and can recover
+// if f nodes crash at the same time.
 func (ts *eudicoConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -309,6 +323,37 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// testMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
+// and recovered nodes eventually operate normally if f nodes crash and then recover (with only initial state)
+// after a long delay (few minutes).
+func (ts *eudicoConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	ens.InterconnectFullNodes().BeginMirMiningWithCrashes(ctx, miners...)
+
+	err := kit.ChainHeightCheck(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
+	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
+	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
+
+	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
+	ens.RestoreMirMinersFromScratch(ctx, miners[:MirFaultyValidatorNumber]...)
+
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+}
+
+// testMirFNodesCrashLongTimeApart tests that n − f nodes operate normally
+// if f nodes crash, long time apart (few minutes).
 func (ts *eudicoConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -335,6 +380,8 @@ func (ts *eudicoConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// tests that n − f nodes operate normally, and partitioned nodes eventually catch up
+// if f nodes have a long period of no network access, but do not crash.
 func (ts *eudicoConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
