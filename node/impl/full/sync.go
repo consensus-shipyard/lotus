@@ -10,6 +10,8 @@ import (
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain"
@@ -163,4 +165,8 @@ func (a *SyncAPI) SyncFetchTipSetFromPeer(ctx context.Context, p peer.ID, tsk ty
 	}
 
 	return fts.TipSet(), nil
+}
+
+func (a *SyncAPI) SyncPurgeForRecovery(ctx context.Context, height abi.ChainEpoch) error {
+	return a.Syncer.SyncPurgeForRecovery(ctx, height)
 }

@@ -461,6 +461,8 @@ type FullNodeStruct struct {
 
 		SyncMarkBad func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
 
+		SyncPurgeForRecovery func(p0 context.Context, p1 abi.ChainEpoch) error `perm:"write"`
+
 		SyncState func(p0 context.Context) (*SyncState, error) `perm:"read"`
 
 		SyncSubmitBlock func(p0 context.Context, p1 *types.BlockMsg) error `perm:"write"`
@@ -3121,6 +3123,17 @@ func (s *FullNodeStruct) SyncMarkBad(p0 context.Context, p1 cid.Cid) error {
 }
 
 func (s *FullNodeStub) SyncMarkBad(p0 context.Context, p1 cid.Cid) error {
+	return ErrNotSupported
+}
+
+func (s *FullNodeStruct) SyncPurgeForRecovery(p0 context.Context, p1 abi.ChainEpoch) error {
+	if s.Internal.SyncPurgeForRecovery == nil {
+		return ErrNotSupported
+	}
+	return s.Internal.SyncPurgeForRecovery(p0, p1)
+}
+
+func (s *FullNodeStub) SyncPurgeForRecovery(p0 context.Context, p1 abi.ChainEpoch) error {
 	return ErrNotSupported
 }
 

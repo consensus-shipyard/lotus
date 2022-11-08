@@ -41,6 +41,7 @@ type blkCache interface {
 	length() int
 	setLatestCheckpoint(ch *CheckpointData) error
 	getLatestCheckpoint() (*CheckpointData, error)
+	purge() error
 }
 
 type dsBlkCache struct {
@@ -66,6 +67,24 @@ func (c *dsBlkCache) put(e abi.ChainEpoch, v cid.Cid) error {
 
 func (c *dsBlkCache) rm(e abi.ChainEpoch) error {
 	return c.ds.Delete(context.Background(), cacheKey(e))
+}
+
+// TODO: For long checkpoint periods this operation may take a
+// while, this is supposed to only be done when RestoreState is
+// called and we are recovering from a checkpoint, but maybe we
+// should consider performing this in the background to remove it
+// from the critical path.
+func (c *dsBlkCache) purge() error {
+	q := query.Query{Prefix: BlkCachePrefix}
+	qr, _ := c.ds.Query(context.Background(), q)
+	entries, err := qr.Rest()
+	if err != nil {
+		return fmt.Errorf("error performing cache query for purge: %w", err)
+	}
+	for _, e := range entries {
+		return c.ds.Delete(context.Background(), datastore.NewKey(e.Key))
+	}
+	return nil
 }
 
 // this operation is potentially expensive according
@@ -214,6 +233,13 @@ func (c *memBlkCache) getLatestCheckpoint() (*CheckpointData, error) {
 	c.lk.RLock()
 	defer c.lk.RUnlock()
 	return c.latestCheckpoint, nil
+}
+
+func (c *memBlkCache) purge() error {
+	c.lk.RLock()
+	defer c.lk.RUnlock()
+	c.m = make(map[abi.ChainEpoch]cid.Cid)
+	return nil
 }
 
 var (

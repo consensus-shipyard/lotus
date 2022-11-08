@@ -57,7 +57,7 @@ type StateManager struct {
 	NextCheckpoint chan *CheckpointData
 
 	// Flag that determines if the mir is syncing.
-	syncLk sync.Mutex
+	syncLk sync.RWMutex
 	synced bool // avoid accessing it directly, we have a lock and accessor methods
 }
 
@@ -144,8 +144,12 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
 		}
 
-		internalSync := false
+		// purge any state previous to the checkpoint
+		if err = sm.api.SyncPurgeForRecovery(sm.MirManager.ctx, ch.Height); err != nil {
+			return xerrors.Errorf("couldn't purge state to recover from checkpoint: %w", err)
+		}
 
+		internalSync := false
 		// From all the peers of my daemon try to get the latest tipset.
 		connPeers, err := sm.api.NetPeers(sm.MirManager.ctx)
 		if err != nil {
@@ -512,11 +516,11 @@ func (sm *StateManager) setSynced() {
 func (sm *StateManager) unsetSynced() {
 	sm.syncLk.Lock()
 	defer sm.syncLk.Unlock()
-	sm.synced = true
+	sm.synced = false
 }
 
 func (sm *StateManager) isSynced() bool {
-	sm.syncLk.Lock()
-	defer sm.syncLk.Unlock()
+	sm.syncLk.RLock()
+	defer sm.syncLk.RUnlock()
 	return sm.synced
 }

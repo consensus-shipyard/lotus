@@ -26,10 +26,10 @@ func TestMirFIFOPool(t *testing.T) {
 	})
 	require.Equal(t, true, inProgress)
 
-	inProgress = p.DeleteRequest(c1)
+	inProgress = p.DeleteRequest(c1, 0)
 	require.Equal(t, true, inProgress)
 
-	inProgress = p.DeleteRequest(c2)
+	inProgress = p.DeleteRequest(c2, 0)
 	require.Equal(t, false, inProgress)
 
 }

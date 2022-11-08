@@ -7,12 +7,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ipfs/go-cid"
 	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/ipfs/go-cid"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	bstore "github.com/filecoin-project/lotus/blockstore"
@@ -188,9 +188,6 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			if err := bft.cache.rcvCheckpoint(ch); err != nil {
 				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
 			}
-			// TODO: If the checkpoint is valid we could consider setting this tipset as a
-			// checkpoint locally so we can't fork from it.
-			// bft.sm.ChainStore().SetCheckpoint(ctx, ts*types.TipSet)
 		}
 
 		// the genesis block can be considered as verified already.
@@ -297,6 +294,13 @@ func hasCheckpoint(h *types.BlockHeader) bool {
 // We will consider potential changes of Consensus interface in https://github.com/filecoin-project/eudico/issues/143.
 func (bft *Mir) IsEpochBeyondCurrMax(epoch abi.ChainEpoch) bool {
 	return false
+}
+
+// PurgeValidationCache cleans the cache from outstanding blocks.
+// (it may be the case that there are some left-overs from previous
+// runs after a crash or an incorrect validation).
+func (bft *Mir) PurgeValidationCache() {
+	bft.cache.cache.purge()
 }
 
 // Weight in mir uses a default approach where the height determines the weight.

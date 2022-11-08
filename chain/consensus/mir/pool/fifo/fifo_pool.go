@@ -25,8 +25,8 @@ func New() *Pool {
 }
 
 // AddRequest adds the request if it satisfies to the FIFO policy.
-func (p *Pool) AddRequest(cid cid.Cid, r *mirrequest.Request) {
-	_, exist := p.orderingClients[r.ClientId]
+func (p *Pool) AddRequest(cid cid.Cid, r *mirrequest.Request) (exist bool) {
+	_, exist = p.orderingClients[r.ClientId]
 	// if it doesn't exist or it has a greater nonce than the one seen.
 	if !exist || r.ReqNo > p.seen[r.ClientId] {
 		p.clientByCID[cid] = r.ClientId

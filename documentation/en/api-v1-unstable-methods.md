@@ -228,6 +228,7 @@
   * [SyncFetchTipSetFromPeer](#SyncFetchTipSetFromPeer)
   * [SyncIncomingBlocks](#SyncIncomingBlocks)
   * [SyncMarkBad](#SyncMarkBad)
+  * [SyncPurgeForRecovery](#SyncPurgeForRecovery)
   * [SyncState](#SyncState)
   * [SyncSubmitBlock](#SyncSubmitBlock)
   * [SyncUnmarkAllBad](#SyncUnmarkAllBad)
@@ -7463,6 +7464,23 @@ Inputs:
   {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   }
+]
+```
+
+Response: `{}`
+
+### SyncPurgeForRecovery
+SyncPurgeForRecovery "forgets" all state after a Mir checkpoint to create
+a clean slate from which the daemon can sync according to the
+checkpoint provided by Mir
+
+
+Perms: write
+
+Inputs:
+```json
+[
+  10101
 ]
 ```
 

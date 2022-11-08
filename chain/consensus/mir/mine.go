@@ -9,13 +9,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/mir"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
