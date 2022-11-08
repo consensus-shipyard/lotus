@@ -133,13 +133,13 @@ func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) er
 	return nil
 }
 
-// ChainHeightCheck verifies that an amount of arbitrary blocks was added to
+// AdvanceChain advances the chain and verifies that an amount of arbitrary blocks was added to
 // the chain. This check is used to ensure that the chain keeps advances but
 // performs no deeper check into the blocks created. We don't check if all
 // nodes created the same blocks for the same height. If you need to perform deeper
 // checks (for instance to see if the nodes have forked) you should use some other
 // check.
-func ChainHeightCheck(ctx context.Context, blocks int, nodes ...*TestFullNode) error {
+func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for _, node := range nodes {
@@ -160,7 +160,6 @@ func ChainHeightCheck(ctx context.Context, blocks int, nodes ...*TestFullNode) e
 
 func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
 	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
-	newHeights := make([]abi.ChainEpoch, len(faultyNodes))
 
 	// Adding an initial buffer for peers to sync their chain head.
 	time.Sleep(500 * time.Millisecond)
@@ -176,7 +175,7 @@ func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*T
 		oldHeights[i] = ts.Height()
 	}
 
-	err := ChainHeightCheck(ctx, blocks, nodes...)
+	err := AdvanceChain(ctx, blocks, nodes...)
 	if err != nil {
 		return err
 	}
@@ -189,14 +188,9 @@ func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*T
 		if ts == nil {
 			return fmt.Errorf("nil tipset for an new block")
 		}
-		newHeights[i] = ts.Height()
-	}
-
-	for i := range newHeights {
-		h1 := newHeights[i]
-		h2 := oldHeights[i]
-		if h1 != h2 {
-			return fmt.Errorf("different heights for miner %d: new - %d, old - %d", i, h1, h2)
+		newHeight := ts.Height()
+		if newHeight != oldHeights[i] {
+			return fmt.Errorf("different heights for miner %d: new - %d, old - %d", i, newHeight, oldHeights[i])
 		}
 	}
 

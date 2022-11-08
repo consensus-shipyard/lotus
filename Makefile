@@ -80,8 +80,13 @@ spacenet: lotus mir-validator
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
-	go test $(GOFLAGS) -shuffle=on -v -race -count=1 ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 ./itests/mir_test.go
 .PHONY: spacenet-test
+
+spacenet-test-race: GOFLAGS+=-tags=spacenet
+spacenet-test-race:
+	go test $(GOFLAGS) -shuffle=on -v -race -count=1 ./itests/mir_test.go
+.PHONY: spacenet-test-race
 
 calibnet: GOFLAGS+=-tags=calibnet
 calibnet: build-devnets
