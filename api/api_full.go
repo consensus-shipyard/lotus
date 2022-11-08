@@ -207,6 +207,11 @@ type FullNode interface {
 	// network through this node
 	SyncSubmitBlock(ctx context.Context, blk *types.BlockMsg) error //perm:write
 
+	// SyncPurgeForRecovery "forgets" all state after a Mir checkpoint to create
+	// a clean slate from which the daemon can sync according to the
+	// checkpoint provided by Mir
+	SyncPurgeForRecovery(ctx context.Context, height abi.ChainEpoch) error //perm:write
+
 	// SyncIncomingBlocks returns a channel streaming incoming, potentially not
 	// yet synced block headers.
 	SyncIncomingBlocks(ctx context.Context) (<-chan *types.BlockHeader, error) //perm:read

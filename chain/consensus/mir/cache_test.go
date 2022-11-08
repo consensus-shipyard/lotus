@@ -26,4 +26,7 @@ func testCacheLen(t *testing.T, c *mirCache) {
 	err = c.cache.rm(11)
 	require.NoError(t, err)
 	require.Equal(t, 1, c.cache.length())
+	err = c.cache.purge()
+	require.NoError(t, err)
+	require.Equal(t, 0, c.cache.length())
 }

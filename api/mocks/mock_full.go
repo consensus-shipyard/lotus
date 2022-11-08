@@ -3185,6 +3185,20 @@ func (mr *MockFullNodeMockRecorder) SyncMarkBad(arg0, arg1 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncMarkBad", reflect.TypeOf((*MockFullNode)(nil).SyncMarkBad), arg0, arg1)
 }
 
+// SyncPurgeForRecovery mocks base method.
+func (m *MockFullNode) SyncPurgeForRecovery(arg0 context.Context, arg1 abi.ChainEpoch) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncPurgeForRecovery", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SyncPurgeForRecovery indicates an expected call of SyncPurgeForRecovery.
+func (mr *MockFullNodeMockRecorder) SyncPurgeForRecovery(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPurgeForRecovery", reflect.TypeOf((*MockFullNode)(nil).SyncPurgeForRecovery), arg0, arg1)
+}
+
 // SyncState mocks base method.
 func (m *MockFullNode) SyncState(arg0 context.Context) (*api.SyncState, error) {
 	m.ctrl.T.Helper()

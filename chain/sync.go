@@ -23,6 +23,7 @@ import (
 	"go.opencensus.io/trace"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/pubsub"
 
@@ -1264,4 +1265,29 @@ func (syncer *Syncer) FetchTipSetFromPeer(ctx context.Context, p peer.ID, tsk ty
 		syncer.InformNewHead(p, ts)
 	}
 	return ts, nil
+}
+
+// SyncPurgeForRecovery "forgets" all state after a Mir checkpoint to create
+// a clean slate from which the daemon can sync according to the
+// checkpoint provided by Mir
+func (syncer *Syncer) SyncPurgeForRecovery(ctx context.Context, height abi.ChainEpoch) error {
+	// purge the cache from bad blocks in case the mir-validator died
+	// while validating a good block and it was included in the cache.
+	// If we receive a bad block we will have to validate it again,
+	// but we won't accept it if it is bad.
+	syncer.bad.Purge()
+
+	// check if we advanced our chain over the height of the checkpoint.
+	if height < syncer.ChainStore().GetHeaviestTipSet().Height() {
+		ts, err := syncer.ChainStore().GetTipsetByHeight(ctx, height, nil, false)
+		if err != nil {
+			return xerrors.Errorf("error getting tipset by height when recovering state: %w", err)
+		}
+		// if we have more tipset in the future we need to forget them and set
+		// our head back to the height pointed by the checkpoint.
+		if err := syncer.ChainStore().ForceHeadSilent(ctx, ts); err != nil {
+			return xerrors.Errorf("error silently setting the height to the one needed for recovery: %w", err)
+		}
+	}
+	return nil
 }

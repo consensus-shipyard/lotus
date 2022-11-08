@@ -931,6 +931,11 @@ workflows:
           target: "./itests/mempool_test.go"
       
       - test:
+          name: test-itest-mir
+          suite: itest-mir
+          target: "./itests/mir_test.go"
+      
+      - test:
           name: test-itest-mpool_msg_uuid
           suite: itest-mpool_msg_uuid
           target: "./itests/mpool_msg_uuid_test.go"
