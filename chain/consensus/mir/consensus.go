@@ -195,9 +195,10 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			// we should receive all blocks, including the ones that don't include checkpoints
 			// so they are conveniently verified
 			// TODO: There is an attack surface here, what if a malicious peer sends two
-			// blocks for the same epoch? This needs to be handled here in rcvBlock
-			// so a new block for the same epoch doesn't overwrite or mess up with our view
-			// of the chain.
+			// blocks for the same epoch? This is handled in the cache by just accepting
+			// the first one and rejecting any subsequent ones. A malicious node could
+			// force a forged block to us to get us out-of-sync. While this is a hustle,
+			// the worst case here is that we would have to keep restoring sync from a checkpoint
 			if err := bft.cache.rcvBlock(h); err != nil {
 				return xerrors.Errorf("error receiving block in cache: %w", err)
 			}

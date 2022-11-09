@@ -209,7 +209,8 @@ type FullNode interface {
 
 	// SyncPurgeForRecovery "forgets" all state after a Mir checkpoint to create
 	// a clean slate from which the daemon can sync according to the
-	// checkpoint provided by Mir
+	// checkpoint provided by Mir. This functions moves the chain head to
+	// the height pointed by the checkpoint.
 	SyncPurgeForRecovery(ctx context.Context, height abi.ChainEpoch) error //perm:write
 
 	// SyncIncomingBlocks returns a channel streaming incoming, potentially not

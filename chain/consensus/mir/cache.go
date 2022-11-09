@@ -164,6 +164,9 @@ func (c mirCache) rcvCheckpoint(ch *CheckpointData) error {
 }
 
 func (c *mirCache) rcvBlock(b *types.BlockHeader) error {
+	if c, _ := c.cache.get(b.Height); c != cid.Undef {
+		return fmt.Errorf("already seen a block for that height in cache: height=%d", b.Height)
+	}
 	return c.cache.put(b.Height, b.Cid())
 }
 
@@ -179,13 +182,9 @@ func (c *mirCache) latestCheckpoint() (*CheckpointData, error) {
 	return ch, nil
 }
 
-// thread-safe memory blockchain. It has low-overhead
+// thread-safe memory block cache. It has low-overhead
 // but it is not persisted between restarts (which may lead
 // to inconsistencies).
-//
-// Learners may use this memory cache, but validators should
-// persist their cache between restarts if they don't want to
-// crash and get out of sync.
 type memBlkCache struct {
 	lk               sync.RWMutex
 	m                map[abi.ChainEpoch]cid.Cid
