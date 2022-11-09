@@ -167,7 +167,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	// configure SegmentLength for specific checkpoint period.
 	m.segmentLength, err = segmentForCheckpointPeriod(CheckpointPeriod, initialMembership)
 	if err != nil {
-		return nil, fmt.Errorf("error getting segment lengt: %w", err)
+		return nil, fmt.Errorf("error getting segment length: %w", err)
 	}
 	params.Iss.SegmentLength = m.segmentLength
 

@@ -80,7 +80,10 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 			return nil, err
 		}
 		// for mir ElectionProof gets out of the
-		// Cid computation.
+		// Cid computation because it includes the
+		// checkpoint certificate, and each validator
+		// may have collected the signatures of different
+		// committee participants.
 		c, err := abi.CidBuilder.Sum(cidData)
 		if err != nil {
 			return nil, err

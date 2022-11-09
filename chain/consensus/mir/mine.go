@@ -39,7 +39,6 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 
-	// TODO: Initialize manager from a snapshot or checkpoint instead of from scratch
 	m, err := NewManager(ctx, addr, h, api, db, cfg)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
