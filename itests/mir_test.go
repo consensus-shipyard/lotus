@@ -33,16 +33,16 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		// runTestDraft(t, kit.ThroughRPC())
-		runMirConsensusTests(t, kit.ThroughRPC())
+		runTestDraft(t, kit.ThroughRPC())
+		// runMirConsensusTests(t, kit.ThroughRPC())
 	})
 }
 
 func runTestDraft(t *testing.T, opts ...interface{}) {
 	ts := eudicoConsensusSuite{opts: opts}
 
-	t.Run("testMirTwoNodesMining", ts.testMirWithFCrashedAndRecoveredNodes)
-	// t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
+	t.Run("testMirTwoNodesMining", ts.testMirAllNodesMining)
+
 }
 
 func runMirConsensusTests(t *testing.T, opts ...interface{}) {
@@ -61,6 +61,7 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirWithFCrashedAndRecoveredNodes", ts.testMirWithFCrashedAndRecoveredNodes)
 	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
 	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
+	t.Run("testMirFNodesSleepAndThenOperate", ts.testMirFNodesSleepAndThenOperate)
 }
 
 type eudicoConsensusSuite struct {
@@ -179,7 +180,6 @@ func (ts *eudicoConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, learners...)
 	require.NoError(t, err)
-
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], learners...)...)
 	require.NoError(t, err)
 }
@@ -198,7 +198,6 @@ func (ts *eudicoConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }
@@ -217,7 +216,6 @@ func (ts *eudicoConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }
@@ -284,6 +282,8 @@ func (ts *eudicoConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 		ens.ReconnectMirMiner(miners[i])
 	}
 
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 }
@@ -312,6 +312,8 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
 	ens.RestoreMirMiners(ctx, miners[:MirFaultyValidatorNumber]...)
 
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 }
@@ -341,6 +343,8 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersFromScratch(ctx, miners[:MirFaultyValidatorNumber]...)
 
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 }
@@ -369,11 +373,14 @@ func (ts *eudicoConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
 	ens.RestoreMirMiners(ctx, miners[:MirFaultyValidatorNumber]...)
 
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 }
 
-// tests that n − f nodes operate normally, and partitioned nodes eventually catch up
+// testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
+// and partitioned nodes eventually catch up
 // if f nodes have a long period of no network access, but do not crash.
 func (ts *eudicoConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -404,6 +411,15 @@ func (ts *eudicoConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 		ens.ReconnectMirMiner(miners[i])
 	}
 
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
+}
+
+// testMirFNodesSleepAndThenOperate tests that n − f nodes operate normally without significant interruption
+// and woken up nodes eventually operate normally
+// if f  nodes sleep for a significant amount of time and then continue operating but keep network connection.
+func (ts *eudicoConsensusSuite) testMirFNodesSleepAndThenOperate(t *testing.T) {
+	// TBD
 }
