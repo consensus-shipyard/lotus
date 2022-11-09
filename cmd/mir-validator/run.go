@@ -39,6 +39,11 @@ var runCmd = &cli.Command{
 			Usage: "manage open file limit",
 			Value: true,
 		},
+		&cli.IntFlag{
+			Name:  "checkpoint-period",
+			Usage: "Checkpoint period",
+			Value: 8,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx, _ := tag.New(lcli.DaemonContext(cctx),
@@ -110,6 +115,9 @@ var runCmd = &cli.Command{
 		// TODO: Make this configurable.
 		membershipCfg := filepath.Join(cctx.String("repo"), MembershipCfgPath)
 
+		// Checkpoint period.
+		checkpointPeriod := cctx.Int("checkpoint-period")
+
 		h, err := newLp2pHost(cctx.String("repo"))
 		if err != nil {
 			return err
@@ -128,7 +136,7 @@ var runCmd = &cli.Command{
 		}
 
 		log.Infow("Starting mining with validator", "validator", validator)
-		cfg := mir.NewConfig(mir.MembershipFromFile(membershipCfg), dbPath)
+		cfg := mir.NewConfig(mir.MembershipFromFile(membershipCfg), dbPath, checkpointPeriod)
 		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
 	},
 }

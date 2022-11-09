@@ -119,6 +119,7 @@ func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) er
 		case <-ctx.Done():
 			return fmt.Errorf("closed channel")
 		case newHead := <-heads:
+			fmt.Println(">>>>", newHead[0].Val.Height())
 			newHead[0].Val.Height()
 			if newHead[0].Val.Height() <= currHead[0].Val.Height() {
 				return fmt.Errorf("wrong %d block height: prev block height - %d, current head height - %d",

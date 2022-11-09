@@ -35,7 +35,7 @@ const (
 //  5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //     they already have it.
 //  6. Sync and restore from state whenever needed.
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB, cfg *Cfg) error {
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB, cfg *Config) error {
 	log.With("addr", addr).Infof("Mir miner started")
 	defer log.With("addr", addr).Infof("Mir miner completed")
 

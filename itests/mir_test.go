@@ -41,7 +41,7 @@ func TestMirConsensus(t *testing.T) {
 func runTestDraft(t *testing.T, opts ...interface{}) {
 	ts := eudicoConsensusSuite{opts: opts}
 
-	t.Run("testMirTwoNodesMining", ts.testMirAllNodesMining)
+	t.Run("test", ts.testMirWithFCrashedNodes)
 
 }
 
@@ -298,7 +298,7 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
-	ens.InterconnectFullNodes().BeginMirMiningWithCrashes(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -310,7 +310,7 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
-	ens.RestoreMirMiners(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithDB(ctx, miners[:MirFaultyValidatorNumber]...)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -329,7 +329,7 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
-	ens.InterconnectFullNodes().BeginMirMiningWithCrashes(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -341,7 +341,7 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersFromScratch(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithEmptyDB(ctx, miners[:MirFaultyValidatorNumber]...)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -359,7 +359,7 @@ func (ts *eudicoConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
-	ens.InterconnectFullNodes().BeginMirMiningWithCrashes(ctx, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -371,7 +371,7 @@ func (ts *eudicoConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
-	ens.RestoreMirMiners(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithDB(ctx, miners[:MirFaultyValidatorNumber]...)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)

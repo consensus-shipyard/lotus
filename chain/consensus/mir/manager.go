@@ -36,10 +36,6 @@ import (
 
 const (
 	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
-	// Desired CheckpointPeriod
-	// TODO: Pass it as an Option to NewManager. Allow
-	// NewManager to receive cfg as an option also.
-	CheckpointPeriod = 8
 )
 
 var (
@@ -73,7 +69,7 @@ type Manager struct {
 	reconfigurationNonce uint64
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Cfg) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Config) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
@@ -165,7 +161,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 
 	params := smr.DefaultParams(initialMembership)
 	// configure SegmentLength for specific checkpoint period.
-	m.segmentLength, err = segmentForCheckpointPeriod(CheckpointPeriod, initialMembership)
+	m.segmentLength, err = segmentForCheckpointPeriod(cfg.CheckpointPeriod, initialMembership)
 	if err != nil {
 		return nil, fmt.Errorf("error getting segment lengt: %w", err)
 	}

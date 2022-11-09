@@ -26,13 +26,18 @@ const (
 	ReconfigurationType = 1
 )
 
-type Cfg struct {
-	MembershipCfg interface{}
-	DatastorePath string
+type Config struct {
+	MembershipCfg    interface{}
+	DatastorePath    string
+	CheckpointPeriod int
 }
 
-func NewConfig(membership interface{}, datastore string) *Cfg {
-	return &Cfg{membership, datastore}
+func NewConfig(membership interface{}, dbPath string, checkpointPeriod int) *Config {
+	return &Config{
+		MembershipCfg:    membership,
+		DatastorePath:    dbPath,
+		CheckpointPeriod: checkpointPeriod,
+	}
 }
 
 var log = logging.Logger("mir-consensus")

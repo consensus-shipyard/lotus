@@ -1015,11 +1015,16 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, de
 	membership := n.mirMembership(append(miners, faultyMiners...)...)
 
 	for i, m := range append(miners, faultyMiners...) {
-		go func(i int, m *TestMiner) {
-			m.mirDB = NewTestDB()
+		ctx, cancel := context.WithCancel(ctx)
+		m.stopMir = cancel
+
+		go func(ctx context.Context, i int, m *TestMiner) {
 			m.mirMembership = membership
-			cfg := mir.Cfg{
-				MembershipCfg: mir.MembershipFromStr(membership),
+			m.mirDB = NewTestDB()
+			m.checkpointPeriod = len(miners) + len(faultyMiners)
+			cfg := mir.Config{
+				MembershipCfg:    mir.MembershipFromStr(membership),
+				CheckpointPeriod: m.checkpointPeriod,
 			}
 			if i > len(miners) && delay > 0 {
 				RandomDelay(delay)
@@ -1029,7 +1034,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, de
 				return
 			}
 			require.NoError(n.t, err)
-		}(i, m)
+		}(ctx, i, m)
 	}
 }
 
@@ -1041,17 +1046,24 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
 	n.BeginMirMiningWithDelay(ctx, 0, miners...)
 }
 
-func (n *Ensemble) RestoreMirMiners(ctx context.Context, miners ...*TestMiner) {
+func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
 	for _, m := range miners {
-		if m.mirDB == nil {
+		if withPersistentDB && m.mirDB == nil {
 			n.t.Fatalf("nil miner database: %v", m.mirAddr)
 		}
 		if m.mirMembership == "" {
 			n.t.Fatalf("empty miner membersip: %v", m.mirAddr)
 		}
+		if m.checkpointPeriod <= 0 {
+			n.t.Fatalf("invalid checkpoint period: %v", m.checkpointPeriod)
+		}
 		go func(m *TestMiner) {
-			cfg := mir.Cfg{
-				MembershipCfg: mir.MembershipFromStr(m.mirMembership),
+			if !withPersistentDB {
+				m.mirDB = NewTestDB()
+			}
+			cfg := mir.Config{
+				MembershipCfg:    mir.MembershipFromStr(m.mirMembership),
+				CheckpointPeriod: m.checkpointPeriod,
 			}
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
@@ -1062,23 +1074,12 @@ func (n *Ensemble) RestoreMirMiners(ctx context.Context, miners ...*TestMiner) {
 	}
 }
 
-func (n *Ensemble) RestoreMirMinersFromScratch(ctx context.Context, miners ...*TestMiner) {
-	for _, m := range miners {
-		if m.mirMembership == "" {
-			n.t.Fatalf("empty miner membersip: %v", m.mirAddr)
-		}
-		go func(m *TestMiner) {
-			m.mirDB = NewTestDB()
-			cfg := mir.Cfg{
-				MembershipCfg: mir.MembershipFromStr(m.mirMembership),
-			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return
-			}
-			require.NoError(n.t, err)
-		}(m)
-	}
+func (n *Ensemble) RestoreMirMinersWithEmptyDB(ctx context.Context, miners ...*TestMiner) {
+	n.RestoreMirMinersWithOptions(ctx, false, miners...)
+}
+
+func (n *Ensemble) RestoreMirMinersWithDB(ctx context.Context, miners ...*TestMiner) {
+	n.RestoreMirMinersWithOptions(ctx, true, miners...)
 }
 
 func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
@@ -1087,28 +1088,6 @@ func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*Tes
 		if delay > 0 {
 			RandomDelay(delay)
 		}
-	}
-}
-
-func (n *Ensemble) BeginMirMiningWithCrashes(ctx context.Context, miners ...*TestMiner) {
-	membership := n.mirMembership(miners...)
-
-	for i, m := range miners {
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
-
-		go func(ctx context.Context, i int, m *TestMiner) {
-			m.mirMembership = membership
-			m.mirDB = NewTestDB()
-			cfg := mir.Cfg{
-				MembershipCfg: mir.MembershipFromStr(m.mirMembership),
-			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return
-			}
-			require.NoError(n.t, err)
-		}(ctx, i, m)
 	}
 }
 
