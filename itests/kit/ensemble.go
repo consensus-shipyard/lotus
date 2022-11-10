@@ -1011,14 +1011,25 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
-func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
+func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, wg *sync.WaitGroup, delay int, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelayForFaultyNodes(ctx, wg, delay, miners)
+}
+
+func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelay(ctx, wg, 0, miners...)
+}
+
+func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg *sync.WaitGroup, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
 	membership := n.mirMembership(append(miners, faultyMiners...)...)
 
 	for i, m := range append(miners, faultyMiners...) {
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel
 
+		wg.Add(1)
+
 		go func(ctx context.Context, i int, m *TestMiner) {
+			defer wg.Done()
 			m.mirMembership = membership
 			m.mirDB = NewTestDB()
 			m.checkpointPeriod = len(miners) + len(faultyMiners)
@@ -1036,14 +1047,6 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, de
 			require.NoError(n.t, err)
 		}(ctx, i, m)
 	}
-}
-
-func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, delay int, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelayForFaultyNodes(ctx, delay, miners)
-}
-
-func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelay(ctx, 0, miners...)
 }
 
 func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
@@ -1096,7 +1099,7 @@ func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*Tes
 		// and if we crash the node we need to close the libp2p
 		// host to prevent other mir validators from considering
 		// the crash validator as "online".
-		m.mirHost.Close()
+		// m.mirHost.Close()
 		if delay > 0 {
 			RandomDelay(delay)
 		}
