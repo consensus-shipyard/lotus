@@ -236,17 +236,17 @@ func (m *Manager) Stop() {
 	log.With("miner", m.MirID).Infof("Mir manager shutting down")
 	defer log.With("miner", m.MirID).Info("Mir manager stopped")
 
-	m.MirNode.Stop()
-
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
-			log.Errorf("Could not close interceptor: %s", err)
+			log.With("miner", m.MirID).Errorf("Could not close interceptor: %s", err)
 		}
-		log.Info("Interceptor closed")
+		log.With("miner", m.MirID).Info("Interceptor closed")
 	}
 
 	m.Net.Stop()
-	log.Info("Network transport stopped")
+	log.With("miner", m.MirID).Info("Network transport stopped")
+
+	m.MirNode.Stop()
 }
 
 // ReconfigureMirNode reconfigures the Mir node.

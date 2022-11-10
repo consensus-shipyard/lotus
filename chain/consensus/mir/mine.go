@@ -106,6 +106,9 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			}
 
 			select {
+			case <-ctx.Done():
+				log.Debug("Mir miner: context closed")
+				return nil
 			case membership := <-m.StateManager.NewMembership:
 				if err := m.ReconfigureMirNode(ctx, membership); err != nil {
 					log.With("epoch", nextHeight).Errorw("reconfiguring Mir failed", "error", err)
