@@ -405,5 +405,7 @@ func (m *Manager) latestCheckpoint(params smr.Params) (*checkpoint.StableCheckpo
 		}
 		return nil, xerrors.Errorf("error getting latest snapshot: %w", err)
 	}
-	return checkpoint.DeserializeStableCheckpoint(b)
+	ch := &checkpoint.StableCheckpoint{}
+	err = ch.Deserialize(b)
+	return ch, err
 }

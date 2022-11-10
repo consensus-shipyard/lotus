@@ -39,8 +39,8 @@ type blkCache interface {
 	put(e abi.ChainEpoch, v cid.Cid) error
 	rm(e abi.ChainEpoch) error
 	length() int
-	setLatestCheckpoint(ch *CheckpointData) error
-	getLatestCheckpoint() (*CheckpointData, error)
+	setLatestCheckpoint(ch *Checkpoint) error
+	getLatestCheckpoint() (*Checkpoint, error)
 	purge() error
 }
 
@@ -103,7 +103,7 @@ func (c *dsBlkCache) length() int {
 	return i
 }
 
-func (c *dsBlkCache) setLatestCheckpoint(ch *CheckpointData) error {
+func (c *dsBlkCache) setLatestCheckpoint(ch *Checkpoint) error {
 	b, err := ch.Bytes()
 	if err != nil {
 		return fmt.Errorf("error serializing checkpoint data: %w", err)
@@ -111,7 +111,7 @@ func (c *dsBlkCache) setLatestCheckpoint(ch *CheckpointData) error {
 	return c.ds.Put(context.Background(), latestCheckKey, b)
 }
 
-func (c *dsBlkCache) getLatestCheckpoint() (*CheckpointData, error) {
+func (c *dsBlkCache) getLatestCheckpoint() (*Checkpoint, error) {
 	b, err := c.ds.Get(context.Background(), latestCheckKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
@@ -119,14 +119,14 @@ func (c *dsBlkCache) getLatestCheckpoint() (*CheckpointData, error) {
 		}
 		return nil, fmt.Errorf("error getting latest checkpoint from Mir cache: %w", err)
 	}
-	ch := &CheckpointData{}
+	ch := &Checkpoint{}
 	err = ch.FromBytes(b)
 	return ch, err
 }
 
-func (c mirCache) rcvCheckpoint(ch *CheckpointData) error {
-	i := ch.Checkpoint.Height
-	for _, k := range ch.Checkpoint.BlockCids {
+func (c mirCache) rcvCheckpoint(snap *Checkpoint) error {
+	i := snap.Height
+	for _, k := range snap.BlockCids {
 		i--
 		// bypass genesis
 		if i == 0 {
@@ -154,7 +154,7 @@ func (c mirCache) rcvCheckpoint(ch *CheckpointData) error {
 	}
 
 	// update the latest checkpoint received.
-	if err := c.cache.setLatestCheckpoint(ch); err != nil {
+	if err := c.cache.setLatestCheckpoint(snap); err != nil {
 		if err != nil {
 			return fmt.Errorf("couldn't persist latest checkpoint in cache: %w", err)
 		}
@@ -174,14 +174,14 @@ func (c *mirCache) rcvBlock(b *types.BlockHeader) error {
 	return c.cache.put(b.Height, b.Cid())
 }
 
-func (c *mirCache) latestCheckpoint() (*CheckpointData, error) {
+func (c *mirCache) latestCheckpoint() (*Checkpoint, error) {
 	ch, err := c.cache.getLatestCheckpoint()
 	if err != nil {
 		return nil, err
 	}
 	if ch == nil {
-		// if not found return empty CheckpointData
-		return &CheckpointData{}, nil
+		// if not found return empty Checkpoint
+		return &Checkpoint{}, nil
 	}
 	return ch, nil
 }
@@ -192,7 +192,7 @@ func (c *mirCache) latestCheckpoint() (*CheckpointData, error) {
 type memBlkCache struct {
 	lk               sync.RWMutex
 	m                map[abi.ChainEpoch]cid.Cid
-	latestCheckpoint *CheckpointData
+	latestCheckpoint *Checkpoint
 }
 
 func newMemBlkCache() *mirCache {
@@ -224,7 +224,7 @@ func (c *memBlkCache) length() int {
 	defer c.lk.RUnlock()
 	return len(c.m)
 }
-func (c *memBlkCache) setLatestCheckpoint(ch *CheckpointData) error {
+func (c *memBlkCache) setLatestCheckpoint(ch *Checkpoint) error {
 	c.lk.Lock()
 	defer c.lk.Unlock()
 	c.latestCheckpoint = ch
@@ -232,7 +232,7 @@ func (c *memBlkCache) setLatestCheckpoint(ch *CheckpointData) error {
 
 }
 
-func (c *memBlkCache) getLatestCheckpoint() (*CheckpointData, error) {
+func (c *memBlkCache) getLatestCheckpoint() (*Checkpoint, error) {
 	c.lk.RLock()
 	defer c.lk.RUnlock()
 	return c.latestCheckpoint, nil

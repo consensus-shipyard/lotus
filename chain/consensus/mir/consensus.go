@@ -5,6 +5,7 @@ package mir
 
 import (
 	"context"
+	"crypto"
 	"fmt"
 
 	"github.com/ipfs/go-cid"
@@ -121,7 +122,7 @@ func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (
 		}
 	}
 	// check that the block is in the right range.
-	if b.Height < prev.Checkpoint.Height {
+	if b.Height < prev.Height {
 		return "block_out_of_range", xerrors.Errorf("the height of the received block is over the latest checkpoint received")
 	}
 	b.SetValidated()
@@ -177,7 +178,7 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 			return xerrors.Errorf("couldn't get latests checkpoint: %w", err)
 		}
 		// check that the block is in the right range.
-		if h.Height < prev.Checkpoint.Height {
+		if h.Height < prev.Height {
 			return xerrors.Errorf("the height of the received block is over the latest checkpoint received")
 		}
 		if hasCheckpoint(h) {
@@ -255,35 +256,42 @@ func blockSanityChecks(h *types.BlockHeader) error {
 	return nil
 }
 
-func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *CheckpointData) (*CheckpointData, error) {
+func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *Checkpoint) (*Checkpoint, error) {
 	ch, err := CheckpointFromVRFProof(h.Ticket)
 	if err != nil {
 		return nil, xerrors.Errorf("error getting checkpoint from ticket: %w", err)
 	}
-	cfg, err := ConfigFromElectionProof(h.ElectionProof)
+	cert, err := CertFromElectionProof(h.ElectionProof)
 	if err != nil {
 		return nil, xerrors.Errorf("error getting checkpoint config from election proof: %w", err)
 	}
-	ch.Config.Cert = cfg.Cert
+	ch = ch.AttachCert(cert)
+
 	// verify checkpoint signature
-	if err := ch.Verify(); err != nil {
+	// TODO: Right now we assume static membership and the membership is received off-chain.
+	// Once we support reconfiguration (and especially if we track membership online), we should
+	// check that the membership expected for the checkpoint is correct as part of the verification.
+	// Here we are just getting the most recent membership according to the cert without additional
+	// checks. We should probably check if the membership included in the cert is the correct one.
+	if err := ch.VerifyCert(crypto.SHA256, CheckpointVerifier{}, ch.Memberships()[0]); err != nil {
 		return nil, xerrors.Errorf("error verifying checkpoint signature: %w", err)
 	}
-	c, err := prev.Checkpoint.Cid()
+	snap, err := UnwrapCheckpointSnapshot(ch)
+	if err != nil {
+		return nil, xerrors.Errorf("error unwrapping checkpoint snapshot: %w", err)
+	}
+	c, err := prev.Cid()
 	if err != nil {
 		return nil, xerrors.Errorf("error computing cid for latest checkpoint: %w", err)
 	}
 	// if cid.Undef this is the first checkpoint, nothing to do here.
 	if c != cid.Undef {
-		if ch.Checkpoint.Parent.Cid != c || ch.Checkpoint.Parent.Height != prev.Checkpoint.Height {
-			return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, ch.Checkpoint.Parent.Cid)
+		if snap.Parent.Cid != c || snap.Parent.Height != prev.Height {
+			return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, snap.Parent.Cid)
 		}
 	}
 
-	// TODO: Right now we assume static membership and the membership is received off-chain.
-	// Once we support reconfiguration (and especially if we track membership online), we should
-	// check that the membership expected for the checkpoint is correct as part of the verification.
-	return ch, nil
+	return snap, nil
 }
 
 func hasCheckpoint(h *types.BlockHeader) bool {

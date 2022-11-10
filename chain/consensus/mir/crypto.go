@@ -5,13 +5,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	xerrors "golang.org/x/xerrors"
-
 	"github.com/filecoin-project/go-address"
 	filcrypto "github.com/filecoin-project/go-state-types/crypto"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	t "github.com/filecoin-project/mir/pkg/types"
-	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/api"
 
@@ -79,33 +76,10 @@ func verifySig(data [][]byte, sigBytes []byte, nodeID string) error {
 	return sigs.Verify(&sig, addr, hash(data))
 }
 
-// borrowing from mir/pkg to accept an alternative input to the protobuf
-func snapshotForHash(ch *CheckpointData) [][]byte {
+type CheckpointVerifier struct{}
 
-	// we should add a sanity-check before this function to ensure that
-	// this can't fail, as we are disregarding the error.
-	b, err := ch.Checkpoint.Bytes()
-	if err != nil {
-		xerrors.Errorf("error computing snapshotForHash: %w", err)
-	}
-
-	// Append epoch and app data
-	data := [][]byte{
-		t.EpochNr(ch.Config.EpochNr).Bytes(),
-		b,
-	}
-
-	// Append membership.
-	// Each string representing an ID and an address is explicitly terminated with a zero byte.
-	// This ensures that the last byte of an ID and the first byte of an address are not interchangeable.
-	for _, membership := range membershipToMapSlice(ch.Config.Memberships) {
-		maputil.IterateSorted(membership, func(id string, addr string) bool {
-			data = append(data, []byte(id), []byte{0}, []byte(addr), []byte{0})
-			return true
-		})
-	}
-
-	return data
+func (CheckpointVerifier) Verify(data [][]byte, signature []byte, nodeID t.NodeID) error {
+	return verifySig(data, signature, nodeID.Pb())
 }
 
 func hash(data [][]byte) []byte {

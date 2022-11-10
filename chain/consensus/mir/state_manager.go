@@ -54,7 +54,7 @@ type StateManager struct {
 	NextBatch chan *Batch
 
 	// Channel to send checkpoints to Lotus
-	NextCheckpoint chan *CheckpointData
+	NextCheckpoint chan *checkpoint.StableCheckpoint
 
 	// Flag that determines if the mir is syncing.
 	syncLk sync.RWMutex
@@ -75,7 +75,7 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 
 	sm := StateManager{
 		NextBatch:            make(chan *Batch),
-		NextCheckpoint:       make(chan *CheckpointData, 1),
+		NextCheckpoint:       make(chan *checkpoint.StableCheckpoint, 1),
 		NewMembership:        make(chan map[t.NodeID]t.NodeAddress, 1),
 		MirManager:           m,
 		memberships:          memberships,
@@ -121,7 +121,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	// to sync, as we are syncing again. This prevents a deadlock.
 	sm.releaseNextCheckpointChan()
 
-	config := checkpoint.Snapshot.Configuration
+	config := checkpoint.Snapshot.EpochData.EpochConfig
 	sm.currentEpoch = t.EpochNr(config.EpochNr)
 	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
 
@@ -387,9 +387,8 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	}
 
 	// Send the checkpoint to Lotus and handle it there
-	config := sm.MirManager.NewEpochConfigFromPb(checkpoint)
 	log.Debug("Sending checkpoint to mining process to include in block")
-	sm.NextCheckpoint <- &CheckpointData{*snapshot, checkpoint.Sn, *config}
+	sm.NextCheckpoint <- checkpoint
 	return nil
 }
 
@@ -407,7 +406,7 @@ func weakQuorum(n int) int {
 
 // pollCheckpoint listens to new available checkpoints to be
 // added in lotus blocks.
-func (sm *StateManager) pollCheckpoint() *CheckpointData {
+func (sm *StateManager) pollCheckpoint() *checkpoint.StableCheckpoint {
 	select {
 	case ch := <-sm.NextCheckpoint:
 		log.Debugf("Polling checkpoint successful. Sending checkpoint for inclusion in block.")

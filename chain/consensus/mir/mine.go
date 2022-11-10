@@ -141,17 +141,17 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 				vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
 				eproofCheckpoint := &ltypes.ElectionProof{}
 				if ch := m.StateManager.pollCheckpoint(); ch != nil {
-					vrfCheckpoint, err = ch.AsVRFProof()
+					eproofCheckpoint, err = CertAsElectionProof(ch)
 					if err != nil {
-						log.With("epoch", nextHeight).Errorw("error getting vrfproof from checkpoint:", "error", err)
+						log.With("epoch", nextHeight).Errorw("error setting eproof from checkpoint certificate:", "error", err)
 						continue
 					}
-					eproofCheckpoint, err = ch.ConfigAsElectionProof()
+					vrfCheckpoint, err = CheckpointAsVRFProof(ch)
 					if err != nil {
-						log.With("epoch", nextHeight).Errorw("error getting eproof from checkpoint:", "error", err)
+						log.With("epoch", nextHeight).Errorw("error setting vrfproof from checkpoint:", "error", err)
 						continue
 					}
-					log.Infof("Including Mir checkpoint for height %d in block %d", ch.Checkpoint.Height, nextHeight)
+					log.Infof("Including Mir checkpoint for in block %d", nextHeight)
 				}
 
 				bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
