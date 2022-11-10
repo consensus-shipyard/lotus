@@ -95,6 +95,7 @@ type TestMiner struct {
 	mirPrivKey       crypto.PrivKey
 	mirHost          host.Host
 	mirAddr          address.Address
+	mirMultiAddr     []multiaddr.Multiaddr
 	stopMir          context.CancelFunc
 	mirDB            *testDB
 	mirMembership    string

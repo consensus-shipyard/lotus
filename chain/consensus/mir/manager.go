@@ -226,9 +226,6 @@ func (m *Manager) Start(ctx context.Context) chan error {
 	go func() {
 		// Run Mir node until it stops.
 		errChan <- m.MirNode.Run(ctx)
-
-		// Perform cleanup of Node's modules.
-		m.Stop()
 	}()
 
 	return errChan

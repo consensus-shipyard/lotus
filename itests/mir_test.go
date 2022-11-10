@@ -42,6 +42,7 @@ func runTestDraft(t *testing.T, opts ...interface{}) {
 	ts := eudicoConsensusSuite{opts: opts}
 
 	t.Run("test", ts.testMirWithFCrashedNodes)
+	// t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 
 }
 
@@ -312,9 +313,11 @@ func (ts *eudicoConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithDB(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
+	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// require.NoError(t, err)
+	time.Sleep(10 * time.Second)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[MirFaultyValidatorNumber], nodes...)
 	require.NoError(t, err)
 }
 

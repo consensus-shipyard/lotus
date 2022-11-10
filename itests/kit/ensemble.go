@@ -1052,12 +1052,19 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 			n.t.Fatalf("nil miner database: %v", m.mirAddr)
 		}
 		if m.mirMembership == "" {
-			n.t.Fatalf("empty miner membersip: %v", m.mirAddr)
+			n.t.Fatalf("empty miner membership: %v", m.mirAddr)
 		}
 		if m.checkpointPeriod <= 0 {
 			n.t.Fatalf("invalid checkpoint period: %v", m.checkpointPeriod)
 		}
 		go func(m *TestMiner) {
+			var err error
+			// recover host with original config
+			m.mirHost, err = libp2p.New(
+				libp2p.Identity(m.mirPrivKey),
+				libp2p.DefaultTransports,
+				libp2p.ListenAddrs(m.mirMultiAddr...),
+			)
 			if !withPersistentDB {
 				m.mirDB = NewTestDB()
 			}
@@ -1065,7 +1072,7 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				MembershipCfg:    mir.MembershipFromStr(m.mirMembership),
 				CheckpointPeriod: m.checkpointPeriod,
 			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
@@ -1085,6 +1092,11 @@ func (n *Ensemble) RestoreMirMinersWithDB(ctx context.Context, miners ...*TestMi
 func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
 	for _, m := range miners {
 		m.stopMir()
+		// FIXME: Mir won't close the transport correctly,
+		// and if we crash the node we need to close the libp2p
+		// host to prevent other mir validators from considering
+		// the crash validator as "online".
+		m.mirHost.Close()
 		if delay > 0 {
 			RandomDelay(delay)
 		}

@@ -48,6 +48,7 @@ func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
 	miner.mirPrivKey = priv
 	miner.mirHost = h
 	miner.mirAddr = addr
+	miner.mirMultiAddr = h.Addrs()
 }
 
 // EnsembleMinimalMir creates and starts an Ensemble suitable for Mir.

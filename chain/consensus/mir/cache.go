@@ -165,7 +165,11 @@ func (c mirCache) rcvCheckpoint(ch *CheckpointData) error {
 
 func (c *mirCache) rcvBlock(b *types.BlockHeader) error {
 	if c, _ := c.cache.get(b.Height); c != cid.Undef {
-		return fmt.Errorf("already seen a block for that height in cache: height=%d", b.Height)
+		// if someone is trying to push a new rcvBlock
+		if c != b.Cid() {
+			return fmt.Errorf("already seen a block for that height in cache: height=%d", b.Height)
+		}
+		return nil
 	}
 	return c.cache.put(b.Height, b.Cid())
 }

@@ -44,6 +44,12 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
 
+	// Perform cleanup of Node's modules and
+	// ensure that mir is closed when we stop mining.
+	// FIXME: I don't think this is working and stopping
+	// the Mir transport correctly.
+	defer m.Stop()
+
 	log.Infof("Miner info:\n\twallet - %s\n\tsubnet - %s\n\tMir ID - %s\n\tPeer ID - %s\n\tvalidators - %v",
 		m.Addr, m.NetName, m.MirID, h.ID(), m.InitialValidatorSet.GetValidators())
 
