@@ -246,7 +246,7 @@ func (m *Manager) Stop() {
 	m.Net.Stop()
 	log.With("miner", m.MirID).Info("Network transport stopped")
 
-	m.MirNode.Stop()
+	// m.MirNode.Stop()
 }
 
 // ReconfigureMirNode reconfigures the Mir node.
