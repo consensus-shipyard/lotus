@@ -155,9 +155,7 @@ func (c mirCache) rcvCheckpoint(snap *Checkpoint) error {
 
 	// update the latest checkpoint received.
 	if err := c.cache.setLatestCheckpoint(snap); err != nil {
-		if err != nil {
-			return fmt.Errorf("couldn't persist latest checkpoint in cache: %w", err)
-		}
+		return fmt.Errorf("couldn't persist latest checkpoint in cache: %w", err)
 	}
 
 	return nil

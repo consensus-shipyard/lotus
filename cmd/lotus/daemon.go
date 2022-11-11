@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"runtime/pprof"
@@ -69,12 +68,7 @@ var daemonStopCmd = &cli.Command{
 		}
 		defer closer()
 
-		err = api.Shutdown(lcli.ReqContext(cctx))
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return api.Shutdown(lcli.ReqContext(cctx))
 	},
 }
 
@@ -249,7 +243,7 @@ var DaemonCmd = &cli.Command{
 
 		var genBytes []byte
 		if cctx.String("genesis") != "" {
-			genBytes, err = ioutil.ReadFile(cctx.String("genesis"))
+			genBytes, err = os.ReadFile(cctx.String("genesis"))
 			if err != nil {
 				return xerrors.Errorf("reading genesis: %w", err)
 			}
@@ -412,7 +406,7 @@ func importKey(ctx context.Context, api lapi.FullNode, f string) error {
 		return err
 	}
 
-	hexdata, err := ioutil.ReadFile(f)
+	hexdata, err := os.ReadFile(f)
 	if err != nil {
 		return err
 	}
