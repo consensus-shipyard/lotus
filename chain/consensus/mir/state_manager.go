@@ -8,7 +8,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -74,7 +74,7 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 	}
 
 	sm := StateManager{
-		NextBatch:            make(chan *Batch),
+		NextBatch:            make(chan *Batch, 1),
 		NextCheckpoint:       make(chan *checkpoint.StableCheckpoint, 1),
 		NewMembership:        make(chan map[t.NodeID]t.NodeAddress, 1),
 		MirManager:           m,
@@ -214,9 +214,12 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 
 	log.Debug("Sending new batch to assemble a lotus block")
 	// Send a batch to the Lotus node.
-	sm.NextBatch <- &Batch{
+	select {
+	case <-sm.MirManager.stopCh:
+	case sm.NextBatch <- &Batch{
 		Messages:   msgs,
 		Validators: maputil.GetSortedKeys(sm.memberships[sm.currentEpoch]),
+	}:
 	}
 
 	return nil

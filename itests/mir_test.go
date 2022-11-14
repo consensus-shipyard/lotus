@@ -42,7 +42,7 @@ func TestMirConsensus(t *testing.T) {
 func runTestDraft(t *testing.T, opts ...interface{}) {
 	ts := eudicoConsensusSuite{opts: opts}
 
-	t.Run("test", ts.testMirWithFCrashedNodes)
+	t.Run("test", ts.testMirStartStop)
 	// t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 
 }

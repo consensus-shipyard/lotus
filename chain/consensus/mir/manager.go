@@ -63,6 +63,7 @@ type Manager struct {
 	ToMir         chan chan []*mirproto.Request
 	segmentLength int // segment length determining the checkpoint period.
 	ds            db.DB
+	stopCh        chan struct{}
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
@@ -136,6 +137,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 
 	m := Manager{
 		ctx:                 ctx,
+		stopCh:              make(chan struct{}),
 		Addr:                addr,
 		NetName:             netName,
 		Pool:                fifo.New(),
@@ -246,7 +248,8 @@ func (m *Manager) Stop() {
 	m.Net.Stop()
 	log.With("miner", m.MirID).Info("Network transport stopped")
 
-	// m.MirNode.Stop()
+	close(m.stopCh)
+	m.MirNode.Stop()
 }
 
 // ReconfigureMirNode reconfigures the Mir node.
