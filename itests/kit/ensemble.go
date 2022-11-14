@@ -909,23 +909,28 @@ func (n *Ensemble) DisconnectNodes(from api.Net, to ...*TestFullNode) *Ensemble 
 	return n
 }
 
-// DisconnectMirMiner disconnects a Mir miner.
-func (n *Ensemble) DisconnectMirMiner(miner *TestMiner) *Ensemble {
-	miner.mirHost.Close() // nolint
-	return n
-}
+// DisconnectMirMiners disconnects Mir miners.
+func (n *Ensemble) DisconnectMirMiners(faultyMiners []*TestMiner) context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+	for _, faultyMiner := range faultyMiners {
+		go func(ctx context.Context, m *TestMiner) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
 
-// ReconnectMirMiner disconnects a Mir miner.
-func (n *Ensemble) ReconnectMirMiner(miner *TestMiner) *Ensemble {
-	h, err := libp2p.New(
-		libp2p.Identity(miner.mirPrivKey),
-		libp2p.DefaultTransports,
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
-	)
-	require.NoError(n.t, err)
+				}
+				conns := m.mirHost.Network().Conns()
+				for _, c := range conns {
+					err := c.Close()
+					require.NoError(n.t, err)
+				}
+			}
+		}(ctx, faultyMiner)
+	}
 
-	miner.mirHost = h
-	return n
+	return cancel
 }
 
 func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestMiner) []*BlockMiner {
@@ -1084,11 +1089,11 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 	}
 }
 
-func (n *Ensemble) RestoreMirMinersWithEmptyDB(ctx context.Context, miners ...*TestMiner) {
+func (n *Ensemble) RestoreMirMinersWithEmptyState(ctx context.Context, miners ...*TestMiner) {
 	n.RestoreMirMinersWithOptions(ctx, false, miners...)
 }
 
-func (n *Ensemble) RestoreMirMinersWithDB(ctx context.Context, miners ...*TestMiner) {
+func (n *Ensemble) RestoreMirMinersWithState(ctx context.Context, miners ...*TestMiner) {
 	n.RestoreMirMinersWithOptions(ctx, true, miners...)
 }
 

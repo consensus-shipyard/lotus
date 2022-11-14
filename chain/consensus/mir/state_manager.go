@@ -478,7 +478,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	case <-out:
 		return nil
 	case <-ctx.Done():
-		return xerrors.Errorf("target block for checkpoint not reached after deadline")
+		return ErrMirCtxCanceledWhileWaitingSnapshot
 	}
 }
 
