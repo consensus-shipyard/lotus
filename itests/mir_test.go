@@ -34,8 +34,7 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		runTestDraft(t, kit.ThroughRPC())
-		// runMirConsensusTests(t, kit.ThroughRPC())
+		runMirConsensusTests(t, kit.ThroughRPC())
 	})
 }
 
