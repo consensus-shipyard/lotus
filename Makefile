@@ -78,7 +78,7 @@ spacenet: lotus mir-validator lotus-seed lotus-keygen
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
-	go test $(GOFLAGS) -shuffle=on -v -count=1 ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
 .PHONY: spacenet-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet
