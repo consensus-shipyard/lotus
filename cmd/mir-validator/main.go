@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path"
 
 	"github.com/fatih/color"
 	logging "github.com/ipfs/go-log/v2"
@@ -55,6 +57,12 @@ func main() {
 		}
 	}
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Errorf("couldn't get homeDir for default LOTUS_PATH. Consider explicitly setting it: %s", err)
+		return
+	}
+
 	// TODO: Enable NET API for mir validator libp2p host?
 	// // adapt the Net* commands to always hit the node running the markets
 	// // subsystem, as that is the only one that runs a libp2p node.
@@ -85,7 +93,7 @@ func main() {
 				Name:    "repo",
 				EnvVars: []string{"LOTUS_PATH"},
 				Hidden:  true,
-				Value:   "~/.lotus", // TODO: Consider XDG_DATA_HOME
+				Value:   path.Join(homeDir, ".lotus"), // TODO: Consider XDG_DATA_HOME
 			},
 			cliutil.FlagVeryVerbose,
 		},
