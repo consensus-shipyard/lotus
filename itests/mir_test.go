@@ -17,6 +17,7 @@ import (
 const (
 	MirTotalValidatorNumber  = 4 // N = 3F+1
 	MirFaultyValidatorNumber = (MirTotalValidatorNumber - 1) / 3
+	MirReferenceSyncingNode  = MirFaultyValidatorNumber // The first non-faulty node is a syncing node.
 	MirHonestValidatorNumber = MirTotalValidatorNumber - MirFaultyValidatorNumber
 	MirLearnersNumber        = MirFaultyValidatorNumber + 1
 	TestedBlockNumber        = 10
@@ -35,7 +36,15 @@ func TestMirConsensus(t *testing.T) {
 
 	t.Run("mir", func(t *testing.T) {
 		runMirConsensusTests(t, kit.ThroughRPC())
+		// runDraftt(t, kit.ThroughRPC())
+
 	})
+}
+
+func runDraftt(t *testing.T, opts ...interface{}) {
+	ts := itestsConsensusSuite{opts: opts}
+
+	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
 }
 
 func runMirConsensusTests(t *testing.T, opts ...interface{}) {
@@ -52,9 +61,10 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
 	t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
 	t.Run("testMirWithFCrashedAndRecoveredNodes", ts.testMirWithFCrashedAndRecoveredNodes)
+	t.Run("testMirStartStop", ts.testMirStartStop)
 	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
 	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
-	t.Run("testMirFNodesSleepAndThenOperate", ts.testMirFNodesSleepAndThenOperate)
+	// t.Run("testMirFNodesSleepAndThenOperate", ts.testMirFNodesSleepAndThenOperate)
 }
 
 type itestsConsensusSuite struct {
@@ -234,7 +244,7 @@ func (ts *itestsConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 	require.NoError(t, err)
 }
 
-// testMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes.
+// testMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
 func (ts *itestsConsensusSuite) testMirAllNodesMiningWithMessaging(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -290,21 +300,19 @@ func (ts *itestsConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
-	for i := 0; i < MirFaultyValidatorNumber; i++ {
-		ens.DisconnectMirMiner(miners[i])
-	}
+
+	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
 
 	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
-	for i := 0; i < MirFaultyValidatorNumber; i++ {
-		ens.ReconnectMirMiner(miners[i])
-	}
+	restoreConnections()
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// require.NoError(t, err)
+	time.Sleep(10 * time.Second)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
 }
 
@@ -333,13 +341,13 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersWithDB(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
 	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
 	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	// require.NoError(t, err)
 	time.Sleep(10 * time.Second)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[MirFaultyValidatorNumber], nodes...)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
 }
 
@@ -397,11 +405,13 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersWithEmptyDB(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithEmptyState(ctx, miners[:MirFaultyValidatorNumber]...)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+
+	t.Log(">>> checking nodes are in sync")
+	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
 }
 
@@ -430,11 +440,13 @@ func (ts *itestsConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersWithDB(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
+	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// require.NoError(t, err)
+	time.Sleep(10 * time.Second)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
 }
 
@@ -458,9 +470,7 @@ func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
-	for i := 0; i < MirFaultyValidatorNumber; i++ {
-		ens.DisconnectMirMiner(miners[i])
-	}
+	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
 
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
@@ -469,13 +479,13 @@ func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 	require.NoError(t, err)
 
 	t.Log(">>> restoring network connections")
-	for i := 0; i < MirFaultyValidatorNumber; i++ {
-		ens.ReconnectMirMiner(miners[i])
-	}
+	restoreConnections()
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
+	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// require.NoError(t, err)
+	time.Sleep(10 * time.Second)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
 }
 

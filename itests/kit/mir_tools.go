@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
@@ -61,6 +62,10 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 				return waitNodeInSync(ctx, h, baseTipSet, node)
 			})
 		}
+
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -71,7 +76,7 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-time.After(2 * time.Second):
+		case <-time.After(5 * time.Second):
 			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
 			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
@@ -95,37 +100,51 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 	}
 }
 
+func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode) error {
+	// get base to determine the gap to sync and configure timeout.
+	base, err := api.ChainHead(ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get chain head: %w", err)
+	}
+
+	// one minute baseline timeout
+	timeout := 60 * time.Second
+	// add extra if the gap is big.
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		head := abi.ChainEpoch(0)
+		// poll until we get the desired height.
+		// TODO: We may be able to add a slight sleep here if needed.
+		for head != height {
+			base, err := api.ChainHead(ctx)
+			if err != nil {
+				return err
+			}
+			head = base.Height()
+			if head > height {
+				break
+			}
+		}
+		return nil
+	})
+
+	return g.Wait()
+}
+
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
-	heads, err := api.ChainNotify(ctx)
+	base, err := api.ChainHead(ctx)
+	err = WaitForBlock(ctx, base.Height()+abi.ChainEpoch(n), api)
 	if err != nil {
 		return err
 	}
-
-	var currHead []*lapi.HeadChange
-
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("closed channel")
-	case currHead = <-heads:
-	}
-
-	i := 0
-	for i < n {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("closed channel")
-		case newHead := <-heads:
-			newHead[0].Val.Height()
-			if newHead[0].Val.Height() <= currHead[0].Val.Height() {
-				return fmt.Errorf("wrong %d block height: prev block height - %d, current head height - %d",
-					i, currHead[0].Val.Height(), newHead[0].Val.Height())
-			}
-
-			currHead = newHead
-			i++
-		}
-	}
-
 	return nil
 }
 
@@ -147,11 +166,8 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
 
-	return nil
+	return g.Wait()
 }
 
 func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {

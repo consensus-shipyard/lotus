@@ -24,6 +24,10 @@ const (
 	ReconfigurationInterval = 2000 * time.Millisecond
 )
 
+var (
+	ErrMirCtxCanceledWhileWaitingSnapshot = fmt.Errorf("context canceled while wating for a snapshot")
+)
+
 // Mine implements "block mining" using the Mir framework.
 //
 // Mine implements the following main algorithm:
@@ -87,7 +91,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			//
 			// TODO: This is a temporary solution while we are discussing that issue
 			// https://filecoinproject.slack.com/archives/C03C77HN3AS/p1660330971306019
-			if err != nil && !errors.Is(err, mir.ErrStopped) {
+			if err != nil && !errors.Is(err, mir.ErrStopped) && !errors.Is(err, ErrMirCtxCanceledWhileWaitingSnapshot) {
 				panic(fmt.Errorf("miner consensus error: %w", err))
 			}
 			log.With("addr", addr).Infof("Mir node stopped signal")
