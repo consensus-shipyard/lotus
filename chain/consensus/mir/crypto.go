@@ -33,7 +33,7 @@ type CryptoManager struct {
 }
 
 func NewCryptoManager(key address.Address, wallet WalletCrypto) (*CryptoManager, error) {
-	// mir-validators only suuport the use of secpk keys for now.
+	// mir-validators only support the use of SECP256K1 keys for now.
 	if key.Protocol() != address.SECP256K1 {
 		return nil, fmt.Errorf("must be SECP address")
 	}

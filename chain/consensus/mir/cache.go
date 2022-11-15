@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	MirCachePrefix = "mir-cache/"
-	BlkCachePrefix = MirCachePrefix + "blk/"
+	CachePrefix    = "mir-cache/"
+	BlkCachePrefix = CachePrefix + "blk/"
 )
 
 var (
-	latestCheckKey = datastore.NewKey(MirCachePrefix + "latestCheck")
+	latestCheckKey = datastore.NewKey(CachePrefix + "latestCheck")
 )
 
 func cacheKey(e abi.ChainEpoch) datastore.Key {
@@ -57,8 +57,8 @@ func (c *dsBlkCache) get(e abi.ChainEpoch) (cid.Cid, error) {
 	if err != nil {
 		return cid.Undef, err
 	}
-	_, cid, err := cid.CidFromBytes(v)
-	return cid, err
+	_, one, err := cid.CidFromBytes(v)
+	return one, err
 }
 
 func (c *dsBlkCache) put(e abi.ChainEpoch, v cid.Cid) error {
@@ -184,8 +184,7 @@ func (c *mirCache) latestCheckpoint() (*Checkpoint, error) {
 	return ch, nil
 }
 
-// thread-safe memory block cache. It has low-overhead
-// but it is not persisted between restarts (which may lead
+// thread-safe memory block cache. It has low-overhead, but it is not persisted between restarts (which may lead
 // to inconsistencies).
 type memBlkCache struct {
 	lk               sync.RWMutex

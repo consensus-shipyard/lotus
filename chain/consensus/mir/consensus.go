@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -73,7 +73,7 @@ func (bft *Mir) CreateBlock(ctx context.Context, w lapi.Wallet, bt *lapi.BlockTe
 	}
 
 	next := &types.BlockHeader{
-		Miner:         builtin.SystemActorAddr, // Mir blocks are not signed, we use system addr as miner.
+		Miner:         builtin.SystemActorAddr, // Mir's blocks are not signed, we use system addr as miner.
 		Parents:       bt.Parents.Cids(),
 		Ticket:        bt.Ticket,
 		ElectionProof: bt.Eproof,

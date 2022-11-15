@@ -263,7 +263,7 @@ func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.N
 	go m.Net.Connect(nodes)
 	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
 	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
-	// (as there is where we have the config information). This functions should be called
+	// (as there is where we have the config information). These functions should be called
 	// in the garbage collection process performed when the reconfiguration is effective.
 	// go m.Net.CloseOldConnections(nodes)
 
