@@ -109,8 +109,8 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("self identity not included in validator set")
 	}
 
-	log.Info("Lotus node's Mir ID: ", mirID)
-	log.Info("Lotus node's address in Mir: ", mirAddr)
+	log.Info("Lotus wallet for Mir ID: ", mirID)
+	log.Info("Libp2p host address for Mir: ", mirAddr)
 	log.Info("Mir nodes IDs: ", nodeIDs)
 	log.Info("Mir node libp2p peerID: ", h.ID())
 	log.Info("Mir nodes addresses: ", initialMembership)

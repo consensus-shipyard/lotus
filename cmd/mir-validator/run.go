@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	_ "net/http/pprof"
 	"path/filepath"
 
@@ -29,6 +30,10 @@ var runCmd = &cli.Command{
 			Name:  "default-key",
 			Value: true,
 			Usage: "use default wallet's key",
+		},
+		&cli.StringFlag{
+			Name:  "from",
+			Usage: "optionally specify the account used for the validator",
 		},
 		&cli.BoolFlag{
 			Name:  "nosync",
@@ -95,20 +100,9 @@ var runCmd = &cli.Command{
 		}
 
 		// Validator identity.
-		var validator address.Address
-		if cctx.Bool("default-key") {
-			validator, err = nodeApi.WalletDefaultAddress(ctx)
-			if err != nil {
-				return err
-			}
-		} else {
-			validator, err = address.NewFromString(cctx.Args().First())
-			if err != nil {
-				return err
-			}
-		}
-		if validator == address.Undef {
-			return xerrors.Errorf("no validator address specified as first argument for validator")
+		validator, err := validatorIDFromFlag(ctx, cctx, nodeApi)
+		if err != nil {
+			return err
 		}
 
 		// Membership config.
@@ -139,4 +133,29 @@ var runCmd = &cli.Command{
 		cfg := mir.NewConfig(mir.MembershipFromFile(membershipCfg), dbPath, checkpointPeriod)
 		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
 	},
+}
+
+func validatorIDFromFlag(ctx context.Context, cctx *cli.Context, nodeApi api.FullNode) (address.Address, error) {
+	var (
+		validator address.Address
+		err       error
+	)
+
+	if cctx.Bool("default-key") {
+		validator, err = nodeApi.WalletDefaultAddress(ctx)
+		if err != nil {
+			return address.Undef, err
+		}
+	}
+	if cctx.String("from") != "" {
+		validator, err = address.NewFromString(cctx.String("from"))
+		if err != nil {
+			return address.Undef, err
+		}
+	}
+	if validator == address.Undef {
+		return address.Undef, xerrors.Errorf("no validator address specified as first argument for validator")
+	}
+
+	return validator, nil
 }
