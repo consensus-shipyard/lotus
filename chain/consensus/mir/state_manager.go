@@ -89,18 +89,18 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 	// checkpoint
 	ch, err := sm.firstEpochCheckpoint()
 	if err != nil {
-		xerrors.Errorf("error getting checkpoint for epoch 0: %w", err)
+		return nil, xerrors.Errorf("error getting checkpoint for epoch 0: %w", err)
 	}
 	c, err := ch.Cid()
 	if err != nil {
-		xerrors.Errorf("error getting cid for checkpoint: %w", err)
+		return nil, xerrors.Errorf("error getting cid for checkpoint: %w", err)
 	}
 	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
 
 	return &sm, nil
 }
 
-// RestoreState is called by Mir when the validator goes out-of-sync and it requires
+// RestoreState is called by Mir when the validator goes out-of-sync, and it requires
 // lotus to sync from the latest checkpoint. Mir provides lotus with the latest
 // checkpoint and from this:
 // - The latest membership and configuration for the consensus is recovered.
@@ -108,10 +108,10 @@ func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, a
 // received while trying to sync.
 // - If there is a snapshot in the checkpoint, we poll our connections to sync
 // to the latest block determined by the checkpoint.
-// - We deliver the checkpoint to the mining process so it can be included in the next
+// - We deliver the checkpoint to the mining process, so it can be included in the next
 // block (Mir provides the latest checkpoint, which hasn't been included in a block
 // yet)
-// - And we flag the mining process that we are synced and it can start accepting new
+// - And we flag the mining process that we are synced, and it can start accepting new
 // batches from Mir and assembling new blocks.
 func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
 	log.Debugf("Calling RestoreState from Mir for epoch %d", sm.currentEpoch)
@@ -164,7 +164,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			log.Debugf("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
 			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.MirManager.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
 			if err != nil {
-				log.Errorf("error fetching latest tipset from peer %s: %w", addr.ID, err)
+				log.Errorf("error fetching latest tipset from peer %s: %v", addr.ID, err)
 				continue
 			}
 			// wait for full-sync before returning from restoreState.
@@ -180,7 +180,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("couldn't find any good peers to sync from")
 		}
 
-		// once synced we deliver the checkpoint to our mining process so it can be
+		// once synced we deliver the checkpoint to our mining process, so it can be
 		// included in the next block (as the rest of Mir validators will do before
 		// accepting the next batch), and we persist it locally.
 		log.Debugf("Delivering checkpoint for height %d to mining process after sync", ch.Height)
@@ -190,7 +190,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		}
 	}
 
-	// flag the mining process that we are synced and we can start accepting new batches.
+	// flag the mining process that we are synced, and we can start accepting new batches.
 	sm.setSynced()
 	return nil
 }
@@ -359,7 +359,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	return sm.deliverCheckpoint(checkpoint, ch)
 }
 
-// deliver checkpoint receives a checkpoint, persists it locally in the local blockstore, and delivers
+// deliver checkpoint receives a checkpoint, persists it locally in the local block store, and delivers
 // it to the mining process to include it in a new block.
 func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoint, snapshot *Checkpoint) error {
 	// if we deserialized it correctly, we can persist it directly in the data store.
@@ -371,7 +371,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	// snapshot if needed.
 	b, err := checkpoint.Serialize()
 	if err != nil {
-		return xerrors.Errorf("error marshaling stablecheckpoint", err)
+		return xerrors.Errorf("error marshaling stable checkpoint", err)
 	}
 	if err := sm.MirManager.ds.Put(sm.MirManager.ctx, LatestCheckpointPbKey, b); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
@@ -462,7 +462,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 		for head != height {
 			base, err := sm.api.ChainHead(sm.MirManager.ctx)
 			if err != nil {
-				log.Errorf("failed to get chain head: %w", err)
+				log.Errorf("failed to get chain head: %v", err)
 				return
 			}
 			head = base.Height()
