@@ -10,10 +10,9 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
-	"golang.org/x/xerrors"
+	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -45,8 +44,6 @@ var (
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
-	ctx context.Context
-
 	// Lotus related types.
 	NetName dtypes.NetworkName
 	Addr    address.Address
@@ -136,7 +133,6 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	var interceptor *eventlog.Recorder
 
 	m := Manager{
-		ctx:                 ctx,
 		stopCh:              make(chan struct{}),
 		Addr:                addr,
 		NetName:             netName,
@@ -150,7 +146,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		ToMir:               make(chan chan []*mirproto.Request),
 	}
 
-	m.StateManager, err = NewStateManager(initialMembership, &m, api)
+	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
 	if err != nil {
 		return nil, fmt.Errorf("error starting mir state manager: %w", err)
 	}
@@ -221,7 +217,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 // Start starts the manager.
 func (m *Manager) Start(ctx context.Context) chan error {
 	log.Infof("Mir manager %s starting", m.MirID)
-	log.Info("Mir initial checkpointing period: ", m.GetCheckpointPeriod())
+	log.Info("Mir initial checkpointing period: ", m.StateManager.GetCheckpointPeriod())
 
 	errChan := make(chan error, 1)
 
@@ -252,53 +248,22 @@ func (m *Manager) Stop() {
 	m.MirNode.Stop()
 }
 
-// ReconfigureMirNode reconfigures the Mir node.
-func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.NodeAddress) error {
-	log.With("miner", m.MirID).Debug("Reconfiguring a Mir node")
-
-	if len(nodes) == 0 {
-		return fmt.Errorf("empty validator set")
-	}
-
-	go m.Net.Connect(nodes)
-	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
-	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
-	// (as there is where we have the config information). These functions should be called
-	// in the garbage collection process performed when the reconfiguration is effective.
-	// go m.Net.CloseOldConnections(nodes)
-
-	return nil
+// ID prints Manager ID.
+func (m *Manager) ID() string {
+	return m.Addr.String()
 }
 
-func parseTx(tx []byte) (interface{}, error) {
-	ln := len(tx)
-	// This is very simple input validation to be protected against invalid messages.
-	// TODO: Make this smarter.
-	if ln <= 2 {
-		return nil, fmt.Errorf("mir tx len %d is too small", ln)
-	}
-
-	var err error
-	var msg interface{}
-
-	// TODO: Consider taking it out to a MirMessageFromBytes function
-	// into mir/types.go so that we have all msgType functionality in
-	// the same place.
-	lastByte := tx[ln-1]
-	switch lastByte {
-	case SignedMessageType:
-		msg, err = types.DecodeSignedMessage(tx[:ln-1])
-	case ConfigMessageType:
-		return nil, fmt.Errorf("config message is not supported")
-	default:
-		err = fmt.Errorf("unknown message type %d", lastByte)
-	}
-
+func (m *Manager) latestCheckpoint(params smr.Params) (*checkpoint.StableCheckpoint, error) {
+	b, err := m.ds.Get(m.StateManager.ctx, LatestCheckpointPbKey)
 	if err != nil {
-		return nil, err
+		if err == datastore.ErrNotFound {
+			return smr.GenesisCheckpoint([]byte{}, params), nil
+		}
+		return nil, xerrors.Errorf("error getting latest snapshot: %w", err)
 	}
-
-	return msg, nil
+	ch := &checkpoint.StableCheckpoint{}
+	err = ch.Deserialize(b)
+	return ch, err
 }
 
 // GetMessages extracts Filecoin messages from a Mir batch.
@@ -385,30 +350,4 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 		requests = append(requests, r)
 	}
 	return requests
-}
-
-// ID prints Manager ID.
-func (m *Manager) ID() string {
-	return m.Addr.String()
-}
-
-// GetCheckpointPeriod returns the checkpoint period for the current epoch.
-//
-// The checkpoint period is computed as the number of validator times the
-// segment length.
-func (m *Manager) GetCheckpointPeriod() abi.ChainEpoch {
-	return abi.ChainEpoch(m.segmentLength * len(m.StateManager.memberships[m.StateManager.currentEpoch]))
-}
-
-func (m *Manager) latestCheckpoint(params smr.Params) (*checkpoint.StableCheckpoint, error) {
-	b, err := m.ds.Get(m.ctx, LatestCheckpointPbKey)
-	if err != nil {
-		if err == datastore.ErrNotFound {
-			return smr.GenesisCheckpoint([]byte{}, params), nil
-		}
-		return nil, xerrors.Errorf("error getting latest snapshot: %w", err)
-	}
-	ch := &checkpoint.StableCheckpoint{}
-	err = ch.Deserialize(b)
-	return ch, err
 }
