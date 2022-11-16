@@ -1,6 +1,8 @@
 package mir
 
 import (
+	"fmt"
+
 	ipfslogging "github.com/ipfs/go-log/v2"
 
 	mirlogging "github.com/filecoin-project/mir/pkg/logging"
@@ -13,16 +15,19 @@ var _ mirlogging.Logger = &managerLogger{}
 // mirLogger implements Mir's Log interface.
 type managerLogger struct {
 	logger *ipfslogging.ZapEventLogger
+	nodeID string
 }
 
-func newManagerLogger() *managerLogger {
+func newManagerLogger(nodeID string) *managerLogger {
 	return &managerLogger{
 		logger: ipfslogging.Logger(managerLoggerName),
+		nodeID: nodeID,
 	}
 }
 
 // Log logs a message with additional context.
 func (l *managerLogger) Log(level mirlogging.LogLevel, text string, args ...interface{}) {
+	fmt.Println("mmm>>", l.nodeID, text, args)
 	// Mir's LevelTrace is ignored.
 	switch level {
 	case mirlogging.LevelError:

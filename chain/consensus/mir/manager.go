@@ -115,7 +115,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	log.Info("Mir node libp2p peerID: ", h.ID())
 	log.Info("Mir nodes addresses: ", initialMembership)
 
-	logger := newManagerLogger()
+	logger := newManagerLogger(mirID)
 
 	// Create Mir modules.
 	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)

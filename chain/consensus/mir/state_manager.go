@@ -3,6 +3,7 @@ package mir
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,8 +18,11 @@ import (
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
 
+	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
 
 var _ smr.AppLogic = &StateManager{}
@@ -59,6 +63,8 @@ type StateManager struct {
 	// Flag that determines if the mir is syncing.
 	syncLk sync.RWMutex
 	synced bool // avoid accessing it directly, we have a lock and accessor methods
+
+	head abi.ChainEpoch
 }
 
 func NewStateManager(initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
@@ -192,18 +198,19 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	// flag the mining process that we are synced, and we can start accepting new batches.
 	sm.setSynced()
+	sm.head = ch.Height - 1
 	return nil
 }
 
 // ApplyTXs applies transactions received from the availability layer to the app state.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
-	var msgs []Message
+	var mirMsgs []Message
 
 	// For each request in the batch
 	for _, req := range txs {
 		switch req.Type {
 		case TransportType:
-			msgs = append(msgs, req.Data)
+			mirMsgs = append(mirMsgs, req.Data)
 		case ReconfigurationType:
 			err := sm.applyConfigMsg(req)
 			if err != nil {
@@ -212,15 +219,92 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		}
 	}
 
-	log.Debug("Sending new batch to assemble a lotus block")
-	// Send a batch to the Lotus node.
-	select {
-	case <-sm.MirManager.stopCh:
-	case sm.NextBatch <- &Batch{
-		Messages:   msgs,
+	batch := &Batch{
+		Messages:   mirMsgs,
 		Validators: maputil.GetSortedKeys(sm.memberships[sm.currentEpoch]),
-	}:
 	}
+
+	base, err := sm.api.ChainHead(sm.MirManager.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get chain head", "error", err)
+	}
+	log.Debugf("Trying to mine new block over base: %s", base.Key())
+
+	nextHeight := base.Height() + 1
+	fmt.Println(">>>>> APPLY TXS NEXT HEIGHT", nextHeight)
+
+	log.Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
+	msgs := sm.MirManager.GetMessages(batch)
+	log.With("epoch", nextHeight).
+		Infof("try to create a block: msgs - %d", len(msgs))
+
+	// include checkpoint in VRF proof field?
+	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
+	eproofCheckpoint := &ltypes.ElectionProof{}
+	if ch := sm.pollCheckpoint(); ch != nil {
+		eproofCheckpoint, err = CertAsElectionProof(ch)
+		if err != nil {
+			log.With("epoch", nextHeight).Errorw("error setting eproof from checkpoint certificate:", "error", err)
+			return xerrors.Errorf("error setting eproof from checkpoint certificate: %w", err)
+		}
+		vrfCheckpoint, err = CheckpointAsVRFProof(ch)
+		if err != nil {
+			log.With("epoch", nextHeight).Errorw("error setting vrfproof from checkpoint:", "error", err)
+			// TODO:  Format error
+			return err
+		}
+		log.Infof("Including Mir checkpoint for in block %d", nextHeight)
+	}
+
+	bh, err := sm.api.MinerCreateBlock(sm.MirManager.ctx, &lapi.BlockTemplate{
+		// mir blocks are created by all miners. We use system actor as miner of the block
+		Miner:            builtin.SystemActorAddr,
+		Parents:          base.Key(),
+		BeaconValues:     nil,
+		Ticket:           vrfCheckpoint,
+		Eproof:           eproofCheckpoint,
+		Epoch:            base.Height() + 1,
+		Timestamp:        uint64(time.Now().Unix()),
+		WinningPoStProof: nil,
+		Messages:         msgs,
+	})
+	if err != nil {
+		log.With("epoch", nextHeight).Errorw("creating a block failed", "error", err)
+		// TODO:  Format error
+		return err
+	}
+	if bh == nil {
+		log.With("epoch", nextHeight).Debug("created a nil block")
+		// TODO:  Format error
+		return err
+	}
+
+	err = sm.api.SyncSubmitBlock(sm.MirManager.ctx, &types.
+		BlockMsg{
+		Header:        bh.Header,
+		BlsMessages:   bh.BlsMessages,
+		SecpkMessages: bh.SecpkMessages,
+	})
+	if err != nil {
+		log.With("epoch", nextHeight).Errorw("unable to sync a block", "error", err)
+		// TODO:  Format error
+		return err
+	}
+
+	log.With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
+
+	// log.Debug("Sending new batch to assemble a lotus block")
+	// // Send a batch to the Lotus node.
+	// select {
+	// case <-sm.MirManager.stopCh:
+	// case sm.NextBatch <- &Batch{
+	// 	Messages:   msgs,
+	// 	Validators: maputil.GetSortedKeys(sm.memberships[sm.currentEpoch]),
+	// }:
+	// }
+	sm.head = nextHeight
+
+	fmt.Println(">>>>> return APPLY TXS NEXT HEIGHT", nextHeight)
 
 	return nil
 }
@@ -304,9 +388,11 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // in our local state, and it collects the cids for all the blocks verified
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
+	fmt.Println(">>>>>>>> SNAPSHOT IS HERE!!!")
 	nextHeight := sm.prevCheckpoint.Height + sm.MirManager.GetCheckpointPeriod()
 	log.Debugf("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
 	log.Debugf("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
+	fmt.Println(">>>>>> SNAPSHOT HEIGHT", nextHeight)
 
 	// populating checkpoint template
 	ch := Checkpoint{
@@ -338,6 +424,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		log.Debugf("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
+	c, _ := ch.Cid()
+	fmt.Println(">>>>>> return SNAPSHOT HEIGHT", ch.Height, c)
 	return ch.Bytes()
 }
 
@@ -355,8 +443,12 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 		return xerrors.Errorf("error getting checkpoint data from mir checkpoint: %w", err)
 	}
 	log.Debugf("Mir generated new checkpoint for height: %d", ch.Height)
+	c, _ := ch.Cid()
+	fmt.Println(">>>>>> CHECKPOINT HEIGHT", ch.Height, c)
 
-	return sm.deliverCheckpoint(checkpoint, ch)
+	err := sm.deliverCheckpoint(checkpoint, ch)
+	fmt.Println(">>>> CHECKPOINT HEIGHT RETURNED", ch.Height)
+	return err
 }
 
 // deliver checkpoint receives a checkpoint, persists it locally in the local block store, and delivers
@@ -392,6 +484,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	// Send the checkpoint to Lotus and handle it there
 	log.Debug("Sending checkpoint to mining process to include in block")
 	sm.NextCheckpoint <- checkpoint
+	fmt.Println(">>>>>> CHECKPOINT DELIVERED", snapshot.Height)
 	return nil
 }
 
@@ -412,6 +505,7 @@ func weakQuorum(n int) int {
 func (sm *StateManager) pollCheckpoint() *checkpoint.StableCheckpoint {
 	select {
 	case ch := <-sm.NextCheckpoint:
+		fmt.Println(">>>>>> POLLING CHECKPOINT SUCCESSFUL")
 		log.Debugf("Polling checkpoint successful. Sending checkpoint for inclusion in block.")
 		return ch
 	default:
