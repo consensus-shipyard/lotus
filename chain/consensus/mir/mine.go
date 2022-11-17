@@ -47,8 +47,6 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 	// Perform cleanup of Node's modules and
 	// ensure that mir is closed when we stop mining.
-	// FIXME: I don't think this is working and stopping
-	// the Mir transport correctly.
 	defer m.Stop()
 
 	log.Infof("Miner info:\n\twallet - %s\n\tsubnet - %s\n\tMir ID - %s\n\tPeer ID - %s\n\tvalidators - %v",

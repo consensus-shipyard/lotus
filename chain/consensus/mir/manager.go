@@ -112,7 +112,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	log.Info("Mir node libp2p peerID: ", h.ID())
 	log.Info("Mir nodes addresses: ", initialMembership)
 
-	logger := newManagerLogger()
+	logger := newManagerLogger(mirID)
 
 	// Create Mir modules.
 	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
@@ -195,6 +195,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	interceptorOutput := os.Getenv(InterceptorOutputEnv)
 	if interceptorOutput != "" {
 		// TODO: Persist in repo path?
+		log.Infof("Interceptor initialized ")
 		m.interceptor, err = eventlog.NewRecorder(
 			t.NodeID(mirID),
 			interceptorOutput,

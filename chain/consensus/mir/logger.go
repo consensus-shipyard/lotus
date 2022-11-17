@@ -13,17 +13,21 @@ var _ mirlogging.Logger = &managerLogger{}
 // mirLogger implements Mir's Log interface.
 type managerLogger struct {
 	logger *ipfslogging.ZapEventLogger
+	id     string
 }
 
-func newManagerLogger() *managerLogger {
+func newManagerLogger(id string) *managerLogger {
 	return &managerLogger{
 		logger: ipfslogging.Logger(managerLoggerName),
+		id:     id,
 	}
 }
 
 // Log logs a message with additional context.
 func (l *managerLogger) Log(level mirlogging.LogLevel, text string, args ...interface{}) {
-	// Mir's LevelTrace is ignored.
+	// adding mirID to logs.
+	args = append(args, []interface{}{"nodeID", l.id}...)
+
 	switch level {
 	case mirlogging.LevelError:
 		l.logger.Errorw(text, args...)

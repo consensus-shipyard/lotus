@@ -134,6 +134,8 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
 		}
 
+		log.Infof("Restoring state from checkpoint at height: %d", ch.Height)
+
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
 			return xerrors.Errorf("couldn't purge state to recover from checkpoint: %w", err)

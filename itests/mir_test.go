@@ -442,10 +442,9 @@ func (ts *itestsConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
-	time.Sleep(10 * time.Second)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
 	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
 }

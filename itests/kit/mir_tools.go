@@ -72,21 +72,23 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
 func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
+	timeout := time.After(5 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-time.After(5 * time.Second):
+		case <-timeout:
 			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
+			id, _ := node.FullNode.ID(ctx)
 			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
 			if err != nil {
-				time.Sleep(500 * time.Second)
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if ts.Height() < targetTipSet.Height() {
 				// we are not synced yet, so continue
-				time.Sleep(500 * time.Second)
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if ts.Height() != targetTipSet.Height() {

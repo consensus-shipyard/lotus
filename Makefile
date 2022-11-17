@@ -78,12 +78,14 @@ spacenet: lotus mir-validator lotus-seed lotus-keygen
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
+	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
 	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
 .PHONY: spacenet-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet
 spacenet-test-race:
-	go test $(GOFLAGS) -shuffle=on -v -race -count=1 ./itests/mir_test.go
+	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
 .PHONY: spacenet-test-race
 
 calibnet: GOFLAGS+=-tags=calibnet
