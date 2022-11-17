@@ -1277,17 +1277,17 @@ func (syncer *Syncer) SyncPurgeForRecovery(ctx context.Context, height abi.Chain
 	// but we won't accept it if it is bad.
 	syncer.bad.Purge()
 
-	// check if we advanced our chain over the height of the checkpoint.
-	if height < syncer.ChainStore().GetHeaviestTipSet().Height() {
-		ts, err := syncer.ChainStore().GetTipsetByHeight(ctx, height, nil, false)
-		if err != nil {
-			return xerrors.Errorf("error getting tipset by height when recovering state: %w", err)
-		}
-		// if we have more tipset in the future we need to forget them and set
-		// our head back to the height pointed by the checkpoint.
-		if err := syncer.ChainStore().ForceHeadSilent(ctx, ts); err != nil {
-			return xerrors.Errorf("error silently setting the height to the one needed for recovery: %w", err)
-		}
-	}
+	// // check if we advanced our chain over the height of the checkpoint.
+	// if height < syncer.ChainStore().GetHeaviestTipSet().Height() {
+	// 	ts, err := syncer.ChainStore().GetTipsetByHeight(ctx, height, nil, false)
+	// 	if err != nil {
+	// 		return xerrors.Errorf("error getting tipset by height when recovering state: %w", err)
+	// 	}
+	// 	// if we have more tipset in the future we need to forget them and set
+	// 	// our head back to the height pointed by the checkpoint.
+	// 	if err := syncer.ChainStore().ForceHeadSilent(ctx, ts); err != nil {
+	// 		return xerrors.Errorf("error silently setting the height to the one needed for recovery: %w", err)
+	// 	}
+	// }
 	return nil
 }
