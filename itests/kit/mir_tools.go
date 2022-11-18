@@ -80,7 +80,6 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 		case <-timeout:
 			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
-			id, _ := node.FullNode.ID(ctx)
 			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
 			if err != nil {
 				time.Sleep(1 * time.Second)
