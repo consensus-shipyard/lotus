@@ -17,10 +17,6 @@ import (
 
 const Consensus ConsensusType = Mir
 
-// FIXME: Using devnet actors and genesis for now.
-const BootstrappersFile = ""
-const GenesisFile = ""
-
 var NetworkBundle = "devnet"
 var BundleOverrides map[actorstypes.Version]string
 var ActorDebugging = false
@@ -32,8 +28,8 @@ var ActorDebugging = false
 // var BundleOverrides map[actors.Version]string
 // var ActorDebugging = true
 
-// const BootstrappersFile = "wallabynet.pi"
-// const GenesisFile = "wallabynet.car"
+const BootstrappersFile = "spacenet.pi"
+const GenesisFile = "spacenet.car"
 
 const GenesisNetworkVersion = network.Version16
 
