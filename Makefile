@@ -74,7 +74,7 @@ debug: build-devnets
 2k: build-devnets
 
 spacenet: GOFLAGS+=-tags=spacenet
-spacenet: lotus mir-validator lotus-seed lotus-keygen
+spacenet: lotus mir-validator lotus-seed lotus-keygen lotus-shed
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
