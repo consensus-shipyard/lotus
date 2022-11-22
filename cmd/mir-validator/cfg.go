@@ -7,7 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
@@ -17,13 +17,13 @@ import (
 
 // TODO: Make these config files configurable.
 const (
-	PrivKeyPath       = "mir.key"
-	MaddrPath         = "mir.maddr"
-	MembershipCfgPath = "mir.validators"
-	LevelDSPath       = "mir.db"
+	PrivKeyPath    = "mir.key"
+	MaddrPath      = "mir.maddr"
+	MembershipPath = "mir.validators"
+	LevelDSPath    = "mir.db"
 )
 
-var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath, LevelDSPath}
+var configFiles = []string{PrivKeyPath, MaddrPath, MembershipPath, LevelDSPath}
 
 var cfgCmd = &cli.Command{
 	Name:  "config",
@@ -53,7 +53,7 @@ var addValidatorCmd = &cli.Command{
 			return err
 		}
 
-		mp := path.Join(cctx.String("repo"), MembershipCfgPath)
+		mp := path.Join(cctx.String("repo"), MembershipPath)
 		val, err := mir.ValidatorFromString(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("error parsing validator from string: %s. Use the following format: <wallet id>@<multiaddr>", err)

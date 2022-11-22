@@ -17,10 +17,6 @@ import (
 	t "github.com/filecoin-project/mir/pkg/types"
 )
 
-type MembershipFromFile string
-type MembershipFromEnv string
-type MembershipFromStr string
-
 type Validator struct {
 	Addr addr.Address
 	// FIXME: Consider using a multiaddr
@@ -81,18 +77,6 @@ func NewValidatorSet(vals []Validator) *ValidatorSet {
 	return &ValidatorSet{Validators: vals}
 }
 
-func NewValidatorSetFromFile(path string) (*ValidatorSet, error) {
-	return GetValidatorsFromFile(path)
-}
-
-func NewValidatorSetFromEnv(v string) (*ValidatorSet, error) {
-	return GetValidatorsFromEnv(v)
-}
-
-func NewValidatorSetFromStr(s string) (*ValidatorSet, error) {
-	return GetValidatorsFromStr(s)
-}
-
 func (set *ValidatorSet) Size() int {
 	return len(set.Validators)
 }
@@ -147,19 +131,6 @@ func (set *ValidatorSet) BlockMiner(epoch abi.ChainEpoch) addr.Address {
 	return set.Validators[i].Addr
 }
 
-func GetValidators(from interface{}) (*ValidatorSet, error) {
-	switch v := from.(type) {
-	case MembershipFromFile:
-		return GetValidatorsFromFile(string(v))
-	case MembershipFromEnv:
-		return GetValidatorsFromEnv(string(v))
-	case MembershipFromStr:
-		return GetValidatorsFromStr(string(v))
-	default:
-		return nil, fmt.Errorf("unknown membership type")
-	}
-}
-
 // GetValidatorsFromEnv gets the membership config from the environment variable.
 func GetValidatorsFromEnv(env string) (*ValidatorSet, error) {
 	var validators []Validator
@@ -168,7 +139,7 @@ func GetValidatorsFromEnv(env string) (*ValidatorSet, error) {
 		return nil, fmt.Errorf("empty validator string")
 	}
 
-	for _, next := range splitAndTrimEmpty(input, ",", " ") {
+	for _, next := range SplitAndTrimEmpty(input, ",", " ") {
 		v, err := ValidatorFromString(next)
 		if err != nil {
 			return nil, err
@@ -187,7 +158,7 @@ func GetValidatorsFromStr(input string) (*ValidatorSet, error) {
 		return nil, fmt.Errorf("empty validator string")
 	}
 
-	for _, next := range splitAndTrimEmpty(input, ",", " ") {
+	for _, next := range SplitAndTrimEmpty(input, ",", " ") {
 		v, err := ValidatorFromString(next)
 		if err != nil {
 			return nil, err
@@ -199,7 +170,7 @@ func GetValidatorsFromStr(input string) (*ValidatorSet, error) {
 	return NewValidatorSet(validators), nil
 }
 
-func splitAndTrimEmpty(s, sep, cutset string) []string {
+func SplitAndTrimEmpty(s, sep, cutset string) []string {
 	if s == "" {
 		return []string{}
 	}
@@ -253,7 +224,7 @@ func GetValidatorsFromFile(path string) (*ValidatorSet, error) {
 	return NewValidatorSet(validators), nil
 }
 
-// ValidatorsToCfg creates validator config or appends to it
+// ValidatorsToCfg creates validator config or appends to it.
 func ValidatorsToCfg(set *ValidatorSet, config string) error {
 	f, err := os.OpenFile(config, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {

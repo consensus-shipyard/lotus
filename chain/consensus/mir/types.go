@@ -10,11 +10,10 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	t "github.com/filecoin-project/mir/pkg/types"
-
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 const (
@@ -24,20 +23,6 @@ const (
 	TransportType       = 0
 	ReconfigurationType = 1
 )
-
-type Config struct {
-	MembershipCfg    interface{}
-	DatastorePath    string
-	CheckpointPeriod int
-}
-
-func NewConfig(membership interface{}, dbPath string, checkpointPeriod int) *Config {
-	return &Config{
-		MembershipCfg:    membership,
-		DatastorePath:    dbPath,
-		CheckpointPeriod: checkpointPeriod,
-	}
-}
 
 var log = logging.Logger("mir-consensus")
 

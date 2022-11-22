@@ -35,13 +35,13 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		runMirConsensusTests(t, kit.ThroughRPC())
-		// runDraftt(t, kit.ThroughRPC())
+		// runMirConsensusTests(t, kit.ThroughRPC())
+		runDraftTests(t, kit.ThroughRPC())
 
 	})
 }
 
-func runDraftt(t *testing.T, opts ...interface{}) {
+func runDraftTests(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
 	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)

@@ -10,9 +10,15 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -24,13 +30,6 @@ import (
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
-
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
@@ -41,6 +40,20 @@ var (
 	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
 	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
 )
+
+type Config struct {
+	MembershipStore  MembershipReader
+	DatastorePath    string
+	CheckpointPeriod int
+}
+
+func NewConfig(m MembershipReader, dbPath string, checkpointPeriod int) *Config {
+	return &Config{
+		MembershipStore:  m,
+		DatastorePath:    dbPath,
+		CheckpointPeriod: checkpointPeriod,
+	}
+}
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
@@ -73,7 +86,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, err
 	}
 
-	initialValidatorSet, err := GetValidators(cfg.MembershipCfg)
+	initialValidatorSet, err := cfg.MembershipStore.GetValidators()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
