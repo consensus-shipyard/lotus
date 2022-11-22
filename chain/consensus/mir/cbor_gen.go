@@ -317,8 +317,6 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 	return nil
 }
 
-var lengthBufCheckpointData = []byte{131}
-
 var lengthBufParentMeta = []byte{130}
 
 func (t *ParentMeta) MarshalCBOR(w io.Writer) error {
