@@ -3,6 +3,7 @@ package itests
 import (
 	"context"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ const (
 	MirReferenceSyncingNode  = MirFaultyValidatorNumber // The first non-faulty node is a syncing node.
 	MirHonestValidatorNumber = MirTotalValidatorNumber - MirFaultyValidatorNumber
 	MirLearnersNumber        = MirFaultyValidatorNumber + 1
+	MirJointValidatorsNumber = MirFaultyValidatorNumber + 2
 	TestedBlockNumber        = 10
 	MaxDelay                 = 30
 )
@@ -44,7 +46,7 @@ func TestMirConsensus(t *testing.T) {
 func runDraftTests(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
-	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
+	t.Run("testMirReconfiguration", ts.testMirWithReconfiguration)
 }
 
 func runMirConsensusTests(t *testing.T, opts ...interface{}) {
@@ -54,6 +56,7 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
+	t.Run("testMirReconfiguration", ts.testMirWithReconfiguration)
 	t.Run("testMirNodesStartWithRandomDelay", ts.testMirNodesStartWithRandomDelay)
 	t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
 	t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
@@ -199,6 +202,49 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, learners...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], learners...)...)
+	require.NoError(t, err)
+}
+
+// testMirWithReconfiguration tests that a validator can join the network.
+func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+	}()
+
+	membershipFileName := "./_membership.config"
+	os.Remove(membershipFileName) // nolint
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	ens.WriteMirMembershipToFile(membershipFileName, miners...)
+	ens.InterconnectFullNodes().BeginMirMiningWithConfigFile(ctx, membershipFileName, &wg, miners)
+
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
+	t.Log(">>> validators join")
+
+	var newMiners []*kit.TestMiner
+	var newNodes []*kit.TestFullNode
+
+	// TODO: use MirJointValidatorsNumber instead of 1
+	for i := 0; i < 1; i++ {
+		var v kit.TestMiner
+		var n kit.TestFullNode
+		ens.FullNode(&n).Miner(&v, &n).Start().InterconnectFullNodes()
+		newMiners = append(newMiners, &v)
+		newNodes = append(newNodes, &n)
+	}
+
+	ens.WriteMirMembershipToFile(membershipFileName, newMiners...)
+
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, append(nodes, newNodes...)...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], newNodes...)...)
 	require.NoError(t, err)
 }
 
