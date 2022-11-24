@@ -12,6 +12,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -44,6 +46,15 @@ var runCmd = &cli.Command{
 			Name:  "manage-fdlimit",
 			Usage: "manage open file limit",
 			Value: true,
+		},
+		&cli.IntFlag{
+			Name:  "init-height",
+			Usage: "checkpoint height from which to start the validator",
+			Value: 0,
+		},
+		&cli.StringFlag{
+			Name:  "init-checkpoint",
+			Usage: "pass initial checkpoint as a file (it overwrites 'init-height' flag)",
 		},
 		&cli.IntFlag{
 			Name:  "checkpoint-period",
@@ -127,11 +138,32 @@ var runCmd = &cli.Command{
 		dbPath := filepath.Join(cctx.String("repo"), LevelDSPath)
 		ds, err := mirkv.NewLevelDB(dbPath, false)
 		if err != nil {
-			log.Fatalf("error initializing mir datastore: %w", err)
+			return xerrors.Errorf("error initializing mir datastore: %w", err)
+		}
+
+		// get initial checkpoint
+		var initCh *checkpoint.StableCheckpoint
+		if cctx.String("init-checkpoint") != "" {
+			initCh, err = checkpointFromFile(ctx, ds, cctx.String("init-checkpoint"))
+			if err != nil {
+				return xerrors.Errorf("failed to get initial checkpoint from file: %s", err)
+			}
+			log.Info("Initializing mir validator from checkpoint provided in file: %s", cctx.String("init-checkpoint"))
+		} else if cctx.Int("init-height") != 0 {
+			initCh, err = mir.GetCheckpointByHeight(ctx, ds, abi.ChainEpoch(cctx.Int("init-height")), nil)
+			if err != nil {
+				return xerrors.Errorf("failed to get initial checkpoint from file: %s", err)
+			}
+			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
 		log.Infow("Starting mining with validator", "validator", validator)
-		cfg := mir.NewConfig(mir.MembershipFromFile(membershipCfg), dbPath, checkpointPeriod)
+		cfg := mir.NewConfig(
+			mir.MembershipFromFile(membershipCfg),
+			dbPath,
+			checkpointPeriod,
+			initCh,
+			cctx.String("checkpoints-repo"))
 		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
 	},
 }
