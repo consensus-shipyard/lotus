@@ -10,13 +10,14 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
-	xerrors "golang.org/x/xerrors"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/eventlog"
+	"github.com/filecoin-project/mir/pkg/eventmangler"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
@@ -35,6 +36,7 @@ import (
 
 const (
 	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
+	ManglerEnv           = "MIR_MANGLER"
 )
 
 var (
@@ -186,6 +188,22 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		WithModule("mempool", mpool).
 		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
+	mirManglerParams := os.Getenv(ManglerEnv)
+	if mirManglerParams != "" {
+		p, err := GetEnvManglerParams()
+		if err != nil {
+			return nil, err
+		}
+		err = smrSystem.PerturbMessages(&eventmangler.ModuleParams{
+			MinDelay: p.MinDelay,
+			MaxDelay: p.MaxDelay,
+			DropRate: p.DropRate,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure SMR mangler: %w", err)
+		}
+	}
+
 	if err := smrSystem.Start(); err != nil {
 		return nil, fmt.Errorf("could not start SMR system: %w", err)
 	}
@@ -195,7 +213,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	interceptorOutput := os.Getenv(InterceptorOutputEnv)
 	if interceptorOutput != "" {
 		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized ")
+		log.Infof("Interceptor initialized")
 		m.interceptor, err = eventlog.NewRecorder(
 			t.NodeID(mirID),
 			interceptorOutput,

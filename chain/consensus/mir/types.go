@@ -2,7 +2,10 @@ package mir
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -29,6 +32,40 @@ type Config struct {
 	MembershipCfg    interface{}
 	DatastorePath    string
 	CheckpointPeriod int
+}
+
+type ManglerParams struct {
+	MinDelay time.Duration `json:"min_delay"`
+	MaxDelay time.Duration `json:"max_delay"`
+	DropRate float32       `json:"drop_rate"`
+}
+
+// SetEnvManglerParams sets Mir's mangler environment variable.
+func SetEnvManglerParams(minDelay, maxDelay time.Duration, dropRate float32) error {
+	p := ManglerParams{
+		MinDelay: minDelay,
+		MaxDelay: maxDelay,
+		DropRate: dropRate,
+	}
+	s, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("failed to encode mangle params: %w", err)
+	}
+	err = os.Setenv(ManglerEnv, string(s))
+	if err != nil {
+		return fmt.Errorf("failed to encode set mangler params: %w", err)
+	}
+	return nil
+}
+
+// GetEnvManglerParams gets Mir's mangler environment variable.
+func GetEnvManglerParams() (ManglerParams, error) {
+	mirManglerParams := os.Getenv(ManglerEnv)
+	var p ManglerParams
+	if err := json.Unmarshal([]byte(mirManglerParams), &p); err != nil {
+		return ManglerParams{}, fmt.Errorf("failed to decode mangler params: %w", err)
+	}
+	return p, nil
 }
 
 func NewConfig(membership interface{}, dbPath string, checkpointPeriod int) *Config {
