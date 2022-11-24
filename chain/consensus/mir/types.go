@@ -3,10 +3,10 @@ package mir
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"os"
-  "path/filepath"
+	"path/filepath"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -15,10 +15,10 @@ import (
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
-  "github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
@@ -41,6 +41,22 @@ type Config struct {
 	// CheckpointRepo determines the path where Mir checkpoints
 	// will be (optionally) persisted.
 	CheckpointRepo string
+}
+
+func NewConfig(
+	membership interface{},
+	dbPath string,
+	checkpointPeriod int,
+	initCheck *checkpoint.StableCheckpoint,
+	checkpointRepo string,
+) *Config {
+	return &Config{
+		MembershipCfg:     membership,
+		DatastorePath:     dbPath,
+		CheckpointPeriod:  checkpointPeriod,
+		InitialCheckpoint: initCheck,
+		CheckpointRepo:    checkpointRepo,
+	}
 }
 
 type ManglerParams struct {
@@ -75,16 +91,6 @@ func GetEnvManglerParams() (ManglerParams, error) {
 		return ManglerParams{}, fmt.Errorf("failed to decode mangler params: %w", err)
 	}
 	return p, nil
-}
-
-func NewConfig(membership interface{}, dbPath string, checkpointPeriod int) *Config {
-	return &Config{
-		MembershipCfg:     membership,
-		DatastorePath:     dbPath,
-		CheckpointPeriod:  checkpointPeriod,
-		InitialCheckpoint: initCheck,
-		CheckpointRepo:    checkpointRepo,
-	}
 }
 
 var log = logging.Logger("mir-consensus")

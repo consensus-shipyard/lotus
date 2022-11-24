@@ -3,6 +3,7 @@ package itests
 import (
 	"context"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -47,16 +48,29 @@ func TestMirConsensusWithMangler(t *testing.T) {
 
 	err := mir.SetEnvManglerParams(200*time.Millisecond, 2*time.Second, 0)
 	require.NoError(t, err)
+	defer func() {
+		err := os.Unsetenv(mir.ManglerEnv)
+		require.NoError(t, err)
+	}()
 
 	t.Run("mirWithMangler", func(t *testing.T) {
-		runDraftTest(t, kit.ThroughRPC())
+		runMirManglingTests(t, kit.ThroughRPC())
 	})
 }
 
+// runDraftTest is used for debugging.
 func runDraftTest(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+}
+
+func runMirManglingTests(t *testing.T, opts ...interface{}) {
+	ts := itestsConsensusSuite{opts: opts}
+
+	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
+	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
 }
 
 func runMirConsensusTests(t *testing.T, opts ...interface{}) {
