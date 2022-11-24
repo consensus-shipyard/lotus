@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"encoding/json"
 	"os"
-	"path/filepath"
+  "path/filepath"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -13,14 +15,13 @@ import (
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
+  "github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
-
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/types"
-	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
@@ -42,14 +43,41 @@ type Config struct {
 	CheckpointRepo string
 }
 
-func NewConfig(
-	membership interface{},
-	dbPath string,
-	checkpointPeriod int,
-	initCheck *checkpoint.StableCheckpoint,
-	checkpointRepo string,
-) *Config {
+type ManglerParams struct {
+	MinDelay time.Duration `json:"min_delay"`
+	MaxDelay time.Duration `json:"max_delay"`
+	DropRate float32       `json:"drop_rate"`
+}
 
+// SetEnvManglerParams sets Mir's mangler environment variable.
+func SetEnvManglerParams(minDelay, maxDelay time.Duration, dropRate float32) error {
+	p := ManglerParams{
+		MinDelay: minDelay,
+		MaxDelay: maxDelay,
+		DropRate: dropRate,
+	}
+	s, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("failed to encode mangle params: %w", err)
+	}
+	err = os.Setenv(ManglerEnv, string(s))
+	if err != nil {
+		return fmt.Errorf("failed to encode set mangler params: %w", err)
+	}
+	return nil
+}
+
+// GetEnvManglerParams gets Mir's mangler environment variable.
+func GetEnvManglerParams() (ManglerParams, error) {
+	mirManglerParams := os.Getenv(ManglerEnv)
+	var p ManglerParams
+	if err := json.Unmarshal([]byte(mirManglerParams), &p); err != nil {
+		return ManglerParams{}, fmt.Errorf("failed to decode mangler params: %w", err)
+	}
+	return p, nil
+}
+
+func NewConfig(membership interface{}, dbPath string, checkpointPeriod int) *Config {
 	return &Config{
 		MembershipCfg:     membership,
 		DatastorePath:     dbPath,
