@@ -189,7 +189,16 @@ func HandleIncomingMessages(mctx helpers.MetricsCtx, lc fx.Lifecycle, ps *pubsub
 		go sub.HandleIncomingMessages(ctx, mpool, msgsub)
 	}
 
-	if bootstrapper {
+	// bootstrap = true or Mir validators subscribe immediately
+	// to the message topic. Mir blocks do not include a proper timestamp
+	// in the Timestamp field, they include the Mir Epoch we are currently in
+	// to make Lotus block validation deterministic, which means that if we
+	// use the current logic for `waitForSync` we won't subscribe to the message
+	// topic never and the mpool won't receive new messages.
+	// see https://github.com/consensus-shipyard/lotus/issues/24 and how
+	// the block timestamp is set in chain/consensus/mir/consensus.go for
+	// context.
+	if bool(bootstrapper) || build.IsMirConsensus() {
 		subscribe()
 		return
 	}

@@ -55,6 +55,7 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
+	t.Run("testMirMessageFromLearner", ts.testMirMessageFromLearner)
 	t.Run("testMirNodesStartWithRandomDelay", ts.testMirNodesStartWithRandomDelay)
 	t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
 	t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
@@ -201,6 +202,85 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], learners...)...)
 	require.NoError(t, err)
+}
+
+// testMirMessageFromLearner tests that messages can be sent from learners and validators,
+// and successfully proposed by validators
+func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+
+	// immediately start learners
+	var learners []*kit.TestFullNode
+	for i := 0; i < MirLearnersNumber; i++ {
+		var learner kit.TestFullNode
+		ens.FullNode(&learner, kit.LearnerNode()).Start().InterconnectFullNodes()
+		require.Equal(t, true, learner.IsLearner())
+		learners = append(learners, &learner)
+	}
+
+	// advance the chain a bit
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, learners...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], learners...)...)
+	require.NoError(t, err)
+
+	// send funds to learners so they can send a message themselves
+	for _, l := range learners {
+		src, err := nodes[0].WalletDefaultAddress(ctx)
+		require.NoError(t, err)
+		dst, err := l.WalletDefaultAddress(ctx)
+		require.NoError(t, err)
+
+		t.Logf(">>> node %s is sending a message to node %s", src, dst)
+
+		smsg, err := nodes[0].MpoolPushMessage(ctx, &types.Message{
+			From:  src,
+			To:    dst,
+			Value: types.FromFil(10),
+		}, nil)
+		require.NoError(t, err)
+
+		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
+		require.NoError(t, err)
+	}
+
+	for range learners {
+		rand.Seed(time.Now().UnixNano())
+		j := rand.Intn(len(learners))
+		src, err := learners[j].WalletDefaultAddress(ctx)
+		require.NoError(t, err)
+		// src := accs[j]
+
+		dst, err := learners[(j+1)%len(learners)].WalletDefaultAddress(ctx)
+		require.NoError(t, err)
+
+		t.Logf(">>> learner %s is sending a message to node %s", src, dst)
+
+		smsg, err := learners[j].MpoolPushMessage(ctx, &types.Message{
+			From:  src,
+			To:    dst,
+			Value: types.FromFil(1),
+		}, nil)
+		require.NoError(t, err)
+
+		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
+		require.NoError(t, err)
+
+		// no message pending in message pool
+		pend, err := learners[j].MpoolPending(ctx, types.EmptyTSK)
+		require.NoError(t, err)
+		require.Equal(t, len(pend), 0)
+	}
 }
 
 // testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
