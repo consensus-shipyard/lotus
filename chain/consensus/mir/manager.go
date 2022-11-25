@@ -10,13 +10,20 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
-	xerrors "golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
 	"github.com/filecoin-project/mir/pkg/eventlog"
+	"github.com/filecoin-project/mir/pkg/eventmangler"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
@@ -24,17 +31,12 @@ import (
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
-
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
-	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
+	CheckpointDBKeyPrefix = "mir/checkpoints/"
+	InterceptorOutputEnv  = "MIR_INTERCEPTOR_OUTPUT"
+	ManglerEnv            = "MIR_MANGLER"
 )
 
 var (
@@ -58,13 +60,16 @@ type Manager struct {
 	StateManager  *StateManager
 	interceptor   *eventlog.Recorder
 	ToMir         chan chan []*mirproto.Request
-	segmentLength int // segment length determining the checkpoint period.
 	ds            db.DB
 	stopCh        chan struct{}
 
 	// Reconfiguration related types.
 	InitialValidatorSet  *ValidatorSet
 	reconfigurationNonce uint64
+
+	// Checkpoints
+	segmentLength  int    // segment length determining the checkpoint period.
+	checkpointRepo string // path where checkpoints are (optionally) persisted
 }
 
 func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Config) (*Manager, error) {
@@ -144,6 +149,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		ds:                  ds,
 		InitialValidatorSet: initialValidatorSet,
 		ToMir:               make(chan chan []*mirproto.Request),
+		checkpointRepo:      cfg.CheckpointRepo,
 	}
 
 	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
@@ -165,15 +171,19 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	}
 	params.Iss.SegmentLength = m.segmentLength
 
-	latestCh, err := m.latestCheckpoint(params)
-	if err != nil {
-		return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
+	initCh := cfg.InitialCheckpoint
+	// if no initial checkpoint provided in config
+	if initCh == nil {
+		initCh, err = m.initCheckpoint(params, 0)
+		if err != nil {
+			return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
+		}
 	}
 
 	smrSystem, err := smr.New(
 		t.NodeID(mirID),
 		h,
-		latestCh,
+		initCh,
 		m.CryptoManager,
 		m.StateManager,
 		params,
@@ -186,6 +196,22 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		WithModule("mempool", mpool).
 		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
+	mirManglerParams := os.Getenv(ManglerEnv)
+	if mirManglerParams != "" {
+		p, err := GetEnvManglerParams()
+		if err != nil {
+			return nil, err
+		}
+		err = smrSystem.PerturbMessages(&eventmangler.ModuleParams{
+			MinDelay: p.MinDelay,
+			MaxDelay: p.MaxDelay,
+			DropRate: p.DropRate,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to configure SMR mangler: %w", err)
+		}
+	}
+
 	if err := smrSystem.Start(); err != nil {
 		return nil, fmt.Errorf("could not start SMR system: %w", err)
 	}
@@ -195,7 +221,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	interceptorOutput := os.Getenv(InterceptorOutputEnv)
 	if interceptorOutput != "" {
 		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized ")
+		log.Infof("Interceptor initialized")
 		m.interceptor, err = eventlog.NewRecorder(
 			t.NodeID(mirID),
 			interceptorOutput,
@@ -254,17 +280,8 @@ func (m *Manager) ID() string {
 	return m.Addr.String()
 }
 
-func (m *Manager) latestCheckpoint(params smr.Params) (*checkpoint.StableCheckpoint, error) {
-	b, err := m.ds.Get(m.StateManager.ctx, LatestCheckpointPbKey)
-	if err != nil {
-		if err == datastore.ErrNotFound {
-			return smr.GenesisCheckpoint([]byte{}, params), nil
-		}
-		return nil, xerrors.Errorf("error getting latest snapshot: %w", err)
-	}
-	ch := &checkpoint.StableCheckpoint{}
-	err = ch.Deserialize(b)
-	return ch, err
+func (m *Manager) initCheckpoint(params smr.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
+	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params)
 }
 
 // GetMessages extracts Filecoin messages from a Mir batch.

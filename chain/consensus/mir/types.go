@@ -2,19 +2,26 @@ package mir
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	t "github.com/filecoin-project/mir/pkg/types"
-
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/systems/smr"
+	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 const (
@@ -29,14 +36,61 @@ type Config struct {
 	MembershipCfg    interface{}
 	DatastorePath    string
 	CheckpointPeriod int
+	// InitialCheckpoint from which to start the validator.
+	InitialCheckpoint *checkpoint.StableCheckpoint
+	// CheckpointRepo determines the path where Mir checkpoints
+	// will be (optionally) persisted.
+	CheckpointRepo string
 }
 
-func NewConfig(membership interface{}, dbPath string, checkpointPeriod int) *Config {
+func NewConfig(
+	membership interface{},
+	dbPath string,
+	checkpointPeriod int,
+	initCheck *checkpoint.StableCheckpoint,
+	checkpointRepo string,
+) *Config {
 	return &Config{
-		MembershipCfg:    membership,
-		DatastorePath:    dbPath,
-		CheckpointPeriod: checkpointPeriod,
+		MembershipCfg:     membership,
+		DatastorePath:     dbPath,
+		CheckpointPeriod:  checkpointPeriod,
+		InitialCheckpoint: initCheck,
+		CheckpointRepo:    checkpointRepo,
 	}
+}
+
+type ManglerParams struct {
+	MinDelay time.Duration `json:"min_delay"`
+	MaxDelay time.Duration `json:"max_delay"`
+	DropRate float32       `json:"drop_rate"`
+}
+
+// SetEnvManglerParams sets Mir's mangler environment variable.
+func SetEnvManglerParams(minDelay, maxDelay time.Duration, dropRate float32) error {
+	p := ManglerParams{
+		MinDelay: minDelay,
+		MaxDelay: maxDelay,
+		DropRate: dropRate,
+	}
+	s, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("failed to encode mangle params: %w", err)
+	}
+	err = os.Setenv(ManglerEnv, string(s))
+	if err != nil {
+		return fmt.Errorf("failed to encode set mangler params: %w", err)
+	}
+	return nil
+}
+
+// GetEnvManglerParams gets Mir's mangler environment variable.
+func GetEnvManglerParams() (ManglerParams, error) {
+	mirManglerParams := os.Getenv(ManglerEnv)
+	var p ManglerParams
+	if err := json.Unmarshal([]byte(mirManglerParams), &p); err != nil {
+		return ManglerParams{}, fmt.Errorf("failed to decode mangler params: %w", err)
+	}
+	return p, nil
 }
 
 var log = logging.Logger("mir-consensus")
@@ -182,4 +236,64 @@ func UnwrapCheckpointSnapshot(ch *checkpoint.StableCheckpoint) (*Checkpoint, err
 	snap := &Checkpoint{}
 	err := snap.FromBytes(ch.Snapshot.AppData)
 	return snap, err
+}
+
+// Get stable checkpoint by height from datastore.
+func GetCheckpointByHeight(ctx context.Context, ds db.DB,
+	height abi.ChainEpoch, params *smr.Params) (*checkpoint.StableCheckpoint, error) {
+
+	var (
+		b   []byte
+		err error
+	)
+	// if no height provided recover Mir from latest checkpoint
+	if height <= 0 {
+		b, err = ds.Get(ctx, LatestCheckpointPbKey)
+		if err != nil {
+			if err == datastore.ErrNotFound {
+				if params != nil {
+					return smr.GenesisCheckpoint([]byte{}, *params), nil
+				} else {
+					return nil, xerrors.Errorf("no checkpoint for height %d or latest checkpoint found in db", height)
+				}
+			}
+			return nil, xerrors.Errorf("error getting latest checkpoint: %w", err)
+		}
+	} else {
+		b, err = ds.Get(ctx, HeightCheckIndexKey(height))
+		if err != nil {
+			if err == datastore.ErrNotFound {
+				return nil, xerrors.Errorf("no checkpoint peristed in database for height: %d", height)
+			}
+			return nil, xerrors.Errorf("error getting checkpoint for height %d: %w", height, err)
+		}
+	}
+
+	ch := &checkpoint.StableCheckpoint{}
+	err = ch.Deserialize(b)
+	return ch, err
+}
+
+// CheckpointToFile persist Mir stable checkpoint on a file.
+func CheckpointToFile(ch *checkpoint.StableCheckpoint, path string) error {
+	b, err := ch.Serialize()
+	if err != nil {
+		return fmt.Errorf("error serializing checkpoint to persist in file: %s", err)
+	}
+	return serializedCheckToFile(b, path)
+}
+
+func serializedCheckToFile(b []byte, path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0770); err != nil {
+		return fmt.Errorf("error creating directory for checkpoint persistence: %s", err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("error creating file to persist checkpoint: %s", err)
+	}
+	_, err = file.Write(b)
+	if err != nil {
+		return fmt.Errorf("error writing checkpoint in file: %s", err)
+	}
+	return nil
 }

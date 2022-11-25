@@ -27,6 +27,7 @@ func main() {
 	local := []*cli.Command{
 		runCmd,
 		cfgCmd,
+		checkCmd,
 	}
 
 	jaeger := tracing.SetupJaegerTracing("lotus")
@@ -94,6 +95,12 @@ func main() {
 				EnvVars: []string{"LOTUS_PATH"},
 				Hidden:  true,
 				Value:   path.Join(homeDir, ".lotus"), // TODO: Consider XDG_DATA_HOME
+			},
+			&cli.StringFlag{
+				Name:    "checkpoints-repo",
+				EnvVars: []string{"CHECKPOINTS_REPO"},
+				Hidden:  true,
+				// Value:   path.Join(homeDir, ".lotus"), // TODO: Consider XDG_DATA_HOME
 			},
 			cliutil.FlagVeryVerbose,
 		},

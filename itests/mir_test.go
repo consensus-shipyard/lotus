@@ -3,6 +3,7 @@ package itests
 import (
 	"context"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-state-types/big"
-
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
 )
@@ -37,15 +38,39 @@ func TestMirConsensus(t *testing.T) {
 
 	t.Run("mir", func(t *testing.T) {
 		runMirConsensusTests(t, kit.ThroughRPC())
-		// runDraftt(t, kit.ThroughRPC())
-
 	})
 }
 
-func runDraftt(t *testing.T, opts ...interface{}) {
+// TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
+func TestMirConsensusWithMangler(t *testing.T) {
+	require.Greater(t, MirFaultyValidatorNumber, 0)
+	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
+
+	err := mir.SetEnvManglerParams(200*time.Millisecond, 2*time.Second, 0)
+	require.NoError(t, err)
+	defer func() {
+		err := os.Unsetenv(mir.ManglerEnv)
+		require.NoError(t, err)
+	}()
+
+	t.Run("mirWithMangler", func(t *testing.T) {
+		runMirManglingTests(t, kit.ThroughRPC())
+	})
+}
+
+// runDraftTest is used for debugging.
+func runDraftTest(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
-	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
+	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+}
+
+func runMirManglingTests(t *testing.T, opts ...interface{}) {
+	ts := itestsConsensusSuite{opts: opts}
+
+	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
+	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
 }
 
 func runMirConsensusTests(t *testing.T, opts ...interface{}) {

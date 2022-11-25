@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -413,32 +414,60 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
 
-	// persist the protobuf of the snapshot to initialize mir from
-	// snapshot if needed.
+	// persist the stable checkpoint to initialize mir from it if needed
 	b, err := checkpoint.Serialize()
 	if err != nil {
 		return xerrors.Errorf("error marshaling stable checkpoint", err)
 	}
+	// store latest checkpoint.
 	if err := sm.MirManager.ds.Put(sm.ctx, LatestCheckpointPbKey, b); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
+	// index checkpoints by epoch to enable Mir to start from a specific checkpoint if needed
+	// (this is useful to perform catastrophic recoveries of the network).
+	if err := sm.MirManager.ds.Put(sm.ctx, HeightCheckIndexKey(snapshot.Height), b); err != nil {
+		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+	}
 
-	// flush checkpoint by cid
+	// also index checkpoint snapshots by cid
 	c, err := snapshot.Cid()
 	if err != nil {
 		return xerrors.Errorf("error computing cid for checkpoint: %w", err)
 	}
-
-	// store metadata for previous checkpoint in datastore and manager
 	sm.prevCheckpoint = ParentMeta{Height: snapshot.Height, Cid: c}
-	if err := sm.MirManager.ds.Put(sm.ctx, datastore.NewKey(c.String()), checkpoint.Snapshot.AppData); err != nil {
+
+	// store metadata for previous snapshot in datastore and manager to
+	// perform additional verifications
+	if err := sm.MirManager.ds.Put(sm.ctx, CidCheckIndexKey(c), checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
+	}
+
+	// optionally persist the checkpoint in a file
+	// (this is a best-effort process, if it fails we shouldn't kill the process)
+	// in the future we could add a flag that makes persistence STRICT to notify
+	// that this process should fail if persisting to file fails.
+	if sm.MirManager.checkpointRepo != "" {
+		// wrapping it in a routine to take it out of the critical path.
+		go func() {
+			path := path.Join(sm.MirManager.checkpointRepo, "checkpoint-"+snapshot.Height.String()+".chkp")
+			if err := serializedCheckToFile(b, path); err != nil {
+				log.Errorf("error persisting checkpoint for height %d in path %s: %s", snapshot.Height, path, err)
+			}
+		}()
 	}
 
 	// Send the checkpoint to Lotus and handle it there
 	log.Debug("Sending checkpoint to mining process to include in block")
 	sm.NextCheckpoint <- checkpoint
 	return nil
+}
+
+func HeightCheckIndexKey(epoch abi.ChainEpoch) datastore.Key {
+	return datastore.NewKey(CheckpointDBKeyPrefix + epoch.String())
+}
+
+func CidCheckIndexKey(c cid.Cid) datastore.Key {
+	return datastore.NewKey(CheckpointDBKeyPrefix + c.String())
 }
 
 func maxFaulty(n int) int {
