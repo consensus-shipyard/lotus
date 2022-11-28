@@ -59,7 +59,7 @@ var runCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "checkpoint-period",
 			Usage: "Checkpoint period",
-			Value: 32,
+			Value: 8,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
