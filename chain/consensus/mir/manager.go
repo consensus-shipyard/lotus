@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -170,6 +171,8 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("error getting segment length: %w", err)
 	}
 	params.Iss.SegmentLength = m.segmentLength
+	params.Mempool.MaxTransactionsInBatch = 1024
+	params.Iss.AdjustSpeed(1 * time.Second)
 
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config
