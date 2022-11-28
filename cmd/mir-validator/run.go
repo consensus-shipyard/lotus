@@ -119,7 +119,7 @@ var runCmd = &cli.Command{
 
 		// Membership config.
 		// TODO: Make this configurable.
-		membershipCfg := filepath.Join(cctx.String("repo"), MembershipCfgPath)
+		membershipFile := filepath.Join(cctx.String("repo"), MembershipPath)
 
 		// Checkpoint period.
 		checkpointPeriod := cctx.Int("checkpoint-period")
@@ -158,12 +158,15 @@ var runCmd = &cli.Command{
 		}
 
 		log.Infow("Starting mining with validator", "validator", validator)
+
 		cfg := mir.NewConfig(
-			mir.MembershipFromFile(membershipCfg),
+			mir.NewMembershipFile(membershipFile),
 			dbPath,
 			checkpointPeriod,
 			initCh,
-			cctx.String("checkpoints-repo"))
+			cctx.String("checkpoints-repo"),
+		)
+
 		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
 	},
 }

@@ -52,7 +52,7 @@ var initCmd = &cli.Command{
 		}
 
 		// TODO: Pass validator set for initialization
-		mp := path.Join(cctx.String("repo"), MembershipCfgPath)
+		mp := path.Join(cctx.String("repo"), MembershipPath)
 		if cctx.String("membership") != "" {
 			validators, err := mir.GetValidatorsFromFile(cctx.String("membership"))
 			if err != nil {

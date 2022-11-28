@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -30,10 +31,6 @@ import (
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/go-statestore"
-	mapi "github.com/filecoin-project/mir"
-	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
-	power3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/power"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/build"
@@ -67,6 +64,9 @@ import (
 	sectorstorage "github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sealer/mock"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+	mapi "github.com/filecoin-project/mir"
+	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
+	power3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/power"
 )
 
 func init() {
@@ -1016,6 +1016,23 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
+func (n *Ensemble) WriteMirMembershipToFile(fname string, miners ...*TestMiner) {
+	f, err := os.OpenFile(fname,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	require.NoError(n.t, err)
+	defer func() {
+		err = f.Close()
+		require.NoError(n.t, err)
+	}()
+
+	for _, m := range miners {
+		id, err := NodeLibp2pAddr(m.mirHost)
+		require.NoError(n.t, err)
+		_, err = f.WriteString(fmt.Sprintf("%s@%s\n", m.mirAddr, id))
+		require.NoError(n.t, err)
+	}
+}
+
 func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, wg *sync.WaitGroup, delay int, miners ...*TestMiner) {
 	n.BeginMirMiningWithDelayForFaultyNodes(ctx, wg, delay, miners)
 }
@@ -1025,7 +1042,7 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miner
 }
 
 func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg *sync.WaitGroup, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
-	membership := n.mirMembership(append(miners, faultyMiners...)...)
+	membershipString := n.mirMembership(append(miners, faultyMiners...)...)
 
 	for i, m := range append(miners, faultyMiners...) {
 		ctx, cancel := context.WithCancel(ctx)
@@ -1035,16 +1052,43 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 
 		go func(ctx context.Context, i int, m *TestMiner) {
 			defer wg.Done()
-			m.mirMembership = membership
+			m.mirMembership = membershipString
 			m.mirDB = NewTestDB()
 			m.checkpointPeriod = len(miners) + len(faultyMiners)
 			cfg := mir.Config{
-				MembershipCfg:    mir.MembershipFromStr(membership),
+				MembershipStore:  mir.MembershipString(membershipString),
 				CheckpointPeriod: m.checkpointPeriod,
 			}
 			if i > len(miners) && delay > 0 {
 				RandomDelay(delay)
 			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(ctx, i, m)
+	}
+}
+
+func (n *Ensemble) BeginMirMiningWithConfigFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, miners []*TestMiner, faultyMiners ...*TestMiner) {
+
+	for i, m := range append(miners, faultyMiners...) {
+		ctx, cancel := context.WithCancel(ctx)
+		m.stopMir = cancel
+
+		wg.Add(1)
+
+		go func(ctx context.Context, i int, m *TestMiner) {
+			defer wg.Done()
+			m.mirMembership = ""
+			m.mirDB = NewTestDB()
+			m.checkpointPeriod = len(miners) + len(faultyMiners)
+			cfg := mir.Config{
+				MembershipStore:  &mir.MembershipFile{FileName: configFileName},
+				CheckpointPeriod: m.checkpointPeriod,
+			}
+
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
@@ -1077,7 +1121,7 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				m.mirDB = NewTestDB()
 			}
 			cfg := mir.Config{
-				MembershipCfg:    mir.MembershipFromStr(m.mirMembership),
+				MembershipStore:  mir.MembershipString(m.mirMembership),
 				CheckpointPeriod: m.checkpointPeriod,
 			}
 			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)

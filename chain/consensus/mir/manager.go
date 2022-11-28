@@ -79,7 +79,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, err
 	}
 
-	initialValidatorSet, err := GetValidators(cfg.MembershipCfg)
+	initialValidatorSet, err := cfg.MembershipStore.GetValidators()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
