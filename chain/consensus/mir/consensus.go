@@ -8,7 +8,6 @@ import (
 	"crypto"
 	"fmt"
 
-	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -181,29 +180,32 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 		if h.Height < prev.Height {
 			return xerrors.Errorf("the height of the received block is over the latest checkpoint received")
 		}
-		if hasCheckpoint(h) {
-			ch, err := bft.verifyCheckpointInHeader(h, prev)
-			if err != nil {
-				return xerrors.Errorf("error verifying checkpoint: %w", err)
-			}
-			if err := bft.cache.rcvCheckpoint(ch); err != nil {
-				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
-			}
-		}
+		// There is a race when syncing a learner for the block verification that needs to be fixed.
+		// See https://github.com/consensus-shipyard/lotus/issues/26. Uncomment once this is fixed.
+		// This happens when syncing from scratch a learner and receiving a block through gossipsub.
+		// if hasCheckpoint(h) {
+		// 	ch, err := bft.verifyCheckpointInHeader(h, prev)
+		// 	if err != nil {
+		// 		return xerrors.Errorf("error verifying checkpoint: %w", err)
+		// 	}
+		// 	if err := bft.cache.rcvCheckpoint(ch); err != nil {
+		// 		return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
+		// 	}
+		// }
 
-		// the genesis block can be considered as verified already.
-		if h.Height != 0 {
-			// we should receive all blocks, including the ones that don't include checkpoints
-			// so they are conveniently verified
-			// TODO: There is an attack surface here, what if a malicious peer sends two
-			// blocks for the same epoch? This is handled in the cache by just accepting
-			// the first one and rejecting any subsequent ones. A malicious node could
-			// force a forged block to us to get us out-of-sync. While this is a hustle,
-			// the worst case here is that we would have to keep restoring sync from a checkpoint
-			if err := bft.cache.rcvBlock(h); err != nil {
-				return xerrors.Errorf("error receiving block in cache: %w", err)
-			}
-		}
+		// // the genesis block can be considered as verified already.
+		// if h.Height != 0 {
+		// 	// we should receive all blocks, including the ones that don't include checkpoints
+		// 	// so they are conveniently verified
+		// 	// TODO: There is an attack surface here, what if a malicious peer sends two
+		// 	// blocks for the same epoch? This is handled in the cache by just accepting
+		// 	// the first one and rejecting any subsequent ones. A malicious node could
+		// 	// force a forged block to us to get us out-of-sync. While this is a hustle,
+		// 	// the worst case here is that we would have to keep restoring sync from a checkpoint
+		// 	if err := bft.cache.rcvBlock(h); err != nil {
+		// 		return xerrors.Errorf("error receiving block in cache: %w", err)
+		// 	}
+		// }
 
 		return nil
 	})
@@ -280,16 +282,18 @@ func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *Checkpoint)
 	if err != nil {
 		return nil, xerrors.Errorf("error unwrapping checkpoint snapshot: %w", err)
 	}
-	c, err := prev.Cid()
-	if err != nil {
-		return nil, xerrors.Errorf("error computing cid for latest checkpoint: %w", err)
-	}
-	// if cid.Undef this is the first checkpoint, nothing to do here.
-	if c != cid.Undef {
-		if snap.Parent.Cid != c || snap.Parent.Height != prev.Height {
-			return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, snap.Parent.Cid)
-		}
-	}
+
+	// TODO: Uncomment once https://github.com/consensus-shipyard/lotus/issues/26 is fixed
+	// c, err := prev.Cid()
+	// if err != nil {
+	// 	return nil, xerrors.Errorf("error computing cid for latest checkpoint: %w", err)
+	// }
+	// // if cid.Undef this is the first checkpoint, nothing to do here.
+	// if c != cid.Undef {
+	// 	if snap.Parent.Cid != c || snap.Parent.Height != prev.Height {
+	// 		return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, snap.Parent.Cid)
+	// 	}
+	// }
 
 	return snap, nil
 }
