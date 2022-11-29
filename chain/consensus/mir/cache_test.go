@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+/*  */
 func TestCacheLen(t *testing.T) {
 	mc := newDsBlkCache(datastore.NewMapDatastore())
 	dc := newMemBlkCache()

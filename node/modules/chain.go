@@ -142,6 +142,7 @@ type SyncerParams struct {
 	SyncMgrCtor  chain.SyncManagerCtor
 	Host         host.Host
 	Beacon       beacon.Schedule
+	BadBlock     *chain.BadBlockCache
 	Gent         chain.Genesis
 	Consensus    consensus.Consensus
 }
@@ -153,10 +154,11 @@ func NewSyncer(params SyncerParams) (*chain.Syncer, error) {
 		sm     = params.StateManager
 		ex     = params.ChainXchg
 		smCtor = params.SyncMgrCtor
+		badBlk = params.BadBlock
 		h      = params.Host
 		b      = params.Beacon
 	)
-	syncer, err := chain.NewSyncer(ds, sm, ex, smCtor, h.ConnManager(), h.ID(), b, params.Gent, params.Consensus)
+	syncer, err := chain.NewSyncer(ds, sm, ex, smCtor, h.ConnManager(), h.ID(), b, badBlk, params.Gent, params.Consensus)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/ipfs/go-cid"
@@ -12,61 +13,98 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 
+	"github.com/filecoin-project/lotus/chain"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
-	CachePrefix    = "mir-cache/"
-	BlkCachePrefix = CachePrefix + "blk/"
+	CachePrefix      = "mir-cache/"
+	BlkCachePrefix   = CachePrefix + "blk/"
+	CheckCachePrefix = CachePrefix + "check/"
 )
 
 var (
 	latestCheckKey = datastore.NewKey(CachePrefix + "latestCheck")
 )
 
-func cacheKey(e abi.ChainEpoch) datastore.Key {
+func blkCacheKey(e abi.ChainEpoch) datastore.Key {
 	return datastore.NewKey(BlkCachePrefix + strconv.FormatUint(uint64(e), 10))
 }
 
-type mirCache struct {
-	cache blkCache
+func checkCacheKey(e abi.ChainEpoch) datastore.Key {
+	return datastore.NewKey(CheckCachePrefix + strconv.FormatUint(uint64(e), 10))
 }
 
-// blkCache used to track Mir unverified blocks,
-// and verify them in bulk when a checkpoint is received.
-type blkCache interface {
-	get(e abi.ChainEpoch) (cid.Cid, error)
-	put(e abi.ChainEpoch, v cid.Cid) error
-	rm(e abi.ChainEpoch) error
-	length() int
-	setLatestCheckpoint(ch *Checkpoint) error
-	getLatestCheckpoint() (*Checkpoint, error)
-	purge() error
-}
-
-type dsBlkCache struct {
-	ds datastore.Batching
-}
-
-func newDsBlkCache(ds datastore.Batching) *mirCache {
-	return &mirCache{&dsBlkCache{ds: ds}}
-}
-
-func (c *dsBlkCache) get(e abi.ChainEpoch) (cid.Cid, error) {
-	v, err := c.ds.Get(context.Background(), cacheKey(e))
+func heightFromBlkKey(k string) (abi.ChainEpoch, error) {
+	n, err := strconv.Atoi(strings.Split(k, BlkCachePrefix)[1])
 	if err != nil {
+		return -1, err
+	}
+	return abi.ChainEpoch(n), nil
+}
+
+type mirCache struct {
+	ds datastore.Batching
+	// lock to avoid starting bad block
+	// marking processes in parallel
+	badBlkLk sync.Mutex
+	badBlk   *chain.BadBlockCache
+}
+
+func newDsBlkCache(ds datastore.Batching, bad *chain.BadBlockCache) *mirCache {
+	return &mirCache{ds: ds, badBlk: bad}
+}
+
+func (c *mirCache) getBlk(e abi.ChainEpoch) (cid.Cid, error) {
+	v, err := c.ds.Get(context.Background(), blkCacheKey(e))
+	if err != nil {
+		if err == datastore.ErrNotFound {
+			return cid.Undef, nil
+		}
 		return cid.Undef, err
 	}
 	_, one, err := cid.CidFromBytes(v)
 	return one, err
 }
 
-func (c *dsBlkCache) put(e abi.ChainEpoch, v cid.Cid) error {
-	return c.ds.Put(context.Background(), cacheKey(e), v.Bytes())
+func (c *mirCache) putBlk(e abi.ChainEpoch, v cid.Cid) error {
+	return c.ds.Put(context.Background(), blkCacheKey(e), v.Bytes())
 }
 
-func (c *dsBlkCache) rm(e abi.ChainEpoch) error {
-	return c.ds.Delete(context.Background(), cacheKey(e))
+func (c *mirCache) rmBlk(e abi.ChainEpoch) error {
+	return c.ds.Delete(context.Background(), blkCacheKey(e))
+}
+
+func (c *mirCache) getCheck(e abi.ChainEpoch) (*Checkpoint, error) {
+	v, err := c.ds.Get(context.Background(), checkCacheKey(e))
+	if err != nil {
+		if err == datastore.ErrNotFound {
+			return &Checkpoint{}, nil
+		}
+		return nil, err
+	}
+	ch := &Checkpoint{}
+	err = ch.FromBytes(v)
+	if err != nil {
+		return nil, err
+	}
+	return ch, nil
+}
+
+func (c *mirCache) putCheck(v *Checkpoint) error {
+	b, err := v.Bytes()
+	if err != nil {
+		return err
+	}
+	return c.putCheckInBytes(v.Height, b)
+}
+
+func (c *mirCache) putCheckInBytes(height abi.ChainEpoch, b []byte) error {
+	return c.ds.Put(context.Background(), checkCacheKey(height), b)
+}
+
+func (c *mirCache) rmCheck(e abi.ChainEpoch) error {
+	return c.ds.Delete(context.Background(), checkCacheKey(e))
 }
 
 // TODO: For long checkpoint periods this operation may take a
@@ -74,12 +112,19 @@ func (c *dsBlkCache) rm(e abi.ChainEpoch) error {
 // called and we are recovering from a checkpoint, but maybe we
 // should consider performing this in the background to remove it
 // from the critical path.
-func (c *dsBlkCache) purge() error {
-	q := query.Query{Prefix: BlkCachePrefix}
+func (c *mirCache) purge() error {
+	if err := c.purgeByPrefix(BlkCachePrefix); err != nil {
+		return err
+	}
+	return c.purgeByPrefix(CheckCachePrefix)
+}
+
+func (c *mirCache) purgeByPrefix(prefix string) error {
+	q := query.Query{Prefix: prefix}
 	qr, _ := c.ds.Query(context.Background(), q)
 	entries, err := qr.Rest()
 	if err != nil {
-		return fmt.Errorf("error performing cache query for purge: %w", err)
+		return fmt.Errorf("error performing cache query for purge prefix %s: %w", prefix, err)
 	}
 	for _, e := range entries {
 		return c.ds.Delete(context.Background(), datastore.NewKey(e.Key))
@@ -90,7 +135,7 @@ func (c *dsBlkCache) purge() error {
 // this operation is potentially expensive according
 // to the underlying datastore and the size of the
 // datastore.
-func (c *dsBlkCache) length() int {
+func (c *mirCache) length() int {
 	q := query.Query{Prefix: BlkCachePrefix}
 	i := 0
 	qr, _ := c.ds.Query(context.Background(), q)
@@ -103,15 +148,7 @@ func (c *dsBlkCache) length() int {
 	return i
 }
 
-func (c *dsBlkCache) setLatestCheckpoint(ch *Checkpoint) error {
-	b, err := ch.Bytes()
-	if err != nil {
-		return fmt.Errorf("error serializing checkpoint data: %w", err)
-	}
-	return c.ds.Put(context.Background(), latestCheckKey, b)
-}
-
-func (c *dsBlkCache) getLatestCheckpoint() (*Checkpoint, error) {
+func (c *mirCache) getLatestCheckpoint() (*Checkpoint, error) {
 	b, err := c.ds.Get(context.Background(), latestCheckKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
@@ -124,7 +161,11 @@ func (c *dsBlkCache) getLatestCheckpoint() (*Checkpoint, error) {
 	return ch, err
 }
 
-func (c mirCache) rcvCheckpoint(snap *Checkpoint) error {
+func (c *mirCache) rcvCheckpoint(snap *Checkpoint) error {
+	prev, err := c.prevCheckpoint(snap)
+	if err != nil {
+		return err
+	}
 	i := snap.Height
 	for _, k := range snap.BlockCids {
 		i--
@@ -133,13 +174,19 @@ func (c mirCache) rcvCheckpoint(snap *Checkpoint) error {
 			continue
 		}
 		log.Debugf("Getting block from mir cache for epoch: %d", i)
-		v, err := c.cache.get(i)
+		v, err := c.getBlk(i)
 		if err != nil {
 			return fmt.Errorf("error getting value from datastore: %w", err)
 		}
+		if v == cid.Undef {
+			// this usually happens when restarting a node, if the block is already on-chain
+			// but we receive the following checkpoint that wasn't received yet.
+			log.Warnf("missing unverified block for that height %d in cache. It may have been verified already", i)
+			continue
+		}
 		if v == k {
 			// delete from cache if verified by checkpoint
-			if err := c.cache.rm(i); err != nil {
+			if err := c.rmBlk(i); err != nil {
 				return fmt.Errorf("error deleting value from datastore: %w", err)
 			}
 		} else {
@@ -147,102 +194,88 @@ func (c mirCache) rcvCheckpoint(snap *Checkpoint) error {
 		}
 	}
 
-	l := c.cache.length()
-	// checkpoint doesn't verify all previous blocks.
-	if l != 0 && l != -1 {
-		return fmt.Errorf("checkpoint in block doesn't verify all previous unverified blocks in cache")
+	// verify that all block in range have been verified
+	// TODO: Mark as bad those that have not been verified and purge
+	// the block store?
+	if i != prev.Height {
+		log.Warnf("Checkpoint didn't verify the whole gap of blocks between checkpoints: %d, %d", i, prev.Height)
 	}
 
 	// update the latest checkpoint received.
-	if err := c.cache.setLatestCheckpoint(snap); err != nil {
+	if err := c.setLatestCheckpoint(snap); err != nil {
 		return fmt.Errorf("couldn't persist latest checkpoint in cache: %w", err)
 	}
+
+	// mark bad blocks
+	// including it on a routine to take it out of the critical path.
+	go c.markBadBlks(snap.Height)
 
 	return nil
 }
 
 func (c *mirCache) rcvBlock(b *types.BlockHeader) error {
-	if c, _ := c.cache.get(b.Height); c != cid.Undef {
+	if c, _ := c.getBlk(b.Height); c != cid.Undef {
 		// if someone is trying to push a new rcvBlock
 		if c != b.Cid() {
 			return fmt.Errorf("already seen a block for that height in cache: height=%d", b.Height)
 		}
 		return nil
 	}
-	return c.cache.put(b.Height, b.Cid())
+	return c.putBlk(b.Height, b.Cid())
 }
 
-func (c *mirCache) latestCheckpoint() (*Checkpoint, error) {
-	ch, err := c.cache.getLatestCheckpoint()
+// return previous checkpoint for checkpoint at epoch e.
+// returns empty checkpoint if no previous checkpoint.
+func (c *mirCache) prevCheckpoint(snap *Checkpoint) (*Checkpoint, error) {
+	return c.getCheck(snap.Parent.Height)
+}
+
+func (c *mirCache) setLatestCheckpoint(snap *Checkpoint) error {
+	b, err := snap.Bytes()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("error serializing checkpoint data: %w", err)
 	}
-	if ch == nil {
-		// if not found return empty Checkpoint
-		return &Checkpoint{}, nil
+	if err := c.putCheckInBytes(snap.Height, b); err != nil {
+		return err
 	}
-	return ch, nil
+	if err := c.ds.Put(context.Background(), latestCheckKey, b); err != nil {
+		return err
+	}
+	// garbage collect the previous checkpoint pointed by this one.
+	// Potentially not needed anymore if rcvCheckpoint was called.
+	return c.rmCheck(snap.Parent.Height)
 }
 
-// thread-safe memory block cache. It has low-overhead, but it is not persisted between restarts (which may lead
-// to inconsistencies).
-type memBlkCache struct {
-	lk               sync.RWMutex
-	m                map[abi.ChainEpoch]cid.Cid
-	latestCheckpoint *Checkpoint
-}
+// if a block with a height below a verify checkpoint hasn't been
+// removed from the cache is because it is bad (or outdated) and it should be marked
+// as such.
+func (c *mirCache) markBadBlks(height abi.ChainEpoch) {
+	// sequentialize badblks marking
+	c.badBlkLk.Lock()
+	defer c.badBlkLk.Unlock()
 
-func newMemBlkCache() *mirCache {
-	return &mirCache{&memBlkCache{m: make(map[abi.ChainEpoch]cid.Cid)}}
-}
+	q := query.Query{Prefix: BlkCachePrefix}
+	qr, _ := c.ds.Query(context.Background(), q)
+	for r := range qr.Next() {
+		if r.Error != nil {
+			log.Errorf("error marking bad blocks for height: %d: %w", height, r.Error)
+			return
+		}
+		h, err := heightFromBlkKey(r.Key)
+		if err != nil {
+			log.Errorf("error getting key height: %w", err)
+			continue
+		}
+		if h < height {
+			// the cid for the badBlockReason should the cid for the tipset or block
+			// where it is verified.
+			_, vcid, err := cid.CidFromBytes(r.Value)
+			if err != nil {
+				log.Errorf("error getting cid for block from ds:  %w", err)
+				continue
 
-func (c *memBlkCache) get(e abi.ChainEpoch) (cid.Cid, error) {
-	c.lk.RLock()
-	defer c.lk.RUnlock()
-	return c.m[e], nil
+			}
+			c.badBlk.Add(vcid, chain.NewBadBlockReason([]cid.Cid{vcid}, "block not verified by mir checkpoint"))
+		}
+	}
 }
-
-func (c *memBlkCache) put(e abi.ChainEpoch, v cid.Cid) error {
-	c.lk.Lock()
-	defer c.lk.Unlock()
-	c.m[e] = v
-	return nil
-}
-
-func (c *memBlkCache) rm(e abi.ChainEpoch) error {
-	c.lk.Lock()
-	defer c.lk.Unlock()
-	delete(c.m, e)
-	return nil
-}
-
-func (c *memBlkCache) length() int {
-	c.lk.RLock()
-	defer c.lk.RUnlock()
-	return len(c.m)
-}
-func (c *memBlkCache) setLatestCheckpoint(ch *Checkpoint) error {
-	c.lk.Lock()
-	defer c.lk.Unlock()
-	c.latestCheckpoint = ch
-	return nil
-
-}
-
-func (c *memBlkCache) getLatestCheckpoint() (*Checkpoint, error) {
-	c.lk.RLock()
-	defer c.lk.RUnlock()
-	return c.latestCheckpoint, nil
-}
-
-func (c *memBlkCache) purge() error {
-	c.lk.RLock()
-	defer c.lk.RUnlock()
-	c.m = make(map[abi.ChainEpoch]cid.Cid)
-	return nil
-}
-
-var (
-	_ blkCache = &memBlkCache{}
-	_ blkCache = &dsBlkCache{}
-)
