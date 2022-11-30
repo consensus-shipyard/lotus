@@ -1016,9 +1016,26 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
-func (n *Ensemble) WriteMirMembershipToFile(fname string, miners ...*TestMiner) {
+func (n *Ensemble) AddMirValidatorsToFile(fname string, miners ...*TestMiner) {
 	f, err := os.OpenFile(fname,
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	require.NoError(n.t, err)
+	defer func() {
+		err = f.Close()
+		require.NoError(n.t, err)
+	}()
+
+	for _, m := range miners {
+		id, err := NodeLibp2pAddr(m.mirHost)
+		require.NoError(n.t, err)
+		_, err = f.WriteString(fmt.Sprintf("%s@%s\n", m.mirAddr, id))
+		require.NoError(n.t, err)
+	}
+}
+
+func (n *Ensemble) StoreMirValidatorsToFile(fname string, miners ...*TestMiner) {
+	f, err := os.OpenFile(fname,
+		os.O_CREATE|os.O_WRONLY, 0666)
 	require.NoError(n.t, err)
 	defer func() {
 		err = f.Close()
@@ -1071,8 +1088,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 	}
 }
 
-func (n *Ensemble) BeginMirMiningWithConfigFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, miners []*TestMiner, faultyMiners ...*TestMiner) {
-
+func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, checkpoint int, miners []*TestMiner, faultyMiners ...*TestMiner) {
 	for i, m := range append(miners, faultyMiners...) {
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel
@@ -1081,12 +1097,11 @@ func (n *Ensemble) BeginMirMiningWithConfigFile(ctx context.Context, configFileN
 
 		go func(ctx context.Context, i int, m *TestMiner) {
 			defer wg.Done()
-			m.mirMembership = ""
 			m.mirDB = NewTestDB()
-			m.checkpointPeriod = len(miners) + len(faultyMiners)
+			m.checkpointPeriod = checkpoint
 			cfg := mir.Config{
 				MembershipStore:  &mir.MembershipFile{FileName: configFileName},
-				CheckpointPeriod: m.checkpointPeriod,
+				CheckpointPeriod: checkpoint,
 			}
 
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)

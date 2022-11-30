@@ -36,8 +36,8 @@ var (
 //     they already have it.
 //  6. Sync and restore from state whenever needed.
 func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB, cfg *Config) error {
-	log.With("addr", addr).Infof("Mir miner started")
-	defer log.With("addr", addr).Infof("Mir miner completed")
+	log.With("miner", addr).Infof("Mir miner started")
+	defer log.With("miner", addr).Infof("Mir miner completed")
 
 	m, err := NewManager(ctx, addr, h, api, db, cfg)
 	if err != nil {
@@ -65,7 +65,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		// because if `ctx` has been closed then `api.ChainHead(ctx)` returns an error,
 		// and we will be in the infinite loop due to `continue`.
 		if ctx.Err() != nil {
-			log.Debug("Mir miner: context closed")
+			log.With("miner", addr).Debug("Mir miner: context closed")
 			return nil
 		}
 
@@ -78,20 +78,20 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			// TODO: This is a temporary solution while we are discussing that issue
 			// https://filecoinproject.slack.com/archives/C03C77HN3AS/p1660330971306019
 			if err != nil && !errors.Is(err, mir.ErrStopped) && !errors.Is(err, ErrMirCtxCanceledWhileWaitingSnapshot) {
-				panic(fmt.Errorf("miner consensus error: %w", err))
+				panic(fmt.Errorf("miner %s consensus error: %w", addr, err))
 			}
-			log.With("addr", addr).Infof("Mir node stopped signal")
+			log.With("miner", addr).Infof("Mir node stopped signal")
 			return nil
 
 		case <-ctx.Done():
-			log.Debug("Mir miner: context closed")
+			log.With("miner", addr).Debug("Mir miner: context closed")
 			return nil
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
 			newValidatorSet, err := cfg.MembershipStore.GetValidators()
 			if err != nil {
-				log.Warnf("failed to get subnet validators: %w", err)
+				log.With("miner", addr).Warnf("failed to get subnet validators: %w", err)
 				continue
 			}
 
@@ -99,7 +99,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 				continue
 			}
 
-			log.Infof("new validator set - size: %d", newValidatorSet.Size())
+			log.With("miner", addr).Infof("new validator set - size: %d", newValidatorSet.Size())
 			lastValidatorSet = newValidatorSet
 
 			if req := m.ReconfigurationRequest(newValidatorSet); req != nil {
@@ -111,7 +111,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			if err != nil {
 				return xerrors.Errorf("failed to get chain head: %w", err)
 			}
-			log.Debugf("selecting messages from mempool from base: %v", base.Key())
+			log.With("miner", addr).Debugf("selecting messages from mempool from base: %v", base.Key())
 			msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
 			if err != nil {
 				log.With("epoch", base.Height()).
@@ -127,7 +127,6 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 			// We send requests via the channel instead of calling m.SubmitRequests(ctx, requests) explicitly.
 			toMir <- requests
-
 		}
 	}
 }

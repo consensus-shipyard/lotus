@@ -250,35 +250,31 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 		wg.Wait()
 	}()
 
-	membershipFileName := "./_membership.config"
+	membershipFileName := "./_membership_config.tmp"
 	os.Remove(membershipFileName) // nolint
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
-	ens.WriteMirMembershipToFile(membershipFileName, miners...)
-	ens.InterconnectFullNodes().BeginMirMiningWithConfigFile(ctx, membershipFileName, &wg, miners)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, ts.opts...)
+	ens.StoreMirValidatorsToFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 4, miners[:MirTotalValidatorNumber])
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Log(">>> validators join")
 
-	var newMiners []*kit.TestMiner
-	var newNodes []*kit.TestFullNode
+	// Update the file to all miners can know each other.
+	ens.StoreMirValidatorsToFile(membershipFileName, miners...)
 
-	// TODO: use MirJointValidatorsNumber instead of 1
-	for i := 0; i < 1; i++ {
-		var v kit.TestMiner
-		var n kit.TestFullNode
-		ens.FullNode(&n).Miner(&v, &n).Start().InterconnectFullNodes()
-		newMiners = append(newMiners, &v)
-		newNodes = append(newNodes, &n)
-	}
+	// Start other miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 5, miners[MirTotalValidatorNumber:])
 
-	ens.WriteMirMembershipToFile(membershipFileName, newMiners...)
-
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, append(nodes, newNodes...)...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], newNodes...)...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }
 

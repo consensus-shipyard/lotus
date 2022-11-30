@@ -325,6 +325,25 @@ func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 	return
 }
 
+// ReconfigureMirNode reconfigures the Mir node.
+func (m *Manager) ReconfigureMirNode(nodes map[t.NodeID]t.NodeAddress) error {
+	log.With("miner", m.MirID).Debugf("Reconfiguring a Mir node")
+
+	if len(nodes) == 0 {
+		return fmt.Errorf("empty validator set")
+	}
+
+	fmt.Printf(">>> reconfiguring network in epoch %d with membership length %d\n", m.StateManager.currentEpoch, len(nodes))
+	go m.Net.Connect(nodes)
+	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
+	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
+	// (as there is where we have the config information). These functions should be called
+	// in the garbage collection process performed when the reconfiguration is effective.
+	// go m.Net.CloseOldConnections(nodes)
+
+	return nil
+}
+
 func (m *Manager) ReconfigurationRequest(valset *ValidatorSet) *mirproto.Request {
 	var payload bytes.Buffer
 	if err := valset.MarshalCBOR(&payload); err != nil {
@@ -349,7 +368,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
 		if !m.Pool.IsTargetRequest(clientID, nonce) {
-			log.Warnf("batchSignedMessage: target request not found for client ID")
+			log.With("miner", m.MirID).Warnf("batchSignedMessage: target request not found for client ID")
 			continue
 		}
 
