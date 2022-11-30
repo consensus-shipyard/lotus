@@ -73,6 +73,7 @@ var ChainNode = Options(
 	Override(new(chain.Genesis), chain.LoadGenesis),
 	Override(new(store.WeightFunc), filcns.Weight),
 	Override(new(stmgr.Executor), consensus.NewTipSetExecutor(filcns.RewardFunc)),
+	Override(new(*chain.BadBlockCache), chain.NewBadBlockCache),
 	Override(new(consensus.Consensus), filcns.NewFilecoinExpectedConsensus),
 	Override(new(*store.ChainStore), modules.ChainStore),
 	Override(new(*stmgr.StateManager), modules.StateManager),

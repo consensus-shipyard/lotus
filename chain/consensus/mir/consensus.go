@@ -8,6 +8,7 @@ import (
 	"crypto"
 	"fmt"
 
+	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -49,13 +50,14 @@ func NewConsensus(
 	ds dtypes.MetadataDS,
 	b beacon.Schedule,
 	g chain.Genesis,
+	badBlock *chain.BadBlockCache,
 	netName dtypes.NetworkName,
 ) (consensus.Consensus, error) {
 	return &Mir{
 		beacon:  b,
 		sm:      sm,
 		genesis: g,
-		cache:   newDsBlkCache(ds),
+		cache:   newDsBlkCache(ds, badBlock),
 	}, nil
 }
 
@@ -108,14 +110,14 @@ func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (
 	}
 
 	// get the latest checkpoint in cache
-	prev, err := bft.cache.latestCheckpoint()
+	prev, err := bft.cache.getLatestCheckpoint()
 	if err != nil {
 		return "err_latest_checkpoint", xerrors.Errorf("couldn't get latests checkpoint: %w", err)
 	}
 
 	// if there is a checkpoint, verify it before accepting the block.
 	if hasCheckpoint(b) {
-		if _, err := bft.verifyCheckpointInHeader(b, prev); err != nil {
+		if _, err := bft.verifyCheckpointInHeader(b); err != nil {
 			log.Warnf("checkpoint validation failed in block: %s", err)
 			return "checkpoint_verification_failed", err
 		}
@@ -171,41 +173,29 @@ func (bft *Mir) ValidateBlock(ctx context.Context, b *types.FullBlock) (err erro
 	}
 
 	checkpointChk := async.Err(func() error {
-		// get the latest checkpoint in cache
-		prev, err := bft.cache.latestCheckpoint()
-		if err != nil {
-			return xerrors.Errorf("couldn't get latests checkpoint: %w", err)
+		if hasCheckpoint(h) {
+			ch, err := bft.verifyCheckpointInHeader(h)
+			if err != nil {
+				return xerrors.Errorf("error verifying checkpoint: %w", err)
+			}
+			if err := bft.cache.rcvCheckpoint(ch); err != nil {
+				return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
+			}
 		}
-		// check that the block is in the right range.
-		if h.Height < prev.Height {
-			return xerrors.Errorf("the height of the received block is over the latest checkpoint received")
-		}
-		// There is a race when syncing a learner for the block verification that needs to be fixed.
-		// See https://github.com/consensus-shipyard/lotus/issues/26. Uncomment once this is fixed.
-		// This happens when syncing from scratch a learner and receiving a block through gossipsub.
-		// if hasCheckpoint(h) {
-		// 	ch, err := bft.verifyCheckpointInHeader(h, prev)
-		// 	if err != nil {
-		// 		return xerrors.Errorf("error verifying checkpoint: %w", err)
-		// 	}
-		// 	if err := bft.cache.rcvCheckpoint(ch); err != nil {
-		// 		return xerrors.Errorf("error verifying unverified blocks from checkpoint: %w", err)
-		// 	}
-		// }
 
-		// // the genesis block can be considered as verified already.
-		// if h.Height != 0 {
-		// 	// we should receive all blocks, including the ones that don't include checkpoints
-		// 	// so they are conveniently verified
-		// 	// TODO: There is an attack surface here, what if a malicious peer sends two
-		// 	// blocks for the same epoch? This is handled in the cache by just accepting
-		// 	// the first one and rejecting any subsequent ones. A malicious node could
-		// 	// force a forged block to us to get us out-of-sync. While this is a hustle,
-		// 	// the worst case here is that we would have to keep restoring sync from a checkpoint
-		// 	if err := bft.cache.rcvBlock(h); err != nil {
-		// 		return xerrors.Errorf("error receiving block in cache: %w", err)
-		// 	}
-		// }
+		// the genesis block can be considered as verified already.
+		if h.Height != 0 {
+			// we should receive all blocks, including the ones that don't include checkpoints
+			// so they are conveniently verified
+			// TODO: There is an attack surface here, what if a malicious peer sends two
+			// blocks for the same epoch? This is handled in the cache by just accepting
+			// the first one and rejecting any subsequent ones. A malicious node could
+			// force a forged block to us to get us out-of-sync. While this is a hustle,
+			// the worst case here is that we would have to keep restoring sync from a checkpoint
+			if err := bft.cache.rcvBlock(h); err != nil {
+				return xerrors.Errorf("error receiving block in cache: %w", err)
+			}
+		}
 
 		return nil
 	})
@@ -258,7 +248,7 @@ func blockSanityChecks(h *types.BlockHeader) error {
 	return nil
 }
 
-func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *Checkpoint) (*Checkpoint, error) {
+func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader) (*Checkpoint, error) {
 	ch, err := CheckpointFromVRFProof(h.Ticket)
 	if err != nil {
 		return nil, xerrors.Errorf("error getting checkpoint from ticket: %w", err)
@@ -269,6 +259,21 @@ func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *Checkpoint)
 	}
 	ch = ch.AttachCert(cert)
 
+	snap, err := UnwrapCheckpointSnapshot(ch)
+	if err != nil {
+		return nil, xerrors.Errorf("error unwrapping checkpoint snapshot: %w", err)
+	}
+
+	// get the latest checkpoint in cache
+	prev, err := bft.cache.prevCheckpoint(snap)
+	if err != nil {
+		return nil, xerrors.Errorf("couldn't get previous checkpoint: %w", err)
+	}
+	// check that the block is in the right range.
+	if h.Height < prev.Height {
+		return nil, xerrors.Errorf("the height of the received block is over the latest checkpoint received")
+	}
+
 	// verify checkpoint signature
 	// TODO: Right now we assume static membership and the membership is received off-chain.
 	// Once we support reconfiguration (and especially if we track membership online), we should
@@ -278,22 +283,16 @@ func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader, prev *Checkpoint)
 	if err := ch.VerifyCert(crypto.SHA256, CheckpointVerifier{}, ch.Memberships()[0]); err != nil {
 		return nil, xerrors.Errorf("error verifying checkpoint signature: %w", err)
 	}
-	snap, err := UnwrapCheckpointSnapshot(ch)
+	c, err := prev.Cid()
 	if err != nil {
-		return nil, xerrors.Errorf("error unwrapping checkpoint snapshot: %w", err)
+		return nil, xerrors.Errorf("error computing cid for latest checkpoint: %w", err)
 	}
-
-	// TODO: Uncomment once https://github.com/consensus-shipyard/lotus/issues/26 is fixed
-	// c, err := prev.Cid()
-	// if err != nil {
-	// 	return nil, xerrors.Errorf("error computing cid for latest checkpoint: %w", err)
-	// }
-	// // if cid.Undef this is the first checkpoint, nothing to do here.
-	// if c != cid.Undef {
-	// 	if snap.Parent.Cid != c || snap.Parent.Height != prev.Height {
-	// 		return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, snap.Parent.Cid)
-	// 	}
-	// }
+	// if cid.Undef this is the first checkpoint, nothing to do here.
+	if c != cid.Undef {
+		if snap.Parent.Cid != c || snap.Parent.Height != prev.Height {
+			return nil, xerrors.Errorf("new checkpoint not pointing to the previous one: %s, %s", c, snap.Parent.Cid)
+		}
+	}
 
 	return snap, nil
 }
@@ -307,13 +306,6 @@ func hasCheckpoint(h *types.BlockHeader) bool {
 // We will consider potential changes of Consensus interface in https://github.com/filecoin-project/eudico/issues/143.
 func (bft *Mir) IsEpochBeyondCurrMax(epoch abi.ChainEpoch) bool {
 	return false
-}
-
-// PurgeValidationCache cleans the cache from outstanding blocks.
-// (it may be the case that there are some left-overs from previous
-// runs after a crash or an incorrect validation).
-func (bft *Mir) PurgeValidationCache() {
-	bft.cache.cache.purge()
 }
 
 // Weight in mir uses a default approach where the height determines the weight.

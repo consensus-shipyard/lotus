@@ -1,6 +1,8 @@
 package fifo
 
 import (
+	"sync"
+
 	"github.com/ipfs/go-cid"
 
 	mirrequest "github.com/filecoin-project/mir/pkg/pb/requestpb"
@@ -14,6 +16,7 @@ type Pool struct {
 	clientByCID     map[cid.Cid]string // messageCID -> clientID
 	orderingClients map[string]bool    // clientID -> bool
 	seen            map[string]uint64  // clientID -> nonce
+	lk              sync.RWMutex
 }
 
 func New() *Pool {
@@ -26,6 +29,8 @@ func New() *Pool {
 
 // AddRequest adds the request if it satisfies to the FIFO policy.
 func (p *Pool) AddRequest(cid cid.Cid, r *mirrequest.Request) (exist bool) {
+	p.lk.Lock()
+	defer p.lk.Unlock()
 	_, exist = p.orderingClients[r.ClientId]
 	// if it doesn't exist or it has a greater nonce than the one seen.
 	if !exist || r.ReqNo > p.seen[r.ClientId] {
@@ -41,12 +46,16 @@ func (p *Pool) AddRequest(cid cid.Cid, r *mirrequest.Request) (exist bool) {
 // IsTargetRequest returns whether the request with clientID should be sent or there is a request from that client that
 // is in progress of ordering.
 func (p *Pool) IsTargetRequest(clientID string, nonce uint64) bool {
+	p.lk.RLock()
+	defer p.lk.RUnlock()
 	_, inProgress := p.orderingClients[clientID]
 	return !inProgress || nonce > p.seen[clientID]
 }
 
 // DeleteRequest deletes the target request by the key h.
 func (p *Pool) DeleteRequest(cid cid.Cid, nonce uint64) (ok bool) {
+	p.lk.Lock()
+	defer p.lk.Unlock()
 	clientID, ok := p.clientByCID[cid]
 	if ok {
 		delete(p.orderingClients, clientID)
@@ -60,4 +69,11 @@ func (p *Pool) DeleteRequest(cid cid.Cid, nonce uint64) (ok bool) {
 	p.seen[clientID] = nonce
 
 	return
+}
+func (p *Pool) Purge() {
+	p.lk.Lock()
+	defer p.lk.Unlock()
+	p.clientByCID = make(map[cid.Cid]string)
+	p.orderingClients = make(map[string]bool)
+	p.seen = make(map[string]uint64)
 }
