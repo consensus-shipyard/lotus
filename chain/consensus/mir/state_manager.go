@@ -412,7 +412,14 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	}
 	log.With("miner", sm.MirManager.Addr).Debugf("Mir generated new checkpoint for height: %d", ch.Height)
 
-	return sm.deliverCheckpoint(checkpoint, ch)
+	if err := sm.deliverCheckpoint(checkpoint, ch); err != nil {
+		return err
+	}
+
+	// reset fifo between checkpoints to avoid requests getting stuck
+	// see https://github.com/consensus-shipyard/lotus/issues/28
+	sm.MirManager.Pool.Purge()
+	return nil
 }
 
 // deliver checkpoint receives a checkpoint, persists it locally in the local block store, and delivers
