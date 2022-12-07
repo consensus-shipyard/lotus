@@ -1,6 +1,7 @@
 package fifo
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ipfs/go-cid"
@@ -48,6 +49,8 @@ func (p *Pool) AddRequest(cid cid.Cid, r *mirrequest.Request) (exist bool) {
 func (p *Pool) IsTargetRequest(clientID string, nonce uint64) bool {
 	p.lk.RLock()
 	defer p.lk.RUnlock()
+	fmt.Println("IsTargetRequest clients", p.orderingClients)
+	fmt.Println("IsTargetRequest cids", p.clientByCID)
 	_, inProgress := p.orderingClients[clientID]
 	return !inProgress || nonce > p.seen[clientID]
 }

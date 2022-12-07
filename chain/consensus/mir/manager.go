@@ -92,20 +92,6 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("failed to build node membership: %w", err)
 	}
 
-	// Create (ConfigOffset + 1) copies of the initial membership,
-	// since ConfigOffset determines the number of epochs after the current epoch
-	// for which the membership configuration is fixed.
-	// That is, if the current epoch is e,
-	// the following ConfigOffset configurations are already fixed
-	// and configuration submitted to Mir will be for e + ConfigOffset + 1.
-	// This is why the first ConfigOffset + 1 epochs have the same initial configuration.
-	// NOTE: The notion of an epoch here is NOT the same as in Filecoin consensus,
-	// but describes a whole sequence of output blocks.
-	memberships := make([]map[t.NodeID]t.NodeAddress, ConfigOffset+1)
-	for i := 0; i < ConfigOffset+1; i++ {
-		memberships[t.EpochNr(i)] = initialMembership
-	}
-
 	mirID := addr.String()
 	mirAddr, ok := initialMembership[t.NodeID(mirID)]
 	if !ok {
@@ -128,7 +114,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	if err := netTransport.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
-	netTransport.Connect(initialMembership)
+	// netTransport.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
@@ -166,10 +152,12 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 
 	params := smr.DefaultParams(initialMembership)
 	// configure SegmentLength for specific checkpoint period.
-	m.segmentLength, err = segmentForCheckpointPeriod(cfg.CheckpointPeriod, initialMembership)
-	if err != nil {
-		return nil, fmt.Errorf("error getting segment length: %w", err)
-	}
+	// m.segmentLength, err = segmentForCheckpointPeriod(cfg.CheckpointPeriod, initialMembership)
+	// if err != nil {
+	//	return nil, fmt.Errorf("error getting segment length: %w", err)
+	// }
+	m.segmentLength = 1
+
 	params.Iss.SegmentLength = m.segmentLength
 	params.Mempool.MaxTransactionsInBatch = 1024
 	params.Iss.AdjustSpeed(1 * time.Second)
@@ -247,7 +235,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 // Start starts the manager.
 func (m *Manager) Start(ctx context.Context) chan error {
 	log.Infof("Mir manager %s starting", m.MirID)
-	log.Info("Mir initial checkpointing period: ", m.StateManager.GetCheckpointPeriod())
+	log.Info("Mir segment length: ", m.segmentLength)
 
 	errChan := make(chan error, 1)
 
@@ -321,6 +309,10 @@ func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
 func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 	requests []*mirproto.Request,
 ) {
+	if len(msgs) > 0 {
+		fmt.Println("msgs for batch", msgs[0].Message.From, msgs[0].Message.Nonce, msgs[0].Message.To, msgs[0].Message.Value)
+	}
+
 	requests = append(requests, m.batchSignedMessages(msgs)...)
 	return
 }
@@ -333,8 +325,8 @@ func (m *Manager) ReconfigureMirNode(nodes map[t.NodeID]t.NodeAddress) error {
 		return fmt.Errorf("empty validator set")
 	}
 
-	fmt.Printf(">>> reconfiguring network in epoch %d with membership length %d\n", m.StateManager.currentEpoch, len(nodes))
-	go m.Net.Connect(nodes)
+	fmt.Printf(">>> reconfiguring network in epoch %d with membership length %d", m.StateManager.currentEpoch, len(nodes))
+	// go m.Net.Connect(nodes)
 	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
 	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
 	// (as there is where we have the config information). These functions should be called

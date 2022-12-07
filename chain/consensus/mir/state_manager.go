@@ -118,8 +118,10 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	for e, membership := range config.Memberships {
 		// skew membership to current epoch, we are starting from a checkpoint
-		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = make(map[t.NodeID]t.NodeAddress)
-		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
+		// sm.memberships[t.EpochNr(e)+sm.currentEpoch] = make(map[t.NodeID]t.NodeAddress)
+		// sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
+		sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
+		sm.memberships[t.EpochNr(e)] = t.Membership(membership)
 	}
 
 	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
@@ -189,6 +191,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
+	fmt.Println(">>>>>>>> ApplyTXs current epoch", sm.currentEpoch)
 	var mirMsgs []Message
 
 	// For each request in the batch
@@ -205,7 +208,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	}
 
 	if len(sm.memberships) == 5 {
-		panic(222)
+		// panic(222)
 	}
 
 	batch := &Batch{
@@ -292,7 +295,7 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	log.Infof("current epoch triggered in new epoch: %d", sm.currentEpoch)
+	log.Infof(" >>>> NEW EPOCH: current epoch triggered in new epoch: %d\n", sm.currentEpoch)
 	// Sanity check.
 	if nr != sm.currentEpoch+1 {
 		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
@@ -305,17 +308,17 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	sm.memberships[nr+ConfigOffset+1] = newMembership
 
 	// Update current epoch number.
-	oldEpoch := sm.currentEpoch
+	// oldEpoch := sm.currentEpoch
 	sm.currentEpoch = nr
 
 	// Remove old membership.
-	delete(sm.memberships, oldEpoch)
-	delete(sm.reconfigurationVotes, oldEpoch)
+	// delete(sm.memberships, oldEpoch)
+	// delete(sm.reconfigurationVotes, oldEpoch)
 
 	// reconfigure node.
-	if err := sm.MirManager.ReconfigureMirNode(newMembership); err != nil {
-		return nil, xerrors.Errorf("error reconfiguring mir node: %w", err)
-	}
+	// if err := sm.MirManager.ReconfigureMirNode(newMembership); err != nil {
+	//	return nil, xerrors.Errorf("error reconfiguring mir node: %w", err)
+	// }
 
 	return newMembership, nil
 }
@@ -327,7 +330,7 @@ func (sm *StateManager) UpdateNextMembership(valSet *ValidatorSet) error {
 	}
 	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
 	id, _ := sm.api.ID(context.Background())
-	fmt.Println(">>>>> id:", id, "epoch:", sm.currentEpoch)
+	fmt.Println(">>>>> UpdateNextMembership - id:", id, "epoch:", sm.currentEpoch)
 	for i, v := range sm.memberships {
 		fmt.Println(i, len(v))
 	}
@@ -360,9 +363,13 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // in our local state, and it collects the cids for all the blocks verified
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
+	fmt.Println("Snapshot started in epoch", sm.MirManager.MirID, sm.currentEpoch)
+	defer fmt.Println("Snapshot stopped in epoch", sm.MirManager.MirID, sm.currentEpoch)
+
 	nextHeight := sm.prevCheckpoint.Height + sm.GetCheckpointPeriod()
-	log.With("miner", sm.MirManager.Addr).Debugf("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
-	log.With("miner", sm.MirManager.Addr).Debugf("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
+	fmt.Println("nextHeight", nextHeight, sm.prevCheckpoint.Height, sm.GetCheckpointPeriod())
+	log.With("miner", sm.MirManager.Addr).Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
+	log.With("miner", sm.MirManager.Addr).Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
 
 	// populating checkpoint template
 	ch := Checkpoint{
@@ -376,7 +383,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// wait the last block to sync for the snapshot before
 	// populating snapshot.
-	log.Debugf("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
+	log.Infof("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
 	err := sm.waitForBlock(i)
 	if err != nil {
 		return nil, xerrors.Errorf("error waiting for next block %d: %w", i, err)
@@ -391,7 +398,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
 		i--
-		log.Debugf("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
+		log.Infof("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
 	return ch.Bytes()

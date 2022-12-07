@@ -256,7 +256,7 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, ts.opts...)
 	ens.StoreMirValidatorsToFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 4, miners[:MirTotalValidatorNumber])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -269,12 +269,11 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 	ens.StoreMirValidatorsToFile(membershipFileName, miners...)
 
 	// Start other miners.
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 5, miners[MirTotalValidatorNumber:])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
+	panic(11)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }

@@ -46,7 +46,10 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 	// Perform cleanup of Node's modules and
 	// ensure that mir is closed when we stop mining.
-	defer m.Stop()
+	defer func() {
+		panic("stopped")
+		m.Stop()
+	}()
 
 	log.Infof("Miner info:\n\twallet - %s\n\tsubnet - %s\n\tMir ID - %s\n\tPeer ID - %s\n\tvalidators - %v",
 		m.Addr, m.NetName, m.MirID, h.ID(), m.InitialValidatorSet.GetValidators())
@@ -73,6 +76,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		// first catch potential errors when mining
 		case err := <-mirErrors:
+			log.With("miner", addr).Info("Miner received error signal:", err)
 			// return fmt.Errorf("miner consensus error: %w", err)
 			//
 			// TODO: This is a temporary solution while we are discussing that issue
