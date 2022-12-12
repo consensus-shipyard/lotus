@@ -43,8 +43,9 @@ func (v *Validator) Bytes() ([]byte, error) {
 // OpaqueNetAddr can contain GRPC or libp2p addresses.
 //
 // Examples of validator strings:
-// 	- t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ
-// 	- t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@127.0.0.1:1000
+//   - t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ
+//   - t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@127.0.0.1:1000
+//
 // FIXME: Consider using json serde for this to support multiple multiaddr for validators.
 func ValidatorFromString(input string) (Validator, error) {
 	parts := strings.Split(input, "@")
