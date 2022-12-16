@@ -70,7 +70,7 @@ func MemoryConstraints() system.MemoryConstraints {
 
 // MemoryWatchdog starts the memory watchdog, applying the computed resource
 // constraints.
-func MemoryWatchdog(lr repo.LockedRepo, lc fx.Lifecycle, constraints system.MemoryConstraints) {
+func MemoryWatchdog(lr repo.LockedRepo, lc fx.Lifecycle) {
 	if os.Getenv(EnvWatchdogDisabled) == "1" {
 		log.Infof("memory watchdog is disabled via %s", EnvWatchdogDisabled)
 		return
@@ -102,7 +102,7 @@ func MemoryWatchdog(lr repo.LockedRepo, lc fx.Lifecycle, constraints system.Memo
 	}
 
 	// 1. If user has set max heap limit, apply it.
-	if maxHeap := constraints.MaxHeapMem; maxHeap != 0 {
+	if maxHeap := MemoryConstraints().MaxHeapMem; maxHeap != 0 {
 		const minGOGC = 10
 		err, stopFn := watchdog.HeapDriven(maxHeap, minGOGC, policy)
 		if err == nil {

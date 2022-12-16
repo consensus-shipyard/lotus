@@ -146,9 +146,8 @@ require (
 	go.opentelemetry.io/otel/bridge/opencensus v0.25.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
 	go.opentelemetry.io/otel/sdk v1.2.0
-	go.uber.org/fx v1.15.0
 	go.uber.org/multierr v1.8.0
-	go.uber.org/zap v1.22.0
+	go.uber.org/zap v1.23.0
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
@@ -186,6 +185,7 @@ require (
 	github.com/drand/kyber-bls12381 v0.2.3 // indirect
 	github.com/elastic/go-windows v1.0.0 // indirect
 	github.com/etclabscore/go-jsonschema-walk v0.0.6 // indirect
+	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/filecoin-project/go-amt-ipld/v2 v2.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v3 v3.1.0 // indirect
 	github.com/filecoin-project/go-amt-ipld/v4 v4.0.0 // indirect
@@ -218,6 +218,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
+	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/hannahhoward/cbor-gen-for v0.0.0-20200817222906-ea96cece81f1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
@@ -291,6 +292,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/profile v1.7.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
@@ -322,7 +324,8 @@ require (
 	go.opentelemetry.io/otel/sdk/export/metric v0.25.0 // indirect
 	go.opentelemetry.io/otel/trace v1.7.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/dig v1.12.0 // indirect
+	go.uber.org/dig v1.15.0 // indirect
+	go.uber.org/fx v0.0.0-20221215155203-3a86277ab0e5 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
