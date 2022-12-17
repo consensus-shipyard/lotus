@@ -76,6 +76,9 @@ debug: build-devnets
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: lotus mir-validator lotus-seed lotus-keygen lotus-shed
 
+spacenet-lotus: GOFLAGS+=-tags=spacenet
+spacenet-lotus: lotus
+
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \

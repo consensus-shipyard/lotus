@@ -338,6 +338,50 @@ func Repo(r repo.Repo) Option {
 
 type StopFunc func(context.Context) error
 
+func ConvertToFxOptions(opts ...Option) (fx.Option, error) {
+	settings := Settings{
+		modules: map[interface{}]fx.Option{},
+		invokes: make([]fx.Option, _nInvokes),
+	}
+
+	// apply module options in the right order
+	if err := Options(Options(defaults()...), Options(opts...))(&settings); err != nil {
+		return nil, xerrors.Errorf("applying node options failed: %w", err)
+	}
+
+	// gather constructors for fx.Options
+	ctors := make([]fx.Option, 0, len(settings.modules))
+	for _, opt := range settings.modules {
+		ctors = append(ctors, opt)
+	}
+
+	// fill holes in invokes for use in fx.Options
+	for i, opt := range settings.invokes {
+		if opt == nil {
+			settings.invokes[i] = fx.Options()
+		}
+	}
+
+	return fx.Options(
+		fx.Options(ctors...),
+		fx.Options(settings.invokes...),
+	), nil
+}
+
+func NewFromFxOptions(ctx context.Context, options fx.Option) (StopFunc, error) {
+	app := fx.New(options)
+
+	// TODO: we probably should have a 'firewall' for Closing signal
+	//  on this context, and implement closing logic through lifecycles
+	//  correctly
+	if err := app.Start(ctx); err != nil {
+		// comment fx.NopLogger few lines above for easier debugging
+		return nil, xerrors.Errorf("starting node: %w", err)
+	}
+
+	return app.Stop, nil
+}
+
 // New builds and starts new Filecoin node
 func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 	settings := Settings{

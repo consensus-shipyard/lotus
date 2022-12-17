@@ -28,6 +28,7 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
+	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 	"os"
 	"runtime/pprof"
@@ -42,10 +43,29 @@ var RefactoredDaemonCmd = func() *cli.Command {
 }()
 
 func refactoredDaemonAction(cctx *cli.Context) error {
-	return legacyDaemonAction(cctx)
+
+	// defaults() - called from node.New
+
+	// node.FullAPI()
+	// node.Base()
+	// node.Repo()
+
+	// dtypes.Bootstrapper
+	// dtypes.ShutdownChan
+
+	// genesis
+	// liteModeDeps
+
+	// Mir Consensus
+
+	// SetApiEndpointKey
+
+	// Unset node.RunPeerMgrKey and peermgr.PeerMgr is not bootstrap
+
+	return legacyDaemonAction(cctx, fx.Options())
 }
 
-func legacyDaemonAction(cctx *cli.Context) error {
+func legacyDaemonAction(cctx *cli.Context, fxOptions fx.Option) error {
 	isLite := cctx.Bool("lite")
 	isMirValidator := cctx.Bool("mir-validator")
 
@@ -203,7 +223,12 @@ func legacyDaemonAction(cctx *cli.Context) error {
 	}
 
 	var api lapi.FullNode
-	stop, err := node.New(ctx,
+
+	//////////////////////////////////////////
+	//// BEGIN REFACTORED NODE CONSTRUCTION //
+	//////////////////////////////////////////
+
+	convertedFxOptions, err := node.ConvertToFxOptions(
 		node.FullAPI(&api, node.Lite(isLite), node.MirValidator(isMirValidator)),
 
 		node.Base(),
@@ -237,8 +262,16 @@ func legacyDaemonAction(cctx *cli.Context) error {
 		),
 	)
 	if err != nil {
+		return xerrors.Errorf("converting options: %w", err)
+	}
+
+	stop, err := node.NewFromFxOptions(ctx, fx.Options(convertedFxOptions, fxOptions))
+	if err != nil {
 		return xerrors.Errorf("initializing node: %w", err)
 	}
+	////////////////////////////////////////
+	//// END REFACTORED NODE CONSTRUCTION //
+	////////////////////////////////////////
 
 	if cctx.String("import-key") != "" {
 		if err := importKey(ctx, api, cctx.String("import-key")); err != nil {
