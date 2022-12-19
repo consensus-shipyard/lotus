@@ -366,8 +366,13 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 	fmt.Println("Snapshot started in epoch", sm.MirManager.MirID, sm.currentEpoch)
 	defer fmt.Println("Snapshot stopped in epoch", sm.MirManager.MirID, sm.currentEpoch)
 
-	nextHeight := sm.prevCheckpoint.Height + sm.GetCheckpointPeriod()
-	fmt.Println("nextHeight", nextHeight, sm.prevCheckpoint.Height, sm.GetCheckpointPeriod())
+	if sm.currentEpoch == 0 {
+		return nil, xerrors.Errorf("trying to make a snapshot in epech", sm.currentEpoch)
+	}
+	targetEpoch := sm.currentEpoch - 1
+
+	nextHeight := sm.prevCheckpoint.Height + sm.GetCheckpointPeriod(targetEpoch)
+	fmt.Println("nextHeight", nextHeight, sm.prevCheckpoint.Height, sm.GetCheckpointPeriod(targetEpoch))
 	log.With("miner", sm.MirManager.Addr).Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
 	log.With("miner", sm.MirManager.Addr).Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
 
@@ -383,7 +388,9 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// wait the last block to sync for the snapshot before
 	// populating snapshot.
+
 	log.Infof("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
+	fmt.Printf("waitForBlock will be wating for - %d, GetCheckpointPeriod - %d in epoch %d, id - %s\n", i, sm.GetCheckpointPeriod(targetEpoch), sm.currentEpoch, sm.MirManager.MirID)
 	err := sm.waitForBlock(i)
 	if err != nil {
 		return nil, xerrors.Errorf("error waiting for next block %d: %w", i, err)
@@ -611,8 +618,8 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 //
 // The checkpoint period is computed as the number of validator times the
 // segment length.
-func (sm *StateManager) GetCheckpointPeriod() abi.ChainEpoch {
-	return abi.ChainEpoch(sm.MirManager.segmentLength * len(sm.memberships[sm.currentEpoch]))
+func (sm *StateManager) GetCheckpointPeriod(epoch t.EpochNr) abi.ChainEpoch {
+	return abi.ChainEpoch(sm.MirManager.segmentLength * len(sm.memberships[epoch]))
 }
 
 func parseTx(tx []byte) (interface{}, error) {

@@ -59,20 +59,20 @@ func T1estMirConsensusWithMangler(t *testing.T) {
 	})
 }
 
-func TestDraft(t *testing.T) {
+func TestReconfiguration(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		runDraftTest(t, kit.ThroughRPC())
+		runReconfigurationTests(t, kit.ThroughRPC())
 	})
 }
 
-// runDraftTest is used for debugging.
-func runDraftTest(t *testing.T, opts ...interface{}) {
+func runReconfigurationTests(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
 	t.Run("testMirReconfiguration", ts.testMirWithReconfiguration)
+	// t.Run("testMirWithReconfigurationIfNewNodeFailsToJoin", ts.testMirWithReconfigurationIfNewNodeFailsToJoin)
 }
 
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
@@ -240,7 +240,8 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirWithReconfiguration tests that a validator can join the network.
+// testMirWithReconfiguration tests that the reconfiguration mechanism operates normally
+// if a new validator joins the network.
 func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -263,18 +264,51 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
-	t.Log(">>> validators join")
+	// t.Log(">>> validators join")
 
 	// Update the file to all miners can know each other.
 	ens.StoreMirValidatorsToFile(membershipFileName, miners...)
 
 	// Start other miners.
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
+	// ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
-	panic(11)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+}
+
+// testMirWithReconfigurationIfNewNodeFailsToJoin tests that the reconfiguration mechanism operates normally
+// if a new validator cannot join the network.
+func (ts *itestsConsensusSuite) testMirWithReconfigurationIfNewNodeFailsToJoin(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+	}()
+
+	membershipFileName := "./_membership_config_failed.tmp"
+	os.Remove(membershipFileName) // nolint
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, ts.opts...)
+	ens.StoreMirValidatorsToFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
+
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	// Update the file to all miners can know each other.
+	ens.StoreMirValidatorsToFile(membershipFileName, miners...)
+	t.Log(">>> new validators have been added to the config")
+
+	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 }
 

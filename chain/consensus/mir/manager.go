@@ -161,6 +161,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	params.Iss.SegmentLength = m.segmentLength
 	params.Mempool.MaxTransactionsInBatch = 1024
 	params.Iss.AdjustSpeed(1 * time.Second)
+	params.Iss.ConfigOffset = ConfigOffset
 
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config

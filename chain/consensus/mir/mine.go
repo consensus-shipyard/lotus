@@ -47,7 +47,6 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 	// Perform cleanup of Node's modules and
 	// ensure that mir is closed when we stop mining.
 	defer func() {
-		panic("stopped")
 		m.Stop()
 	}()
 
