@@ -8,6 +8,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -16,6 +17,7 @@ import (
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/lotus/node"
+	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/testing"
@@ -44,9 +46,19 @@ var RefactoredDaemonCmd = func() *cli.Command {
 
 func refactoredDaemonAction(cctx *cli.Context) error {
 
-	// defaults() - called from node.New
+	/*
+		// node.defaults() - originally called from node.New
+		options := node.Defaults()
 
-	// node.FullAPI()
+		// node.FullAPI()
+		var api lapi.FullNode
+		options = append(
+			options,
+			node.FullAPI(&api, node.Lite(false), node.MirValidator(false)),
+		)
+
+		fxOptions, _ := node.ConvertToFxOptions(options...)
+	*/
 	// node.Base()
 	// node.Repo()
 
@@ -62,10 +74,10 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 
 	// Unset node.RunPeerMgrKey and peermgr.PeerMgr is not bootstrap
 
-	return legacyDaemonAction(cctx, fx.Options())
+	return legacyDaemonAction(cctx)
 }
 
-func legacyDaemonAction(cctx *cli.Context, fxOptions fx.Option) error {
+func legacyDaemonAction(cctx *cli.Context) error {
 	isLite := cctx.Bool("lite")
 	isMirValidator := cctx.Bool("mir-validator")
 
@@ -222,16 +234,57 @@ func legacyDaemonAction(cctx *cli.Context, fxOptions fx.Option) error {
 		log.Warnf("unable to inject prometheus ipfs/go-metrics exporter; some metrics will be unavailable; err: %s", err)
 	}
 
-	var api lapi.FullNode
-
 	//////////////////////////////////////////
 	//// BEGIN REFACTORED NODE CONSTRUCTION //
 	//////////////////////////////////////////
+	fxProviders := make([]fx.Option, 0)
+	fxInvokes := make([]fx.Option, 28)
 
-	convertedFxOptions, err := node.ConvertToFxOptions(
-		node.FullAPI(&api, node.Lite(isLite), node.MirValidator(isMirValidator)),
+	// node.defaults
+	fxProviders = append(fxProviders, node.FxDefaultsProviders)
+	mergeInvokes(fxInvokes, node.FxDefaultsInvokers())
 
-		node.Base(),
+	// node.FullAPI (settings are set further below)
+	var api lapi.FullNode
+	var resAPI = &impl.FullNodeAPI{}
+	fxInvokes[node.ExtractApiKey] = fx.Populate(resAPI)
+	api = resAPI
+
+	// node.Base()
+	fxProviders = append(
+		fxProviders,
+		node.FxLibP2PProviders,
+		node.FxChainNodeProviders)
+	mergeInvokes(fxInvokes, node.FxLibP2PInvokers())
+	mergeInvokes(fxInvokes, node.FxChainNodeInvokers())
+
+	//// consensus conditional providers
+	if build.IsMirConsensus() {
+		fxProviders = append(
+			fxProviders,
+			fx.Provide(mir.NewConsensus),
+			fx.Supply(store.WeightFunc(mir.Weight)),
+			fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(mir.RewardFunc), fx.As(new(stmgr.Executor)))),
+		)
+	} else {
+		fxProviders = append(
+			fxProviders,
+			fx.Provide(filcns.NewFilecoinExpectedConsensus),
+			fx.Supply(store.WeightFunc(filcns.Weight)),
+			fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(filcns.RewardFunc), fx.As(new(stmgr.Executor)))),
+		)
+	}
+
+	// node.Repo()
+	fxProviders = append(
+		fxProviders,
+		node.FxRepoProviders(r))
+
+	opts := []node.Option{
+		//node.Options(node.Defaults()...),
+		//node.FullAPI(&api, node.Lite(isLite), node.MirValidator(isMirValidator)),
+
+		//node.Base(),
 		node.Repo(r),
 
 		node.Override(new(dtypes.Bootstrapper), isBootstrapper),
@@ -240,12 +293,12 @@ func legacyDaemonAction(cctx *cli.Context, fxOptions fx.Option) error {
 		genesis,
 		liteModeDeps,
 
-		node.ApplyIf(
-			func(s *node.Settings) bool { return build.IsMirConsensus() },
-			node.Override(new(consensus.Consensus), mir.NewConsensus),
-			node.Override(new(store.WeightFunc), mir.Weight),
-			node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
-		),
+		//node.ApplyIf(
+		//func(s *node.Settings) bool { return build.IsMirConsensus() },
+		//node.Override(new(consensus.Consensus), mir.NewConsensus),
+		//node.Override(new(store.WeightFunc), mir.Weight),
+		//node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
+		//),
 
 		node.ApplyIf(func(s *node.Settings) bool { return cctx.IsSet("api") },
 			node.Override(node.SetApiEndpointKey, func(lr repo.LockedRepo) error {
@@ -260,14 +313,55 @@ func legacyDaemonAction(cctx *cli.Context, fxOptions fx.Option) error {
 			node.Unset(node.RunPeerMgrKey),
 			node.Unset(new(*peermgr.PeerMgr)),
 		),
-	)
-	if err != nil {
-		return xerrors.Errorf("converting options: %w", err)
 	}
 
-	stop, err := node.NewFromFxOptions(ctx, fx.Options(convertedFxOptions, fxOptions))
-	if err != nil {
-		return xerrors.Errorf("initializing node: %w", err)
+	// apply node options
+	settings := node.Settings{
+		Modules:          map[interface{}]fx.Option{},
+		Invokes:          make([]fx.Option, 28),
+		NodeType:         repo.FullNode,
+		Lite:             isLite,
+		MirValidator:     isMirValidator,
+		EnableLibp2pNode: true,
+		Base:             true,
+	}
+	if err := node.Options(opts...)(&settings); err != nil {
+		return xerrors.Errorf("applying node options failed: %w", err)
+	}
+
+	// gather constructors for fx.Options
+	ctors := make([]fx.Option, 0, len(settings.Modules))
+	for _, opt := range settings.Modules {
+		ctors = append(ctors, opt)
+	}
+
+	// fill holes in invokes for use in fx.Options
+	for i, opt := range settings.Invokes {
+		if opt == nil {
+			settings.Invokes[i] = fx.Options()
+		}
+	}
+
+	// Merge options. First the providers, then the invokes.
+	ctors = append(ctors, fxProviders...)
+	for i, invoke := range fxInvokes {
+		if invoke != nil {
+			settings.Invokes[i] = invoke
+		}
+	}
+
+	app := fx.New(
+		fx.Options(
+			fx.Options(ctors...),
+			fx.Options(settings.Invokes...),
+		),
+	)
+
+	// TODO: we probably should have a 'firewall' for Closing signal
+	//  on this context, and implement closing logic through lifecycles
+	//  correctly
+	if err := app.Start(ctx); err != nil {
+		return xerrors.Errorf("starting node: %w", err)
 	}
 	////////////////////////////////////////
 	//// END REFACTORED NODE CONSTRUCTION //
@@ -309,10 +403,22 @@ func legacyDaemonAction(cctx *cli.Context, fxOptions fx.Option) error {
 	// Monitor for shutdown.
 	finishCh := node.MonitorShutdown(shutdownChan,
 		node.ShutdownHandler{Component: "rpc server", StopFunc: rpcStopper},
-		node.ShutdownHandler{Component: "node", StopFunc: stop},
+		node.ShutdownHandler{Component: "node", StopFunc: app.Stop},
 	)
 	<-finishCh // fires when shutdown is complete.
 
 	// TODO: properly parse api endpoint (or make it a URL)
 	return nil
+}
+
+func mergeInvokes(into []fx.Option, from []fx.Option) {
+	if len(into) != len(from) {
+		panic("failed to merge invokes due to different lengths")
+	}
+
+	for i, invoke := range from {
+		if invoke != nil {
+			into[i] = invoke
+		}
+	}
 }
