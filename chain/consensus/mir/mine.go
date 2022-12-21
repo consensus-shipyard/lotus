@@ -80,7 +80,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			//
 			// TODO: This is a temporary solution while we are discussing that issue
 			// https://filecoinproject.slack.com/archives/C03C77HN3AS/p1660330971306019
-			if err != nil && !errors.Is(err, mir.ErrStopped) && !errors.Is(err, ErrMirCtxCanceledWhileWaitingSnapshot) {
+			if err != nil && !errors.Is(err, mir.ErrStopped) {
 				panic(fmt.Errorf("miner %s consensus error: %w", addr, err))
 			}
 			log.With("miner", addr).Infof("Mir node stopped signal")

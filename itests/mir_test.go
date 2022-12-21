@@ -33,7 +33,7 @@ const (
 // - It is assumed that the first F of N nodes can be byzantine
 // - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
 //   and nodes[MirFaultyValidatorNumber:] are honest nodes.
-func T1estMirConsensus(t *testing.T) {
+func TestMirConsensus(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
@@ -43,7 +43,7 @@ func T1estMirConsensus(t *testing.T) {
 }
 
 // TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
-func T1estMirConsensusWithMangler(t *testing.T) {
+func TestMirConsensusWithMangler(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
@@ -72,7 +72,7 @@ func runReconfigurationTests(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
 	t.Run("testMirReconfiguration", ts.testMirWithReconfiguration)
-	// t.Run("testMirWithReconfigurationIfNewNodeFailsToJoin", ts.testMirWithReconfigurationIfNewNodeFailsToJoin)
+	t.Run("testMirWithReconfigurationIfNewNodeFailsToJoin", ts.testMirWithReconfigurationIfNewNodeFailsToJoin)
 }
 
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
@@ -256,7 +256,7 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 	os.Remove(membershipFileName) // nolint
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, ts.opts...)
-	ens.StoreMirValidatorsToFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.StoreMirValidatorsToMembersipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
@@ -264,17 +264,14 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
-	// t.Log(">>> validators join")
+	t.Log(">>> new validators have been added to the membership")
+	ens.StoreMirValidatorsToMembersipFile(membershipFileName, miners...)
+	// Start new miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
 
-	// Update the file to all miners can know each other.
-	ens.StoreMirValidatorsToFile(membershipFileName, miners...)
-
-	// Start other miners.
-	// ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
-
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[:MirTotalValidatorNumber]...)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 }
 
@@ -294,7 +291,7 @@ func (ts *itestsConsensusSuite) testMirWithReconfigurationIfNewNodeFailsToJoin(t
 	os.Remove(membershipFileName) // nolint
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, ts.opts...)
-	ens.StoreMirValidatorsToFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.StoreMirValidatorsToMembersipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
@@ -302,9 +299,8 @@ func (ts *itestsConsensusSuite) testMirWithReconfigurationIfNewNodeFailsToJoin(t
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
-	// Update the file to all miners can know each other.
-	ens.StoreMirValidatorsToFile(membershipFileName, miners...)
-	t.Log(">>> new validators have been added to the config")
+	t.Log(">>> new validators have been added to the membership")
+	ens.StoreMirValidatorsToMembersipFile(membershipFileName, miners...)
 
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)

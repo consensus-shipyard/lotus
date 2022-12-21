@@ -1033,7 +1033,7 @@ func (n *Ensemble) AddMirValidatorsToFile(fname string, miners ...*TestMiner) {
 	}
 }
 
-func (n *Ensemble) StoreMirValidatorsToFile(fname string, miners ...*TestMiner) {
+func (n *Ensemble) StoreMirValidatorsToMembersipFile(fname string, miners ...*TestMiner) {
 	f, err := os.OpenFile(fname,
 		os.O_CREATE|os.O_WRONLY, 0666)
 	require.NoError(n.t, err)

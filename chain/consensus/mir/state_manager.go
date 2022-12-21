@@ -12,17 +12,16 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/smr"
-	t "github.com/filecoin-project/mir/pkg/types"
-	"github.com/filecoin-project/mir/pkg/util/maputil"
-
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/systems/smr"
+	t "github.com/filecoin-project/mir/pkg/types"
+	"github.com/filecoin-project/mir/pkg/util/maputil"
 )
 
 var _ smr.AppLogic = &StateManager{}
@@ -54,6 +53,8 @@ type StateManager struct {
 
 	// Channel to send checkpoints to assemble them in blocks
 	NextCheckpoint chan *checkpoint.StableCheckpoint
+
+	height abi.ChainEpoch
 }
 
 func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
@@ -120,8 +121,8 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// skew membership to current epoch, we are starting from a checkpoint
 		// sm.memberships[t.EpochNr(e)+sm.currentEpoch] = make(map[t.NodeID]t.NodeAddress)
 		// sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
-		sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
-		sm.memberships[t.EpochNr(e)] = t.Membership(membership)
+		// sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
+		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
 	}
 
 	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
@@ -138,6 +139,9 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		}
 
 		log.Infof("Restoring state from checkpoint at height: %d", ch.Height)
+
+		// Restore the height.
+		sm.height = ch.Height
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -191,8 +195,9 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
-	fmt.Println(">>>>>>>> ApplyTXs current epoch", sm.currentEpoch)
 	var mirMsgs []Message
+
+	sm.height++
 
 	// For each request in the batch
 	for _, req := range txs {
@@ -205,10 +210,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				return err
 			}
 		}
-	}
-
-	if len(sm.memberships) == 5 {
-		// panic(222)
 	}
 
 	batch := &Batch{
@@ -295,7 +296,6 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	log.Infof(" >>>> NEW EPOCH: current epoch triggered in new epoch: %d\n", sm.currentEpoch)
 	// Sanity check.
 	if nr != sm.currentEpoch+1 {
 		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
@@ -308,17 +308,12 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	sm.memberships[nr+ConfigOffset+1] = newMembership
 
 	// Update current epoch number.
-	// oldEpoch := sm.currentEpoch
+	oldEpoch := sm.currentEpoch
 	sm.currentEpoch = nr
 
 	// Remove old membership.
-	// delete(sm.memberships, oldEpoch)
-	// delete(sm.reconfigurationVotes, oldEpoch)
-
-	// reconfigure node.
-	// if err := sm.MirManager.ReconfigureMirNode(newMembership); err != nil {
-	//	return nil, xerrors.Errorf("error reconfiguring mir node: %w", err)
-	// }
+	delete(sm.memberships, oldEpoch)
+	delete(sm.reconfigurationVotes, oldEpoch)
 
 	return newMembership, nil
 }
@@ -329,11 +324,6 @@ func (sm *StateManager) UpdateNextMembership(valSet *ValidatorSet) error {
 		return err
 	}
 	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
-	id, _ := sm.api.ID(context.Background())
-	fmt.Println(">>>>> UpdateNextMembership - id:", id, "epoch:", sm.currentEpoch)
-	for i, v := range sm.memberships {
-		fmt.Println(i, len(v))
-	}
 	return nil
 }
 
@@ -363,16 +353,11 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) 
 // in our local state, and it collects the cids for all the blocks verified
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
-	fmt.Println("Snapshot started in epoch", sm.MirManager.MirID, sm.currentEpoch)
-	defer fmt.Println("Snapshot stopped in epoch", sm.MirManager.MirID, sm.currentEpoch)
-
 	if sm.currentEpoch == 0 {
 		return nil, xerrors.Errorf("trying to make a snapshot in epech", sm.currentEpoch)
 	}
-	targetEpoch := sm.currentEpoch - 1
 
-	nextHeight := sm.prevCheckpoint.Height + sm.GetCheckpointPeriod(targetEpoch)
-	fmt.Println("nextHeight", nextHeight, sm.prevCheckpoint.Height, sm.GetCheckpointPeriod(targetEpoch))
+	nextHeight := abi.ChainEpoch(sm.height) + 1
 	log.With("miner", sm.MirManager.Addr).Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
 	log.With("miner", sm.MirManager.Addr).Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
 
@@ -388,11 +373,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// wait the last block to sync for the snapshot before
 	// populating snapshot.
-
-	log.Infof("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
-	fmt.Printf("waitForBlock will be wating for - %d, GetCheckpointPeriod - %d in epoch %d, id - %s\n", i, sm.GetCheckpointPeriod(targetEpoch), sm.currentEpoch, sm.MirManager.MirID)
-	err := sm.waitForBlock(i)
-	if err != nil {
+	if err := sm.waitForBlock(i); err != nil {
 		return nil, xerrors.Errorf("error waiting for next block %d: %w", i, err)
 	}
 
@@ -612,14 +593,6 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 		return nil, err
 	}
 	return ch, nil
-}
-
-// GetCheckpointPeriod returns the checkpoint period for the current epoch.
-//
-// The checkpoint period is computed as the number of validator times the
-// segment length.
-func (sm *StateManager) GetCheckpointPeriod(epoch t.EpochNr) abi.ChainEpoch {
-	return abi.ChainEpoch(sm.MirManager.segmentLength * len(sm.memberships[epoch]))
 }
 
 func parseTx(tx []byte) (interface{}, error) {

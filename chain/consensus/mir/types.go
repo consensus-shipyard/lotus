@@ -136,8 +136,6 @@ func MessageBytes(msg MirMessage) ([]byte, error) {
 func segmentForCheckpointPeriod(desiredPeriod int, membership map[t.NodeID]t.NodeAddress) (int, error) {
 	segment := desiredPeriod / len(membership)
 	if segment < 1 {
-		fmt.Println(desiredPeriod)
-		fmt.Println(len(membership))
 		return 0, fmt.Errorf("wrong checkpoint period: the minimum checkpoint allowed for this number of validators is %d", len(membership))
 	}
 	return segment, nil
