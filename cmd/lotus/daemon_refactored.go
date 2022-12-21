@@ -13,10 +13,10 @@ import (
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/lib/peermgr"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/lotus/node"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -24,7 +24,6 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	metricsprom "github.com/ipfs/go-metrics-prometheus"
 	"github.com/mitchellh/go-homedir"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/plugin/runmetrics"
 	"go.opencensus.io/stats"
@@ -80,6 +79,7 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 func legacyDaemonAction(cctx *cli.Context) error {
 	isLite := cctx.Bool("lite")
 	isMirValidator := cctx.Bool("mir-validator")
+	log.Warnf("mir-validator = %v", isMirValidator)
 
 	err := runmetrics.Enable(runmetrics.RunMetricOptions{
 		EnableCPU:    true,
@@ -201,22 +201,22 @@ func legacyDaemonAction(cctx *cli.Context) error {
 		}
 	}
 
-	genesis := node.Options()
+	genesis := fx.Options()
 	if len(genBytes) > 0 {
-		genesis = node.Override(new(modules.Genesis), modules.LoadGenesis(genBytes))
+		genesis = fx.Provide(modules.LoadGenesis(genBytes))
 	}
 	if cctx.String(makeGenFlag) != "" {
 		if cctx.String(preTemplateFlag) == "" {
 			return xerrors.Errorf("must also pass file with genesis template to `--%s`", preTemplateFlag)
 		}
-		genesis = node.Override(new(modules.Genesis), testing.MakeGenesis(cctx.String(makeGenFlag), cctx.String(preTemplateFlag)))
+		genesis = fx.Provide(testing.MakeGenesis(cctx.String(makeGenFlag), cctx.String(preTemplateFlag)))
 	}
 
 	shutdownChan := make(chan struct{})
 
 	// If the daemon is started in "lite mode", provide a  Gateway
 	// for RPC calls
-	liteModeDeps := node.Options()
+	liteModeDeps := fx.Options()
 	if isLite {
 		gapi, closer, err := lcli.GetGatewayAPI(cctx)
 		if err != nil {
@@ -224,7 +224,7 @@ func legacyDaemonAction(cctx *cli.Context) error {
 		}
 
 		defer closer()
-		liteModeDeps = node.Override(new(lapi.Gateway), gapi)
+		liteModeDeps = fx.Supply(gapi)
 	}
 
 	// some libraries like ipfs/go-ds-measure and ipfs/go-ipfs-blockstore
@@ -239,6 +239,9 @@ func legacyDaemonAction(cctx *cli.Context) error {
 	//////////////////////////////////////////
 	fxProviders := make([]fx.Option, 0)
 	fxInvokes := make([]fx.Option, 28)
+	for i := range fxInvokes {
+		fxInvokes[i] = fx.Options()
+	}
 
 	// node.defaults
 	fxProviders = append(fxProviders, node.FxDefaultsProviders)
@@ -276,86 +279,51 @@ func legacyDaemonAction(cctx *cli.Context) error {
 	}
 
 	// node.Repo()
+	//// setup
+	lockedRepo, err := r.Lock(repo.FullNode)
+	if err != nil {
+		panic(err)
+	}
+	c, err := lockedRepo.Config()
+	if err != nil {
+		panic(err)
+	}
+	cfg, ok := c.(*config.FullNode)
+	if !ok {
+		panic("invalid config from repo")
+	}
+
+	//// providers and invokes
 	fxProviders = append(
 		fxProviders,
-		node.FxRepoProviders(r))
+		node.FxRepoProviders(lockedRepo, cfg))
+	mergeInvokes(fxInvokes, node.FxConfigCommonInvokers(&cfg.Common))
 
-	opts := []node.Option{
-		//node.Options(node.Defaults()...),
-		//node.FullAPI(&api, node.Lite(isLite), node.MirValidator(isMirValidator)),
-
-		//node.Base(),
-		node.Repo(r),
-
-		node.Override(new(dtypes.Bootstrapper), isBootstrapper),
-		node.Override(new(dtypes.ShutdownChan), shutdownChan),
-
+	// misc providers
+	fxProviders = append(
+		fxProviders,
+		fx.Supply(isBootstrapper),
+		fx.Supply(dtypes.ShutdownChan(shutdownChan)),
 		genesis,
 		liteModeDeps,
-
-		//node.ApplyIf(
-		//func(s *node.Settings) bool { return build.IsMirConsensus() },
-		//node.Override(new(consensus.Consensus), mir.NewConsensus),
-		//node.Override(new(store.WeightFunc), mir.Weight),
-		//node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
-		//),
-
-		node.ApplyIf(func(s *node.Settings) bool { return cctx.IsSet("api") },
-			node.Override(node.SetApiEndpointKey, func(lr repo.LockedRepo) error {
-				apima, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/" +
-					cctx.String("api"))
-				if err != nil {
-					return err
-				}
-				return lr.SetAPIEndpoint(apima)
-			})),
-		node.ApplyIf(func(s *node.Settings) bool { return !cctx.Bool("bootstrap") },
-			node.Unset(node.RunPeerMgrKey),
-			node.Unset(new(*peermgr.PeerMgr)),
-		),
-	}
-
-	// apply node options
-	settings := node.Settings{
-		Modules:          map[interface{}]fx.Option{},
-		Invokes:          make([]fx.Option, 28),
-		NodeType:         repo.FullNode,
-		Lite:             isLite,
-		MirValidator:     isMirValidator,
-		EnableLibp2pNode: true,
-		Base:             true,
-	}
-	if err := node.Options(opts...)(&settings); err != nil {
-		return xerrors.Errorf("applying node options failed: %w", err)
-	}
-
-	// gather constructors for fx.Options
-	ctors := make([]fx.Option, 0, len(settings.Modules))
-	for _, opt := range settings.Modules {
-		ctors = append(ctors, opt)
-	}
-
-	// fill holes in invokes for use in fx.Options
-	for i, opt := range settings.Invokes {
-		if opt == nil {
-			settings.Invokes[i] = fx.Options()
-		}
-	}
-
-	// Merge options. First the providers, then the invokes.
-	ctors = append(ctors, fxProviders...)
-	for i, invoke := range fxInvokes {
-		if invoke != nil {
-			settings.Invokes[i] = invoke
-		}
-	}
-
-	app := fx.New(
-		fx.Options(
-			fx.Options(ctors...),
-			fx.Options(settings.Invokes...),
-		),
 	)
+
+	//TODO(hmz): leave these for later in the refactoring
+	//node.ApplyIf(func(s *node.Settings) bool { return cctx.IsSet("api") },
+	//	node.Override(node.SetApiEndpointKey, func(lr repo.LockedRepo) error {
+	//		apima, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/" +
+	//			cctx.String("api"))
+	//		if err != nil {
+	//			return err
+	//		}
+	//		return lr.SetAPIEndpoint(apima)
+	//	})),
+	//node.ApplyIf(func(s *node.Settings) bool { return !cctx.Bool("bootstrap") },
+	//	node.Unset(node.RunPeerMgrKey),
+	//	node.Unset(new(*peermgr.PeerMgr)),
+	//),
+
+	app := fx.New(fx.Options(fxProviders...), fx.Options(fxInvokes...))
 
 	// TODO: we probably should have a 'firewall' for Closing signal
 	//  on this context, and implement closing logic through lifecycles

@@ -387,9 +387,48 @@ var ChainNode = Options(
 )
 
 func FxConfigFullNodeProviders(cfg *config.FullNode) fx.Option {
-	ipfsMaddr := cfg.Client.IpfsMAddr
+	return fx.Options(
+		FxConfigCommonProviders(&cfg.Common),
+		fx.Provide(modules.UniversalBlockstore),
 
-	return fx.Options()
+		// TODO(hmz): assuming cfg.Chainstore.EnableSplitstore == false
+		// check if this should always be the case for Eudico
+		fx.Provide(fx.Annotate(modules.ChainFlatBlockstore, fx.As(new(dtypes.BasicChainBlockstore)))),
+		fx.Provide(fx.Annotate(modules.StateFlatBlockstore, fx.As(new(dtypes.BasicStateBlockstore)))),
+		fx.Provide(
+			func(blockstore dtypes.UniversalBlockstore) dtypes.BaseBlockstore {
+				return (dtypes.BaseBlockstore)(blockstore)
+			},
+		),
+		fx.Provide(
+			func(blockstore dtypes.UniversalBlockstore) dtypes.ExposedBlockstore {
+				return (dtypes.ExposedBlockstore)(blockstore)
+			},
+		),
+		fx.Provide(modules.NoopGCReferenceProtector),
+
+		fx.Provide(
+			func(blockstore dtypes.BasicChainBlockstore) dtypes.ChainBlockstore {
+				return (dtypes.ChainBlockstore)(blockstore)
+			},
+		),
+		fx.Provide(
+			func(blockstore dtypes.BasicStateBlockstore) dtypes.StateBlockstore {
+				return (dtypes.StateBlockstore)(blockstore)
+			},
+		),
+
+		fx.Provide(modules.ClientImportMgr),
+
+		fx.Provide(modules.ClientBlockstore),
+
+		fx.Provide(modules.Graphsync(cfg.Client.SimultaneousTransfersForStorage, cfg.Client.SimultaneousTransfersForRetrieval)),
+
+		fx.Provide(modules.RetrievalClient(cfg.Client.OffChainRetrieval)),
+
+		// then assuming that cfg.Client.UseIpfs, cfg.Wallet.RemoteBackend, cfg.Wallet.EnableLedger,
+		// cfg.Wallet.DisableLocal are all false
+	)
 }
 
 func ConfigFullNode(c interface{}) Option {

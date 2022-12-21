@@ -3,7 +3,10 @@ package node
 import (
 	"context"
 	"errors"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/journal"
+	"github.com/filecoin-project/lotus/node/impl/net"
+	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/system"
 	metricsi "github.com/ipfs/go-metrics-interface"
 	record "github.com/libp2p/go-libp2p-record"
@@ -34,14 +37,12 @@ import (
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/impl/common"
-	"github.com/filecoin-project/lotus/node/impl/net"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/node/repo"
-	"github.com/filecoin-project/lotus/storage/paths"
 )
 
 //nolint:deadcode,varcheck
@@ -338,6 +339,72 @@ func Base() Option {
 	)
 }
 
+func FxConfigCommonProviders(cfg *config.Common) fx.Option {
+	// setup logging early
+	lotuslog.SetLevelsFromConfig(cfg.Logging.SubsystemLevels)
+
+	options := fx.Options(
+		fx.Provide(
+			func() (dtypes.APIEndpoint, error) {
+				return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
+			},
+		),
+		fx.Provide(func(e dtypes.APIEndpoint) (paths.URLs, error) {
+			ip := cfg.API.RemoteListenAddress
+
+			var urls paths.URLs
+			urls = append(urls, "http://"+ip+"/remote") // TODO: This makes no assumptions, and probably could...
+			return urls, nil
+		}),
+		// ApplyIf(enableLibp2pNode)
+		fx.Provide(
+			func(netAPI net.NetAPI) api.Net {
+				return &netAPI
+			},
+		),
+		fx.Provide(
+			func(commonAPI common.CommonAPI) api.Common {
+				return &commonAPI
+			},
+		),
+		fx.Provide(
+			lp2p.ConnectionManager(
+				cfg.Libp2p.ConnMgrLow,
+				cfg.Libp2p.ConnMgrHigh,
+				time.Duration(cfg.Libp2p.ConnMgrGrace),
+				cfg.Libp2p.ProtectedPeers),
+		),
+		fx.Provide(lp2p.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
+		fx.Provide(lp2p.GossipSub),
+		fx.Supply(&cfg.Pubsub),
+
+		fx.Provide(lp2p.AddrsFactory(cfg.Libp2p.AnnounceAddresses, cfg.Libp2p.NoAnnounceAddresses)),
+
+		fx.Provide(modules.Datastore(cfg.Backup.DisableMetadataLog)),
+	)
+
+	if len(cfg.Libp2p.BootstrapPeers) > 0 {
+		options = fx.Options(options, fx.Provide(modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)))
+	}
+
+	if !cfg.Libp2p.DisableNatPortMap {
+		options = fx.Options(options, fx.Provide(lp2p.NatPortMap))
+	}
+
+	return options
+}
+
+func FxConfigCommonInvokers(cfg *config.Common) []fx.Option {
+	invokers := make([]fx.Option, _nInvokes)
+	invokers[SetApiEndpointKey] = fx.Invoke(
+		func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
+			return lr.SetAPIEndpoint(e)
+		},
+	)
+	invokers[StartListeningKey] = fx.Invoke(lp2p.StartListening(cfg.Libp2p.ListenAddresses))
+	return invokers
+}
+
 // Config sets up constructors based on the provided Config
 func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 	// setup logging early
@@ -390,17 +457,7 @@ func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 	)
 }
 
-var FxRepoProviders = func(r repo.Repo) fx.Option {
-	lr, err := r.Lock(repo.FullNode)
-	if err != nil {
-		panic(err)
-	}
-	//c, err := lr.Config()
-	//if err != nil {
-	//	panic(err)
-	//}
-	globalLr = lr
-
+var FxRepoProviders = func(lr repo.LockedRepo, cfg *config.FullNode) fx.Option {
 	return fx.Options(
 		fx.Provide(modules.LockedRepo(lr)),
 		fx.Provide(fx.Annotate(lp2p.PrivKey, fx.As(new(ci.PrivKey)))),
@@ -414,34 +471,31 @@ var FxRepoProviders = func(r repo.Repo) fx.Option {
 		fx.Provide(modules.KeyStore),
 
 		fx.Provide(modules.APISecret),
+
+		FxConfigFullNodeProviders(cfg),
 	)
-
-	// hmz: the stuff from ConfigFullNode
 }
-
-var globalLr repo.LockedRepo
 
 func Repo(r repo.Repo) Option {
 	return func(settings *Settings) error {
-		//lr, err := r.Lock(settings.NodeType)
-		//if err != nil {
-		//	return err
-		//}
-		lr := globalLr
+		lr, err := r.Lock(settings.NodeType)
+		if err != nil {
+			return err
+		}
 		c, err := lr.Config()
 		if err != nil {
 			return err
 		}
 		return Options(
-			//Override(new(repo.LockedRepo), modules.LockedRepo(lr)), // module handles closing
-			//
-			//Override(new(ci.PrivKey), lp2p.PrivKey),
-			//Override(new(ci.PubKey), ci.PrivKey.GetPublic),
-			//Override(new(peer.ID), peer.IDFromPublicKey),
-			//
-			//Override(new(types.KeyStore), modules.KeyStore),
-			//
-			//Override(new(*dtypes.APIAlg), modules.APISecret),
+			Override(new(repo.LockedRepo), modules.LockedRepo(lr)), // module handles closing
+
+			Override(new(ci.PrivKey), lp2p.PrivKey),
+			Override(new(ci.PubKey), ci.PrivKey.GetPublic),
+			Override(new(peer.ID), peer.IDFromPublicKey),
+
+			Override(new(types.KeyStore), modules.KeyStore),
+
+			Override(new(*dtypes.APIAlg), modules.APISecret),
 
 			ApplyIf(IsType(repo.FullNode), ConfigFullNode(c)),
 			ApplyIf(IsType(repo.StorageMiner), ConfigStorageMiner(c)),
