@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-state-types/big"
-
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
@@ -61,7 +60,7 @@ func TestMirConsensusWithMangler(t *testing.T) {
 }
 
 func TestReconfiguration(t *testing.T) {
-	require.Greater(t, MirFaultyValidatorNumber, 0)
+	defer require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
@@ -253,8 +252,10 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 		wg.Wait()
 	}()
 
-	membershipFileName := "./_membership_config.tmp"
-	os.Remove(membershipFileName) // nolint
+	membershipFileName := "_membership_config.tmp"
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, ts.opts...)
 	ens.StoreMirValidatorsToMembersipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
@@ -288,8 +289,10 @@ func (ts *itestsConsensusSuite) testMirWithReconfigurationIfNewNodeFailsToJoin(t
 		wg.Wait()
 	}()
 
-	membershipFileName := "./_membership_config_failed.tmp"
-	os.Remove(membershipFileName) // nolint
+	membershipFileName := "_membership_failed_config.tmp"
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, ts.opts...)
 	ens.StoreMirValidatorsToMembersipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
