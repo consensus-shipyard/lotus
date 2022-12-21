@@ -252,7 +252,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		Ticket:           vrfCheckpoint,
 		Eproof:           eproofCheckpoint,
 		Epoch:            base.Height() + 1,
-		Timestamp:        uint64(time.Now().Unix()),
+		Timestamp:        uint64(base.Height() + 1),
 		WinningPoStProof: nil,
 		Messages:         msgs,
 	})

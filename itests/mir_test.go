@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-state-types/big"
+
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
@@ -30,9 +31,9 @@ const (
 // TestMirConsensus tests that Mir operates normally.
 //
 // Notes:
-// - It is assumed that the first F of N nodes can be byzantine
-// - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
-//   and nodes[MirFaultyValidatorNumber:] are honest nodes.
+//   - It is assumed that the first F of N nodes can be byzantine
+//   - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
+//     and nodes[MirFaultyValidatorNumber:] are honest nodes.
 func TestMirConsensus(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
