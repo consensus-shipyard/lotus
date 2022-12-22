@@ -696,7 +696,7 @@ func (n *Ensemble) Start() *Ensemble {
 		copy.FullNode = modules.MakeUuidWrapper(copy.FullNode)
 		m.FullNode = &copy
 
-		//m.FullNode.FullNode = modules.MakeUuidWrapper(fn.FullNode)
+		// m.FullNode.FullNode = modules.MakeUuidWrapper(fn.FullNode)
 
 		opts := []node.Option{
 			node.StorageMiner(&m.StorageMiner, cfg.Subsystems),
@@ -705,8 +705,8 @@ func (n *Ensemble) Start() *Ensemble {
 			node.Test(),
 
 			node.If(m.options.disableLibp2p, node.MockHost(n.mn)),
-			//node.Override(new(v1api.RawFullNodeAPI), func() api.FullNode { return modules.MakeUuidWrapper(m.FullNode) }),
-			//node.Override(new(v1api.RawFullNodeAPI), modules.MakeUuidWrapper),
+			// node.Override(new(v1api.RawFullNodeAPI), func() api.FullNode { return modules.MakeUuidWrapper(m.FullNode) }),
+			// node.Override(new(v1api.RawFullNodeAPI), modules.MakeUuidWrapper),
 			node.Override(new(v1api.RawFullNodeAPI), m.FullNode),
 			node.Override(new(*lotusminer.Miner), lotusminer.NewTestMiner(mineBlock, m.ActorAddr)),
 
@@ -1141,13 +1141,13 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 			m.mirDB = NewTestDB()
 			m.checkpointPeriod = len(miners) + len(faultyMiners)
 			cfg := mir.Config{
-				MembershipStore:  mir.MembershipString(membershipString),
 				CheckpointPeriod: m.checkpointPeriod,
 			}
+			membership := mir.MembershipString(membershipString)
 			if i > len(miners) && delay > 0 {
 				RandomDelay(delay)
 			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
@@ -1168,11 +1168,11 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, con
 			m.mirDB = NewTestDB()
 			m.checkpointPeriod = checkpoint
 			cfg := mir.Config{
-				MembershipStore:  &mir.MembershipFile{FileName: configFileName},
 				CheckpointPeriod: checkpoint,
 			}
+			membership := mir.MembershipFile{FileName: configFileName}
 
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
@@ -1204,10 +1204,11 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				m.mirDB = NewTestDB()
 			}
 			cfg := mir.Config{
-				MembershipStore:  mir.MembershipString(m.mirMembership),
 				CheckpointPeriod: m.checkpointPeriod,
 			}
-			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			membership := mir.MembershipString(m.mirMembership)
+
+			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}

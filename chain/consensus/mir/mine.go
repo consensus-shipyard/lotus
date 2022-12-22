@@ -35,11 +35,12 @@ var (
 //  5. Broadcast this block to the rest of the network. Validators will not accept broadcasted,
 //     they already have it.
 //  6. Sync and restore from state whenever needed.
-func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB, cfg *Config) error {
+func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB,
+	membership MembershipReader, cfg *Config) error {
 	log.With("miner", addr).Infof("Mir miner started")
 	defer log.With("miner", addr).Infof("Mir miner completed")
 
-	m, err := NewManager(ctx, addr, h, api, db, cfg)
+	m, err := NewManager(ctx, addr, h, api, db, membership, cfg)
 	if err != nil {
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
@@ -95,7 +96,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := cfg.MembershipStore.GetValidators()
+			newValidatorSet, err := membership.GetValidators()
 			if err != nil {
 				log.With("miner", addr).Warnf("failed to get subnet validators: %w", err)
 				continue

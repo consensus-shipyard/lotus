@@ -47,6 +47,8 @@ var (
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
+	GetValidators MembershipReader
+
 	// Lotus types.
 	NetName dtypes.NetworkName
 	Addr    address.Address
@@ -73,13 +75,14 @@ type Manager struct {
 	checkpointRepo string // path where checkpoints are (optionally) persisted
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Config) (*Manager, error) {
+func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB,
+	membership MembershipReader, cfg *Config) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	initialValidatorSet, err := cfg.MembershipStore.GetValidators()
+	initialValidatorSet, err := membership.GetValidators()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}

@@ -159,15 +159,16 @@ var runCmd = &cli.Command{
 
 		log.Infow("Starting mining with validator", "validator", validator)
 
+		membership := mir.NewMembershipFile(membershipFile)
+
 		cfg := mir.NewConfig(
-			mir.NewMembershipFile(membershipFile),
 			dbPath,
 			checkpointPeriod,
 			initCh,
 			cctx.String("checkpoints-repo"),
 		)
 
-		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
+		return mir.Mine(ctx, validator, h, nodeApi, ds, membership, cfg)
 	},
 }
 

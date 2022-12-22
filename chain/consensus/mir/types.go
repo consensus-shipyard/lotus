@@ -34,7 +34,6 @@ const (
 )
 
 type Config struct {
-	MembershipStore  MembershipReader
 	DatastorePath    string
 	CheckpointPeriod int
 	// InitialCheckpoint from which to start the validator.
@@ -45,14 +44,12 @@ type Config struct {
 }
 
 func NewConfig(
-	m MembershipReader,
 	dbPath string,
 	checkpointPeriod int,
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 ) *Config {
 	return &Config{
-		MembershipStore:   m,
 		DatastorePath:     dbPath,
 		CheckpointPeriod:  checkpointPeriod,
 		InitialCheckpoint: initCheck,

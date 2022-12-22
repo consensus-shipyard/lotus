@@ -15,7 +15,7 @@ func NewMembershipFile(fileName string) *MembershipFile {
 }
 
 // GetValidators gets the membership config from a file.
-func (mf *MembershipFile) GetValidators() (*ValidatorSet, error) {
+func (mf MembershipFile) GetValidators() (*ValidatorSet, error) {
 	return GetValidatorsFromFile(mf.FileName)
 }
 
