@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/mir"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 )
@@ -36,7 +37,7 @@ var (
 //     they already have it.
 //  6. Sync and restore from state whenever needed.
 func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB,
-	membership MembershipReader, cfg *Config) error {
+	membership validator.MembershipReader, cfg *Config) error {
 	log.With("miner", addr).Infof("Mir miner started")
 	defer log.With("miner", addr).Infof("Mir miner completed")
 
@@ -50,16 +51,8 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		m.Stop()
 	}()
 
-	log.Infof("Miner info:\n\twallet - %s\n\tsubnet - %s\n\tMir ID - %s\n\tPeer ID - %s\n\tvalidators - %v",
-		m.Addr, m.NetName, m.MirID, h.ID(), m.InitialValidatorSet.GetValidators())
-
-	log.Info("Miner info:")
-	log.Info("\t - Network: ", m.NetName)
-	log.Info("\t - Miner Lotus node ID: ", m.Addr)
-	log.Info("\t - Miner validator ID: ", m.MirID)
-	log.Info("\t - Miner validator libp2p address: ", m.MirID)
-	log.Info("\t - Mir validator peerID: ", h.ID())
-	log.Info("\t - Validators:", m.InitialValidatorSet.GetValidators())
+	log.Infof("Miner info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir ID - %v\n\tMir peerID - %v\n\tMir peerID - %v",
+		m.NetName, m.ValidatorID, m.MirID, h.ID(), m.InitialValidatorSet.GetValidators())
 
 	mirErrors := m.Start(ctx)
 

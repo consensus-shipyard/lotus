@@ -16,13 +16,11 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/systems/smr"
-	t "github.com/filecoin-project/mir/pkg/types"
-
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/systems/smr"
 )
 
 const (
@@ -127,18 +125,6 @@ func MessageBytes(msg MirMessage) ([]byte, error) {
 	return append(msgBytes, byte(msgType)), nil
 }
 
-// Mir's checkpoint period is computed as the number of validators times the SegmentLength.
-// In order to configure the initial checkpoint period close to a specific value, we need
-// to set the SegmentLength for the SMR system accordingly. This function does this math
-// for you.
-func segmentForCheckpointPeriod(desiredPeriod int, membership map[t.NodeID]t.NodeAddress) (int, error) {
-	segment := desiredPeriod / len(membership)
-	if segment < 1 {
-		return 0, fmt.Errorf("wrong checkpoint period: the minimum checkpoint allowed for this number of validators is %d", len(membership))
-	}
-	return segment, nil
-}
-
 type ParentMeta struct {
 	Height abi.ChainEpoch
 	Cid    cid.Cid
@@ -236,7 +222,7 @@ func UnwrapCheckpointSnapshot(ch *checkpoint.StableCheckpoint) (*Checkpoint, err
 	return snap, err
 }
 
-// Get stable checkpoint by height from datastore.
+// GetCheckpointByHeight stable checkpoint by height from datastore.
 func GetCheckpointByHeight(ctx context.Context, ds db.DB,
 	height abi.ChainEpoch, params *smr.Params) (*checkpoint.StableCheckpoint, error) {
 

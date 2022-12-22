@@ -15,6 +15,7 @@ import (
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -220,13 +221,13 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if err != nil {
 		return xerrors.Errorf("failed to get chain head: %w", err)
 	}
-	log.With("miner", sm.MirManager.Addr).Debugf("Trying to mine new block over base: %s", base.Key())
+	log.With("miner", sm.MirManager.ValidatorID).Debugf("Trying to mine new block over base: %s", base.Key())
 
 	nextHeight := base.Height() + 1
-	log.With("miner", sm.MirManager.Addr).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
+	log.With("miner", sm.MirManager.ValidatorID).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
 
 	msgs := sm.MirManager.GetMessages(batch)
-	log.With("miner", sm.MirManager.Addr).With("epoch", nextHeight).
+	log.With("miner", sm.MirManager.ValidatorID).With("epoch", nextHeight).
 		Infof("try to create a block: msgs - %d", len(msgs))
 
 	// include checkpoint in VRF proof field?
@@ -241,7 +242,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		if err != nil {
 			return xerrors.Errorf("error setting vrfproof from checkpoint: %w", err)
 		}
-		log.With("miner", sm.MirManager.Addr).Infof("Including Mir checkpoint for in block %d", nextHeight)
+		log.With("miner", sm.MirManager.ValidatorID).Infof("Including Mir checkpoint for in block %d", nextHeight)
 	}
 
 	bh, err := sm.api.MinerCreateBlock(sm.ctx, &lapi.BlockTemplate{
@@ -260,7 +261,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("creating a block failed: %w", err)
 	}
 	if bh == nil {
-		log.With("miner", sm.MirManager.Addr).With("epoch", nextHeight).Debug("created a nil block")
+		log.With("miner", sm.MirManager.ValidatorID).With("epoch", nextHeight).Debug("created a nil block")
 		return nil
 	}
 
@@ -273,12 +274,12 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("unable to sync a block: %w", err)
 	}
 
-	log.With("miner", sm.MirManager.Addr).With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
+	log.With("miner", sm.MirManager.ValidatorID).With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
 	return nil
 }
 
 func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
-	var newValSet ValidatorSet
+	var newValSet validator.ValidatorSet
 	if err := newValSet.UnmarshalCBOR(bytes.NewReader(in.Data)); err != nil {
 		return err
 	}
@@ -318,8 +319,8 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	return newMembership, nil
 }
 
-func (sm *StateManager) UpdateNextMembership(valSet *ValidatorSet) error {
-	_, mbs, err := validatorsMembership(valSet.GetValidators())
+func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) error {
+	_, mbs, err := validator.Membership(valSet.GetValidators())
 	if err != nil {
 		return err
 	}
@@ -328,7 +329,7 @@ func (sm *StateManager) UpdateNextMembership(valSet *ValidatorSet) error {
 }
 
 // UpdateAndCheckVotes votes for the valSet and returns true if it has enough votes for this valSet.
-func (sm *StateManager) UpdateAndCheckVotes(valSet *ValidatorSet) (bool, error) {
+func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (bool, error) {
 	h, err := valSet.Hash()
 	if err != nil {
 		return false, err
@@ -358,8 +359,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 	}
 
 	nextHeight := abi.ChainEpoch(sm.height) + 1
-	log.With("miner", sm.MirManager.Addr).Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
-	log.With("miner", sm.MirManager.Addr).Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
+	log.With("miner", sm.MirManager.ValidatorID).Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
+	log.With("miner", sm.MirManager.ValidatorID).Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
 
 	// populating checkpoint template
 	ch := Checkpoint{
@@ -405,7 +406,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	if err := ch.FromBytes(checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error getting checkpoint data from mir checkpoint: %w", err)
 	}
-	log.With("miner", sm.MirManager.Addr).Debugf("Mir generated new checkpoint for height: %d", ch.Height)
+	log.With("miner", sm.MirManager.ValidatorID).Debugf("Mir generated new checkpoint for height: %d", ch.Height)
 
 	if err := sm.deliverCheckpoint(checkpoint, ch); err != nil {
 		return err
@@ -468,7 +469,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	}
 
 	// Send the checkpoint to Lotus and handle it there
-	log.With("miner", sm.MirManager.Addr).Debug("Sending checkpoint to mining process to include in block")
+	log.With("miner", sm.MirManager.ValidatorID).Debug("Sending checkpoint to mining process to include in block")
 	sm.NextCheckpoint <- checkpoint
 	return nil
 }
@@ -536,7 +537,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	if base.Height() < height {
 		timeout = timeout + time.Duration(height-base.Height())*time.Second
 	}
-	log.With("miner", sm.MirManager.Addr).Debugf("waiting for block on height %d with timeout %v", height, timeout)
+	log.With("miner", sm.MirManager.ValidatorID).Debugf("waiting for block on height %d with timeout %v", height, timeout)
 	ctx, cancel := context.WithTimeout(sm.ctx, timeout)
 	defer cancel()
 

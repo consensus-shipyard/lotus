@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
@@ -47,12 +48,12 @@ var (
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
-	GetValidators MembershipReader
+	GetValidators validator.MembershipReader
 
 	// Lotus types.
-	NetName dtypes.NetworkName
-	Addr    address.Address
-	Pool    *fifo.Pool
+	NetName     dtypes.NetworkName
+	ValidatorID address.Address
+	Pool        *fifo.Pool
 
 	// Mir types.
 	MirNode       *mir.Node
@@ -67,7 +68,7 @@ type Manager struct {
 	stopCh        chan struct{}
 
 	// Reconfiguration types.
-	InitialValidatorSet  *ValidatorSet
+	InitialValidatorSet  *validator.ValidatorSet
 	reconfigurationNonce uint64
 
 	// Checkpoints
@@ -75,8 +76,8 @@ type Manager struct {
 	checkpointRepo string // path where checkpoints are (optionally) persisted
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB,
-	membership MembershipReader, cfg *Config) (*Manager, error) {
+func NewManager(ctx context.Context, validatorID address.Address, h host.Host, api v1api.FullNode, ds db.DB,
+	membership validator.MembershipReader, cfg *Config) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
@@ -90,12 +91,12 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("empty validator set")
 	}
 
-	_, initialMembership, err := validatorsMembership(initialValidatorSet.Validators)
+	_, initialMembership, err := validator.Membership(initialValidatorSet.Validators)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build node membership: %w", err)
 	}
 
-	mirID := addr.String()
+	mirID := validatorID.String()
 	_, ok := initialMembership[t.NodeID(mirID)]
 	if !ok {
 		return nil, fmt.Errorf("self identity is not included in the validator set")
@@ -109,7 +110,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("failed to create network transport: %w", err)
 	}
 
-	cryptoManager, err := NewCryptoManager(addr, api)
+	cryptoManager, err := NewCryptoManager(validatorID, api)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create crypto manager: %w", err)
 	}
@@ -131,7 +132,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 
 	m := Manager{
 		stopCh:              make(chan struct{}),
-		Addr:                addr,
+		ValidatorID:         validatorID,
 		NetName:             netName,
 		Pool:                fifo.New(),
 		MirID:               mirID,
@@ -253,7 +254,7 @@ func (m *Manager) Stop() {
 
 // ID prints Manager ID.
 func (m *Manager) ID() string {
-	return m.Addr.String()
+	return m.ValidatorID.String()
 }
 
 func (m *Manager) initCheckpoint(params smr.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
@@ -298,7 +299,7 @@ func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 	return
 }
 
-func (m *Manager) ReconfigurationRequest(valset *ValidatorSet) *mirproto.Request {
+func (m *Manager) ReconfigurationRequest(valset *validator.ValidatorSet) *mirproto.Request {
 	var payload bytes.Buffer
 	if err := valset.MarshalCBOR(&payload); err != nil {
 		log.Error("unable to marshall config valset:", err)

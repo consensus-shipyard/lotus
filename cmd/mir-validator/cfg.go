@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
@@ -53,13 +53,13 @@ var addValidatorCmd = &cli.Command{
 			return err
 		}
 
-		mp := path.Join(cctx.String("repo"), MembershipPath)
-		val, err := mir.ValidatorFromString(cctx.Args().First())
+		membershipFile := path.Join(cctx.String("repo"), MembershipPath)
+		val, err := validator.NewValidatorFromString(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("error parsing validator from string: %s. Use the following format: <wallet id>@<multiaddr>", err)
 		}
 		// persist validator config in the right path.
-		if err := mir.ValidatorsToCfg(mir.NewValidatorSet([]mir.Validator{val}), mp); err != nil {
+		if err := val.AppendToFile(membershipFile); err != nil {
 			return fmt.Errorf("error exporting membership config: %s", err)
 		}
 

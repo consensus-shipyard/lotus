@@ -41,6 +41,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/messagepool"
@@ -1143,7 +1144,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 			cfg := mir.Config{
 				CheckpointPeriod: m.checkpointPeriod,
 			}
-			membership := mir.MembershipString(membershipString)
+			membership := validator.StringMembership(membershipString)
 			if i > len(miners) && delay > 0 {
 				RandomDelay(delay)
 			}
@@ -1170,7 +1171,7 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, con
 			cfg := mir.Config{
 				CheckpointPeriod: checkpoint,
 			}
-			membership := mir.MembershipFile{FileName: configFileName}
+			membership := validator.FileMembership{FileName: configFileName}
 
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
@@ -1206,7 +1207,7 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 			cfg := mir.Config{
 				CheckpointPeriod: m.checkpointPeriod,
 			}
-			membership := mir.MembershipString(m.mirMembership)
+			membership := validator.StringMembership(m.mirMembership)
 
 			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {

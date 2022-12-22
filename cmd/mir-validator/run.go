@@ -13,16 +13,16 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
 )
 
 var runCmd = &cli.Command{
@@ -112,7 +112,7 @@ var runCmd = &cli.Command{
 		}
 
 		// Validator identity.
-		validator, err := validatorIDFromFlag(ctx, cctx, nodeApi)
+		validatorID, err := validatorIDFromFlag(ctx, cctx, nodeApi)
 		if err != nil {
 			return err
 		}
@@ -157,9 +157,9 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		log.Infow("Starting mining with validator", "validator", validator)
+		log.Infow("Starting mining with validator", "validator", validatorID)
 
-		membership := mir.NewMembershipFile(membershipFile)
+		membership := validator.NewFileMembership(membershipFile)
 
 		cfg := mir.NewConfig(
 			dbPath,
@@ -168,7 +168,7 @@ var runCmd = &cli.Command{
 			cctx.String("checkpoints-repo"),
 		)
 
-		return mir.Mine(ctx, validator, h, nodeApi, ds, membership, cfg)
+		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
 	},
 }
 
