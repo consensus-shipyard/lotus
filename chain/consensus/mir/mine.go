@@ -10,11 +10,10 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/mir"
-	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
-
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/mir"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 )
 
 const (
@@ -45,14 +44,21 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
 
-	// Perform cleanup of Node's modules and
-	// ensure that mir is closed when we stop mining.
+	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
 	defer func() {
 		m.Stop()
 	}()
 
 	log.Infof("Miner info:\n\twallet - %s\n\tsubnet - %s\n\tMir ID - %s\n\tPeer ID - %s\n\tvalidators - %v",
 		m.Addr, m.NetName, m.MirID, h.ID(), m.InitialValidatorSet.GetValidators())
+
+	log.Info("Miner info:")
+	log.Info("\t - Network: ", m.NetName)
+	log.Info("\t - Miner Lotus node ID: ", m.Addr)
+	log.Info("\t - Miner validator ID: ", m.MirID)
+	log.Info("\t - Miner validator libp2p address: ", m.MirID)
+	log.Info("\t - Mir validator peerID: ", h.ID())
+	log.Info("\t - Validators:", m.InitialValidatorSet.GetValidators())
 
 	mirErrors := m.Start(ctx)
 
@@ -77,12 +83,8 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		// first catch potential errors when mining
 		case err := <-mirErrors:
 			log.With("miner", addr).Info("Miner received error signal:", err)
-			// return fmt.Errorf("miner consensus error: %w", err)
-			//
-			// TODO: This is a temporary solution while we are discussing that issue
-			// https://filecoinproject.slack.com/archives/C03C77HN3AS/p1660330971306019
 			if err != nil && !errors.Is(err, mir.ErrStopped) {
-				panic(fmt.Errorf("miner %s consensus error: %w", addr, err))
+				panic(fmt.Sprintf("miner %s consensus error: %v", addr, err))
 			}
 			log.With("miner", addr).Infof("Mir node stopped signal")
 			return nil

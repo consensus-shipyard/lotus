@@ -14,6 +14,12 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -26,13 +32,6 @@ import (
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/smr"
 	t "github.com/filecoin-project/mir/pkg/types"
-
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
@@ -48,12 +47,12 @@ var (
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
-	// Lotus related types.
+	// Lotus types.
 	NetName dtypes.NetworkName
 	Addr    address.Address
 	Pool    *fifo.Pool
 
-	// Mir related types.
+	// Mir types.
 	MirNode       *mir.Node
 	MirID         string
 	WAL           *simplewal.WAL
@@ -65,7 +64,7 @@ type Manager struct {
 	ds            db.DB
 	stopCh        chan struct{}
 
-	// Reconfiguration related types.
+	// Reconfiguration types.
 	InitialValidatorSet  *ValidatorSet
 	reconfigurationNonce uint64
 
@@ -88,42 +87,44 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("empty validator set")
 	}
 
-	nodeIDs, initialMembership, err := validatorsMembership(initialValidatorSet.Validators)
+	_, initialMembership, err := validatorsMembership(initialValidatorSet.Validators)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build node membership: %w", err)
 	}
 
 	mirID := addr.String()
-	mirAddr, ok := initialMembership[t.NodeID(mirID)]
+	_, ok := initialMembership[t.NodeID(mirID)]
 	if !ok {
-		return nil, fmt.Errorf("self identity not included in validator set")
+		return nil, fmt.Errorf("self identity is not included in the validator set")
 	}
-
-	log.Info("Lotus wallet for Mir ID: ", mirID)
-	log.Info("Libp2p host address for Mir: ", mirAddr)
-	log.Info("Mir nodes IDs: ", nodeIDs)
-	log.Info("Mir node libp2p peerID: ", h.ID())
-	log.Info("Mir nodes addresses: ", initialMembership)
 
 	logger := newManagerLogger(mirID)
 
 	// Create Mir modules.
 	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transport: %w", err)
+		return nil, fmt.Errorf("failed to create network transport: %w", err)
 	}
-	if err := netTransport.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start transport: %w", err)
-	}
-	// netTransport.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create crypto manager: %w", err)
 	}
 
-	// Instantiate an interceptor.
 	var interceptor *eventlog.Recorder
+	interceptorOutput := os.Getenv(InterceptorOutputEnv)
+	if interceptorOutput != "" {
+		// TODO: Persist in repo path?
+		log.Infof("Interceptor initialized")
+		interceptor, err = eventlog.NewRecorder(
+			t.NodeID(mirID),
+			interceptorOutput,
+			logging.Decorate(logger, "Interceptor: "),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create interceptor: %w", err)
+		}
+	}
 
 	m := Manager{
 		stopCh:              make(chan struct{}),
@@ -138,6 +139,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		InitialValidatorSet: initialValidatorSet,
 		ToMir:               make(chan chan []*mirproto.Request),
 		checkpointRepo:      cfg.CheckpointRepo,
+		segmentLength:       1,
 	}
 
 	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
@@ -145,6 +147,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		return nil, fmt.Errorf("error starting mir state manager: %w", err)
 	}
 
+	// Create SMR modules.
 	mpool := pool.NewModule(
 		m.ToMir,
 		pool.DefaultModuleConfig(),
@@ -152,13 +155,6 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	)
 
 	params := smr.DefaultParams(initialMembership)
-	// configure SegmentLength for specific checkpoint period.
-	// m.segmentLength, err = segmentForCheckpointPeriod(cfg.CheckpointPeriod, initialMembership)
-	// if err != nil {
-	//	return nil, fmt.Errorf("error getting segment length: %w", err)
-	// }
-	m.segmentLength = 1
-
 	params.Iss.SegmentLength = m.segmentLength
 	params.Mempool.MaxTransactionsInBatch = 1024
 	params.Iss.AdjustSpeed(1 * time.Second)
@@ -169,7 +165,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	if initCh == nil {
 		initCh, err = m.initCheckpoint(params, 0)
 		if err != nil {
-			return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
+			return nil, fmt.Errorf("failed to get inital SMR system snapshot: %w", err)
 		}
 	}
 
@@ -185,6 +181,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	if err != nil {
 		return nil, fmt.Errorf("could not create SMR system: %w", err)
 	}
+
 	smrSystem = smrSystem.
 		WithModule("mempool", mpool).
 		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
@@ -210,23 +207,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	}
 
 	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
-
-	interceptorOutput := os.Getenv(InterceptorOutputEnv)
-	if interceptorOutput != "" {
-		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized")
-		m.interceptor, err = eventlog.NewRecorder(
-			t.NodeID(mirID),
-			interceptorOutput,
-			logging.Decorate(logger, "Interceptor: "),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create interceptor: %w", err)
-		}
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
-	} else {
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, nil)
-	}
+	m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Mir node: %w", err)
 	}
@@ -237,7 +218,6 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 // Start starts the manager.
 func (m *Manager) Start(ctx context.Context) chan error {
 	log.Infof("Mir manager %s starting", m.MirID)
-	log.Info("Mir segment length: ", m.segmentLength)
 
 	errChan := make(chan error, 1)
 

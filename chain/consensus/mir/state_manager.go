@@ -386,7 +386,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
 		i--
-		log.Infof("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
+		log.Debugf("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
 	return ch.Bytes()
