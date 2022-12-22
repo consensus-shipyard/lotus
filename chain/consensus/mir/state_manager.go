@@ -95,104 +95,6 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 	return &sm, nil
 }
 
-// RestoreState is called by Mir when the validator goes out-of-sync, and it requires
-// lotus to sync from the latest checkpoint. Mir provides lotus with the latest
-// checkpoint and from this:
-// - The latest membership and configuration for the consensus is recovered.
-// - We clean all previous outdated checkpoints and configurations we may have
-// received while trying to sync.
-// - If there is a snapshot in the checkpoint, we poll our connections to sync
-// to the latest block determined by the checkpoint.
-// - We deliver the checkpoint to the mining process, so it can be included in the next
-// block (Mir provides the latest checkpoint, which hasn't been included in a block
-// yet)
-// - And we flag the mining process that we are synced, and it can start accepting new
-// batches from Mir and assembling new blocks.
-func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
-	log.Debugf("Calling RestoreState from Mir for epoch %d", sm.currentEpoch)
-	// release any previous checkpoint delivered and pending
-	// to sync, as we are syncing again. This prevents a deadlock.
-	sm.releaseNextCheckpointChan()
-
-	config := checkpoint.Snapshot.EpochData.EpochConfig
-	sm.currentEpoch = t.EpochNr(config.EpochNr)
-	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
-
-	for e, membership := range config.Memberships {
-		// skew membership to current epoch, we are starting from a checkpoint
-		// sm.memberships[t.EpochNr(e)+sm.currentEpoch] = make(map[t.NodeID]t.NodeAddress)
-		// sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
-		// sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
-		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
-	}
-
-	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
-	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
-
-	// if mir provides a snapshot
-	snapshot := checkpoint.Snapshot.AppData
-	ch := &Checkpoint{}
-	if len(snapshot) > 0 {
-		// get checkpoint from snapshot.
-		err := ch.FromBytes(snapshot)
-		if err != nil {
-			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
-		}
-
-		log.Infof("Restoring state from checkpoint at height: %d", ch.Height)
-
-		// Restore the height.
-		sm.height = ch.Height
-
-		// purge any state previous to the checkpoint
-		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
-			return xerrors.Errorf("couldn't purge state to recover from checkpoint: %w", err)
-		}
-
-		internalSync := false
-		// From all the peers of my daemon try to get the latest tipset.
-		connPeers, err := sm.api.NetPeers(sm.ctx)
-		if err != nil {
-			return xerrors.Errorf("error getting list of peers from daemon: %w", err)
-		}
-		if len(connPeers) == 0 {
-			return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
-		}
-
-		log.Debugf("Restoring from checkpoint at height %d ", ch.Height)
-		for _, addr := range connPeers {
-			log.Debugf("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
-			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
-			if err != nil {
-				log.Errorf("error fetching latest tipset from peer %s: %v", addr.ID, err)
-				continue
-			}
-			// wait for full-sync before returning from restoreState.
-			err = sm.waitForBlock(ts.Height())
-			if err != nil {
-				return xerrors.Errorf("error waiting for next block %d: %w", ts.Height(), err)
-			}
-			internalSync = true
-		}
-
-		// if we couldn't find any valid peer or validator to sync from, just abort.
-		if !internalSync {
-			return xerrors.Errorf("couldn't find any good peers to sync from")
-		}
-
-		// once synced we deliver the checkpoint to our mining process, so it can be
-		// included in the next block (as the rest of Mir validators will do before
-		// accepting the next batch), and we persist it locally.
-		log.Debugf("Delivering checkpoint for height %d to mining process after sync", ch.Height)
-		err = sm.deliverCheckpoint(checkpoint, ch)
-		if err != nil {
-			return xerrors.Errorf("error delivering checkpoint to lotus from mir after restoreState: %w", err)
-		}
-	}
-
-	return nil
-}
-
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
@@ -346,6 +248,102 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (boo
 		return false, nil
 	}
 	return true, nil
+}
+
+// RestoreState is called by Mir when the validator goes out-of-sync, and it requires
+// lotus to sync from the latest checkpoint. Mir provides lotus with the latest
+// checkpoint and from this:
+// - The latest membership and configuration for the consensus is recovered.
+// - We clean all previous outdated checkpoints and configurations we may have
+// received while trying to sync.
+// - If there is a snapshot in the checkpoint, we poll our connections to sync
+// to the latest block determined by the checkpoint.
+// - We deliver the checkpoint to the mining process, so it can be included in the next
+// block (Mir provides the latest checkpoint, which hasn't been included in a block
+// yet)
+// - And we flag the mining process that we are synced, and it can start accepting new
+// batches from Mir and assembling new blocks.
+func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
+	log.Debugf("Calling RestoreState from Mir for epoch %d", sm.currentEpoch)
+	// release any previous checkpoint delivered and pending
+	// to sync, as we are syncing again. This prevents a deadlock.
+	sm.releaseNextCheckpointChan()
+
+	config := checkpoint.Snapshot.EpochData.EpochConfig
+	sm.currentEpoch = t.EpochNr(config.EpochNr)
+	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
+
+	for e, membership := range config.Memberships {
+		// skew membership to current epoch, we are starting from a checkpoint
+		sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
+		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
+	}
+
+	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
+	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
+
+	// if mir provides a snapshot
+	snapshot := checkpoint.Snapshot.AppData
+	ch := &Checkpoint{}
+	if len(snapshot) > 0 {
+		// get checkpoint from snapshot.
+		err := ch.FromBytes(snapshot)
+		if err != nil {
+			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
+		}
+
+		log.Infof("Restoring state from checkpoint at height: %d", ch.Height)
+
+		// Restore the height.
+		sm.height = ch.Height
+
+		// purge any state previous to the checkpoint
+		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
+			return xerrors.Errorf("couldn't purge state to recover from checkpoint: %w", err)
+		}
+
+		internalSync := false
+		// From all the peers of my daemon try to get the latest tipset.
+		connPeers, err := sm.api.NetPeers(sm.ctx)
+		if err != nil {
+			return xerrors.Errorf("error getting list of peers from daemon: %w", err)
+		}
+		if len(connPeers) == 0 {
+			return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
+		}
+
+		log.Debugf("Restoring from checkpoint at height %d ", ch.Height)
+		for _, addr := range connPeers {
+			log.Debugf("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
+			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
+			if err != nil {
+				log.Errorf("error fetching latest tipset from peer %s: %v", addr.ID, err)
+				continue
+			}
+			// wait for full-sync before returning from restoreState.
+			err = sm.waitForBlock(ts.Height())
+			if err != nil {
+				return xerrors.Errorf("error waiting for next block %d: %w", ts.Height(), err)
+			}
+			internalSync = true
+		}
+
+		// if we couldn't find any valid peer or validator to sync from, just abort.
+		if !internalSync {
+			return xerrors.Errorf("couldn't find any good peers to sync from")
+		}
+
+		// once synced we deliver the checkpoint to our mining process, so it can be
+		// included in the next block (as the rest of Mir validators will do before
+		// accepting the next batch), and we persist it locally.
+		log.Debugf("Delivering checkpoint for height %d to mining process after sync", ch.Height)
+		err = sm.deliverCheckpoint(checkpoint, ch)
+		if err != nil {
+			return xerrors.Errorf("error delivering checkpoint to lotus from mir after restoreState: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Snapshot is called by Mir every time a checkpoint period has
