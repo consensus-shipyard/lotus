@@ -146,9 +146,9 @@ require (
 	go.opentelemetry.io/otel/bridge/opencensus v0.25.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
 	go.opentelemetry.io/otel/sdk v1.2.0
-	go.uber.org/fx v1.15.0
+	go.uber.org/fx v0.0.0-20221215155203-3a86277ab0e5
 	go.uber.org/multierr v1.8.0
-	go.uber.org/zap v1.22.0
+	go.uber.org/zap v1.23.0
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
@@ -322,7 +322,7 @@ require (
 	go.opentelemetry.io/otel/sdk/export/metric v0.25.0 // indirect
 	go.opentelemetry.io/otel/trace v1.7.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/dig v1.12.0 // indirect
+	go.uber.org/dig v1.15.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect

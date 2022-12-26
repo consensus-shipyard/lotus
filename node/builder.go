@@ -344,63 +344,19 @@ func FxConfigCommonProviders(cfg *config.Common) fx.Option {
 	lotuslog.SetLevelsFromConfig(cfg.Logging.SubsystemLevels)
 
 	options := fx.Options(
-		fx.Provide(
-			func() (dtypes.APIEndpoint, error) {
-				return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
-			},
-		),
-		fx.Provide(func(e dtypes.APIEndpoint) (paths.URLs, error) {
-			ip := cfg.API.RemoteListenAddress
-
-			var urls paths.URLs
-			urls = append(urls, "http://"+ip+"/remote") // TODO: This makes no assumptions, and probably could...
-			return urls, nil
-		}),
-		// ApplyIf(enableLibp2pNode)
-		fx.Provide(
-			func(netAPI net.NetAPI) api.Net {
-				return &netAPI
-			},
-		),
-		fx.Provide(
-			func(commonAPI common.CommonAPI) api.Common {
-				return &commonAPI
-			},
-		),
-		fx.Provide(
-			lp2p.ConnectionManager(
-				cfg.Libp2p.ConnMgrLow,
-				cfg.Libp2p.ConnMgrHigh,
-				time.Duration(cfg.Libp2p.ConnMgrGrace),
-				cfg.Libp2p.ProtectedPeers),
-		),
-		fx.Provide(lp2p.ResourceManager(cfg.Libp2p.ConnMgrHigh)),
-		fx.Provide(lp2p.GossipSub),
-		fx.Supply(&cfg.Pubsub),
-
-		fx.Provide(lp2p.AddrsFactory(cfg.Libp2p.AnnounceAddresses, cfg.Libp2p.NoAnnounceAddresses)),
-
 		fx.Provide(modules.Datastore(cfg.Backup.DisableMetadataLog)),
 	)
-
-	if len(cfg.Libp2p.BootstrapPeers) > 0 {
-		options = fx.Options(options, fx.Provide(modules.ConfigBootstrap(cfg.Libp2p.BootstrapPeers)))
-	}
-
-	if !cfg.Libp2p.DisableNatPortMap {
-		options = fx.Options(options, fx.Provide(lp2p.NatPortMap))
-	}
 
 	return options
 }
 
 func FxConfigCommonInvokers(cfg *config.Common) []fx.Option {
 	invokers := make([]fx.Option, _nInvokes)
-	invokers[SetApiEndpointKey] = fx.Invoke(
-		func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
-			return lr.SetAPIEndpoint(e)
-		},
-	)
+	//invokers[SetApiEndpointKey] = fx.Invoke(
+	//	func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
+	//		return lr.SetAPIEndpoint(e)
+	//	},
+	//)
 	invokers[StartListeningKey] = fx.Invoke(lp2p.StartListening(cfg.Libp2p.ListenAddresses))
 	return invokers
 }
@@ -460,19 +416,12 @@ func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 var FxRepoProviders = func(lr repo.LockedRepo, cfg *config.FullNode) fx.Option {
 	return fx.Options(
 		fx.Provide(modules.LockedRepo(lr)),
-		fx.Provide(fx.Annotate(lp2p.PrivKey, fx.As(new(ci.PrivKey)))),
-		fx.Provide(
-			func(privKey ci.PrivKey) ci.PubKey {
-				return privKey.GetPublic()
-			},
-		),
-		fx.Provide(peer.IDFromPublicKey),
 
 		fx.Provide(modules.KeyStore),
 
 		fx.Provide(modules.APISecret),
 
-		FxConfigFullNodeProviders(cfg),
+		//FxConfigFullNodeProviders(cfg),
 	)
 }
 
@@ -504,57 +453,6 @@ func Repo(r repo.Repo) Option {
 }
 
 type StopFunc func(context.Context) error
-
-func ConvertToFxOptions(fxInvokes []fx.Option, opts ...Option) (fx.Option, error) {
-	settings := Settings{
-		Modules: map[interface{}]fx.Option{},
-		Invokes: make([]fx.Option, _nInvokes),
-	}
-
-	// apply module options in the right order
-	if err := Options(opts...)(&settings); err != nil {
-		return nil, xerrors.Errorf("applying node options failed: %w", err)
-	}
-
-	// gather constructors for fx.Options
-	ctors := make([]fx.Option, 0, len(settings.Modules))
-	for _, opt := range settings.Modules {
-		ctors = append(ctors, opt)
-	}
-
-	// fill holes in Invokes for use in fx.Options
-	for i, opt := range settings.Invokes {
-		if opt == nil {
-			settings.Invokes[i] = fx.Options()
-		}
-	}
-
-	// merge Invokes built externally to this function
-	for i, invocation := range fxInvokes {
-		if invocation != nil {
-			settings.Invokes[i] = invocation
-		}
-	}
-
-	return fx.Options(
-		fx.Options(ctors...),
-		fx.Options(settings.Invokes...),
-	), nil
-}
-
-func NewFromFxOptions(ctx context.Context, options fx.Option) (StopFunc, error) {
-	app := fx.New(options)
-
-	// TODO: we probably should have a 'firewall' for Closing signal
-	//  on this context, and implement closing logic through lifecycles
-	//  correctly
-	if err := app.Start(ctx); err != nil {
-		// comment fx.NopLogger few lines above for easier debugging
-		return nil, xerrors.Errorf("starting node: %w", err)
-	}
-
-	return app.Stop, nil
-}
 
 // New builds and starts new Filecoin node
 func New(ctx context.Context, opts ...Option) (StopFunc, error) {

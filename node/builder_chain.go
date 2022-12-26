@@ -113,25 +113,21 @@ var FxChainNodeProviders = fx.Options(
 	fx.Provide(wallet.NewWallet),
 	fx.Provide(
 		fx.Annotate(
-			From(new(*wallet.LocalWallet)),
+			wallet.NewWallet,
 			fx.As(new(wallet.Default)),
 		),
 	),
 	fx.Provide(
-		fx.Annotate(
-			From(new(wallet.MultiWallet)),
-			fx.As(new(api.Wallet)),
-		),
+		func(multiWallet wallet.MultiWallet) api.Wallet {
+			return &multiWallet
+		},
 	),
 
 	// Service: Payment channels
 	fx.Provide(
-		fx.Annotate(
-			func(in modules.PaychAPI) *modules.PaychAPI {
-				return &in
-			},
-			fx.As(new(paychmgr.PaychAPI)),
-		),
+		func(in modules.PaychAPI) paychmgr.PaychAPI {
+			return &in
+		},
 	),
 	fx.Provide(modules.NewPaychStore),
 	fx.Provide(modules.NewManager),
@@ -177,40 +173,24 @@ var FxChainNodeProviders = fx.Options(
 		),
 	),
 	fx.Provide(
-		fx.Annotate(
-			//From(new(full.ChainModule)),
-			func(in full.ChainModule) *full.ChainModule {
-				return &in
-			},
-			fx.As(new(full.ChainModuleAPI)),
-		),
+		func(in full.ChainModule) full.ChainModuleAPI {
+			return &in
+		},
 	),
 	fx.Provide(
-		fx.Annotate(
-			//From(new(full.GasModule)),
-			func(in full.GasModule) *full.GasModule {
-				return &in
-			},
-			fx.As(new(full.GasModuleAPI)),
-		),
+		func(in full.GasModule) full.GasModuleAPI {
+			return &in
+		},
 	),
 	fx.Provide(
-		fx.Annotate(
-			//From(new(full.MpoolModule)),
-			func(in full.MpoolModule) *full.MpoolModule {
-				return &in
-			},
-			fx.As(new(full.MpoolModuleAPI)),
-		),
+		func(in full.MpoolModule) full.MpoolModuleAPI {
+			return &in
+		},
 	),
 	fx.Provide(
-		fx.Annotate(
-			//From(new(full.StateModule)),
-			func(in full.StateModule) *full.StateModule {
-				return &in
-			},
-			fx.As(new(full.StateModuleAPI)),
-		),
+		func(in full.StateModule) full.StateModuleAPI {
+			return &in
+		},
 	),
 	fx.Provide(
 		fx.Annotate(
@@ -388,7 +368,7 @@ var ChainNode = Options(
 
 func FxConfigFullNodeProviders(cfg *config.FullNode) fx.Option {
 	return fx.Options(
-		FxConfigCommonProviders(&cfg.Common),
+		//FxConfigCommonProviders(&cfg.Common),
 		fx.Provide(modules.UniversalBlockstore),
 
 		// TODO(hmz): assuming cfg.Chainstore.EnableSplitstore == false

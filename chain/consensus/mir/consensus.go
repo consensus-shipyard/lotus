@@ -45,14 +45,12 @@ type Mir struct {
 }
 
 func NewConsensus(
-	ctx context.Context,
 	sm *stmgr.StateManager,
 	ds dtypes.MetadataDS,
 	b beacon.Schedule,
 	g chain.Genesis,
 	badBlock *chain.BadBlockCache,
-	netName dtypes.NetworkName,
-) (consensus.Consensus, error) {
+) (*Mir, error) {
 	return &Mir{
 		beacon:  b,
 		sm:      sm,
@@ -62,7 +60,7 @@ func NewConsensus(
 }
 
 // CreateBlock creates a Filecoin block from the block template provided by Mir.
-func (bft *Mir) CreateBlock(ctx context.Context, w lapi.Wallet, bt *lapi.BlockTemplate) (*types.FullBlock, error) {
+func (bft *Mir) CreateBlock(ctx context.Context, _ lapi.Wallet, bt *lapi.BlockTemplate) (*types.FullBlock, error) {
 	pts, err := bft.sm.ChainStore().LoadTipSet(ctx, bt.Parents)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load parent tipset: %w", err)
@@ -104,7 +102,7 @@ func (bft *Mir) CreateBlock(ctx context.Context, w lapi.Wallet, bt *lapi.BlockTe
 	}, nil
 }
 
-func (bft *Mir) ValidateBlockHeader(ctx context.Context, b *types.BlockHeader) (rejectReason string, err error) {
+func (bft *Mir) ValidateBlockHeader(_ context.Context, b *types.BlockHeader) (rejectReason string, err error) {
 	if b.IsValidated() {
 		return "", nil
 	}
@@ -304,14 +302,14 @@ func hasCheckpoint(h *types.BlockHeader) bool {
 // IsEpochBeyondCurrMax is used in Filcns to detect delayed blocks.
 // We are currently using defaults here and not worrying about it.
 // We will consider potential changes of Consensus interface in https://github.com/filecoin-project/eudico/issues/143.
-func (bft *Mir) IsEpochBeyondCurrMax(epoch abi.ChainEpoch) bool {
+func (bft *Mir) IsEpochBeyondCurrMax(_ abi.ChainEpoch) bool {
 	return false
 }
 
 // Weight in mir uses a default approach where the height determines the weight.
 //
 // Every tipset in mir has a single block.
-func Weight(ctx context.Context, stateBs bstore.Blockstore, ts *types.TipSet) (types.BigInt, error) {
+func Weight(_ context.Context, _ bstore.Blockstore, ts *types.TipSet) (types.BigInt, error) {
 	if ts == nil {
 		return types.NewInt(0), nil
 	}

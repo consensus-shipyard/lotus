@@ -20,10 +20,12 @@ import (
 	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/node/repo"
 	metricsprom "github.com/ipfs/go-metrics-prometheus"
 	"github.com/mitchellh/go-homedir"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/plugin/runmetrics"
 	"go.opencensus.io/stats"
@@ -31,6 +33,7 @@ import (
 	"go.opencensus.io/tag"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
+	"net/http"
 	"os"
 	"runtime/pprof"
 )
@@ -44,39 +47,6 @@ var RefactoredDaemonCmd = func() *cli.Command {
 }()
 
 func refactoredDaemonAction(cctx *cli.Context) error {
-
-	/*
-		// node.defaults() - originally called from node.New
-		options := node.Defaults()
-
-		// node.FullAPI()
-		var api lapi.FullNode
-		options = append(
-			options,
-			node.FullAPI(&api, node.Lite(false), node.MirValidator(false)),
-		)
-
-		fxOptions, _ := node.ConvertToFxOptions(options...)
-	*/
-	// node.Base()
-	// node.Repo()
-
-	// dtypes.Bootstrapper
-	// dtypes.ShutdownChan
-
-	// genesis
-	// liteModeDeps
-
-	// Mir Consensus
-
-	// SetApiEndpointKey
-
-	// Unset node.RunPeerMgrKey and peermgr.PeerMgr is not bootstrap
-
-	return legacyDaemonAction(cctx)
-}
-
-func legacyDaemonAction(cctx *cli.Context) error {
 	isLite := cctx.Bool("lite")
 	isMirValidator := cctx.Bool("mir-validator")
 	log.Warnf("mir-validator = %v", isMirValidator)
@@ -243,43 +213,7 @@ func legacyDaemonAction(cctx *cli.Context) error {
 		fxInvokes[i] = fx.Options()
 	}
 
-	// node.defaults
-	fxProviders = append(fxProviders, node.FxDefaultsProviders)
-	mergeInvokes(fxInvokes, node.FxDefaultsInvokers())
-
-	// node.FullAPI (settings are set further below)
-	var api lapi.FullNode
-	var resAPI = &impl.FullNodeAPI{}
-	fxInvokes[node.ExtractApiKey] = fx.Populate(resAPI)
-	api = resAPI
-
-	// node.Base()
-	fxProviders = append(
-		fxProviders,
-		node.FxLibP2PProviders,
-		node.FxChainNodeProviders)
-	mergeInvokes(fxInvokes, node.FxLibP2PInvokers())
-	mergeInvokes(fxInvokes, node.FxChainNodeInvokers())
-
-	//// consensus conditional providers
-	if build.IsMirConsensus() {
-		fxProviders = append(
-			fxProviders,
-			fx.Provide(mir.NewConsensus),
-			fx.Supply(store.WeightFunc(mir.Weight)),
-			fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(mir.RewardFunc), fx.As(new(stmgr.Executor)))),
-		)
-	} else {
-		fxProviders = append(
-			fxProviders,
-			fx.Provide(filcns.NewFilecoinExpectedConsensus),
-			fx.Supply(store.WeightFunc(filcns.Weight)),
-			fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(filcns.RewardFunc), fx.As(new(stmgr.Executor)))),
-		)
-	}
-
-	// node.Repo()
-	//// setup
+	// repo setup
 	lockedRepo, err := r.Lock(repo.FullNode)
 	if err != nil {
 		panic(err)
@@ -293,10 +227,45 @@ func legacyDaemonAction(cctx *cli.Context) error {
 		panic("invalid config from repo")
 	}
 
+	// Refactored into modules
+	var consensusModule fx.Option
+	if build.IsMirConsensus() {
+		consensusModule = mir.Module
+	} else {
+		consensusModule = fx.Provide(
+			fx.Provide(filcns.NewFilecoinExpectedConsensus),
+			fx.Supply(store.WeightFunc(filcns.Weight)),
+			fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(filcns.RewardFunc), fx.As(new(stmgr.Executor)))),
+		)
+	}
+
+	fxProviders = append(fxProviders,
+		lp2p.Module(&cfg.Common),
+		repoModule(lockedRepo),
+		consensusModule,
+		// orphaned, but likely belongs in some repo/store module
+		fx.Provide(modules.Datastore(cfg.Backup.DisableMetadataLog)),
+	)
+
+	// node.defaults
+	fxProviders = append(fxProviders, node.FxDefaultsProviders)
+	mergeInvokes(fxInvokes, node.FxDefaultsInvokers())
+
+	// node.Base()
+	fxProviders = append(
+		fxProviders,
+		//node.FxLibP2PProviders,
+		node.FxChainNodeProviders)
+	//mergeInvokes(fxInvokes, node.FxLibP2PInvokers())
+	mergeInvokes(fxInvokes, node.FxChainNodeInvokers())
+
+	// node.Repo()
 	//// providers and invokes
 	fxProviders = append(
 		fxProviders,
-		node.FxRepoProviders(lockedRepo, cfg))
+		//node.FxRepoProviders(lockedRepo, cfg),
+		node.FxConfigFullNodeProviders(cfg),
+	)
 	mergeInvokes(fxInvokes, node.FxConfigCommonInvokers(&cfg.Common))
 
 	// misc providers
@@ -323,7 +292,22 @@ func legacyDaemonAction(cctx *cli.Context) error {
 	//	node.Unset(new(*peermgr.PeerMgr)),
 	//),
 
-	app := fx.New(fx.Options(fxProviders...), fx.Options(fxInvokes...))
+	// Debugging of the dependency graph
+	fxInvokes = append(fxInvokes,
+		fx.Invoke(
+			func(dotGraph fx.DotGraph) {
+				os.WriteFile("fx.dot", []byte(dotGraph), 0660)
+			}),
+	)
+
+	fxProviders = append(fxProviders, startupModule(cctx, r, lockedRepo, cfg))
+
+	var rpcStopper node.StopFunc
+	app := fx.New(
+		fx.Options(fxProviders...),
+		fx.Options(fxInvokes...),
+		fx.Populate(&rpcStopper),
+	)
 
 	// TODO: we probably should have a 'firewall' for Closing signal
 	//  on this context, and implement closing logic through lifecycles
@@ -335,38 +319,11 @@ func legacyDaemonAction(cctx *cli.Context) error {
 	//// END REFACTORED NODE CONSTRUCTION //
 	////////////////////////////////////////
 
-	if cctx.String("import-key") != "" {
-		if err := importKey(ctx, api, cctx.String("import-key")); err != nil {
-			log.Errorf("importing key failed: %+v", err)
-		}
-	}
-
-	endpoint, err := r.APIEndpoint()
-	if err != nil {
-		return xerrors.Errorf("getting api endpoint: %w", err)
-	}
-
-	//
-	// Instantiate JSON-RPC endpoint.
-	// ----
-
-	// Populate JSON-RPC options.
-	serverOptions := []jsonrpc.ServerOption{jsonrpc.WithServerErrors(lapi.RPCErrors)}
-	if maxRequestSize := cctx.Int("api-max-req-size"); maxRequestSize != 0 {
-		serverOptions = append(serverOptions, jsonrpc.WithMaxRequestSize(int64(maxRequestSize)))
-	}
-
-	// Instantiate the full node handler.
-	h, err := node.FullNodeHandler(api, true, serverOptions...)
-	if err != nil {
-		return fmt.Errorf("failed to instantiate rpc handler: %s", err)
-	}
-
-	// Serve the RPC.
-	rpcStopper, err := node.ServeRPC(h, "lotus-daemon", endpoint)
-	if err != nil {
-		return fmt.Errorf("failed to start json-rpc endpoint: %s", err)
-	}
+	//if cctx.String("import-key") != "" {
+	//	if err := importKey(ctx, api, cctx.String("import-key")); err != nil {
+	//		log.Errorf("importing key failed: %+v", err)
+	//	}
+	//}
 
 	// Monitor for shutdown.
 	finishCh := node.MonitorShutdown(shutdownChan,
@@ -377,6 +334,60 @@ func legacyDaemonAction(cctx *cli.Context) error {
 
 	// TODO: properly parse api endpoint (or make it a URL)
 	return nil
+}
+
+var repoModule = func(lr repo.LockedRepo) fx.Option {
+	return fx.Module("repo",
+		fx.Provide(
+			modules.LockedRepo(lr),
+			modules.KeyStore,
+			modules.APISecret,
+		),
+	)
+}
+
+func startupModule(cctx *cli.Context, r *repo.FsRepo, lr repo.LockedRepo, cfg *config.FullNode) fx.Option {
+	return fx.Module("startup",
+		fx.Provide(newFullNodeHandler),
+		fx.Supply(newServerOptions(cctx.Int("api-max-req-size"))),
+		fx.Supply(r),
+		fx.Supply(lr),
+		fx.Provide(
+			func(api impl.FullNodeAPI, lr repo.LockedRepo, e dtypes.APIEndpoint) lapi.FullNode {
+				lr.SetAPIEndpoint(e)
+				return &api
+			},
+		),
+		fx.Provide(
+			func() (dtypes.APIEndpoint, error) {
+				return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
+			},
+		),
+		fx.Provide(startRPCServer),
+		//func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
+		//	return lr.SetAPIEndpoint(e)
+		//},
+	)
+}
+
+func newServerOptions(maxRequestSize int) []jsonrpc.ServerOption {
+	serverOptions := []jsonrpc.ServerOption{jsonrpc.WithServerErrors(lapi.RPCErrors)}
+	if maxRequestSize > 0 {
+		serverOptions = append(serverOptions, jsonrpc.WithMaxRequestSize(int64(maxRequestSize)))
+	}
+	return serverOptions
+}
+
+func newFullNodeHandler(api lapi.FullNode, serverOptions []jsonrpc.ServerOption) (http.Handler, error) {
+	return node.FullNodeHandler(api, true, serverOptions...)
+}
+
+func startRPCServer(h http.Handler, repo *repo.FsRepo) (node.StopFunc, error) {
+	endpoint, err := repo.APIEndpoint()
+	if err != nil {
+		return nil, xerrors.Errorf("getting api endpoint: %w", err)
+	}
+	return node.ServeRPC(h, "lotus-daemon", endpoint)
 }
 
 func mergeInvokes(into []fx.Option, from []fx.Option) {
