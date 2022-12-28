@@ -47,7 +47,7 @@ issues:
       linters:
         - errcheck
 
-    - path: node/modules/lp2p
+    - path: node/fx/lp2p
       linters:
         - golint
 

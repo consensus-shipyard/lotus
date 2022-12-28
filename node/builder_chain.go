@@ -49,7 +49,7 @@ var FxChainNodeProviders = fx.Options(
 	fx.Provide(modules.UpgradeSchedule),
 	fx.Provide(modules.NetworkName),
 	// this one is only checking if genesis has already been provided
-	//fx.Provide(modules.ErrorGenesis),
+	//fx.Provide(fx.ErrorGenesis),
 	fx.Provide(modules.SetGenesis),
 	fx.Provide(modules.RandomSchedule),
 
@@ -106,7 +106,7 @@ var FxChainNodeProviders = fx.Options(
 
 	// Shared graphsync (markets, serving chain)
 	// already provided later
-	//fx.Provide(modules.Graphsync(config.DefaultFullNode().Client.SimultaneousTransfersForStorage, config.DefaultFullNode().Client.SimultaneousTransfersForRetrieval)),
+	//fx.Provide(fx.Graphsync(config.DefaultFullNode().Client.SimultaneousTransfersForStorage, config.DefaultFullNode().Client.SimultaneousTransfersForRetrieval)),
 
 	// Service: Wallet
 	fx.Provide(messagesigner.NewMessageSigner),
@@ -139,7 +139,7 @@ var FxChainNodeProviders = fx.Options(
 	fx.Provide(modules.RetrievalResolver),
 	fx.Provide(modules.RetrievalBlockstoreAccessor),
 	// already provided later
-	//fx.Provide(modules.RetrievalClient(false)),
+	//fx.Provide(fx.RetrievalClient(false)),
 	fx.Provide(modules.NewClientGraphsyncDataTransfer),
 
 	// Markets (storage)
@@ -155,7 +155,7 @@ var FxChainNodeProviders = fx.Options(
 	// Lite node API
 	//ApplyIf(isLiteNode,
 	//	Override(new(messagepool.Provider), messagepool.NewProviderLite),
-	//	Override(new(messagesigner.MpoolNonceAPI), From(new(modules.MpoolNonceAPI))),
+	//	Override(new(messagesigner.MpoolNonceAPI), From(new(fx.MpoolNonceAPI))),
 	//	Override(new(full.ChainModuleAPI), From(new(api.Gateway))),
 	//	Override(new(full.GasModuleAPI), From(new(api.Gateway))),
 	//	Override(new(full.MpoolModuleAPI), From(new(api.Gateway))),
@@ -292,7 +292,7 @@ var ChainNode = Options(
 	Override(new(api.Wallet), From(new(wallet.MultiWallet))),
 
 	// Service: Payment channels
-	//Override(new(paychmgr.PaychAPI), From(new(modules.PaychAPI))),
+	//Override(new(paychmgr.PaychAPI), From(new(fx.PaychAPI))),
 	Override(new(*paychmgr.Store), modules.NewPaychStore),
 	Override(new(*paychmgr.Manager), modules.NewManager),
 	Override(HandlePaymentChannelManagerKey, modules.HandlePaychManager),

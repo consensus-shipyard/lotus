@@ -3,29 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-paramfetch"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/consensus"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
-	"github.com/filecoin-project/lotus/chain/consensus/mir"
-	"github.com/filecoin-project/lotus/chain/stmgr"
-	"github.com/filecoin-project/lotus/chain/store"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/eudico/fxmodules"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/lotus/node"
 	"github.com/filecoin-project/lotus/node/config"
-	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/node/repo"
 	metricsprom "github.com/ipfs/go-metrics-prometheus"
 	"github.com/mitchellh/go-homedir"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/plugin/runmetrics"
 	"go.opencensus.io/stats"
@@ -33,7 +24,6 @@ import (
 	"go.opencensus.io/tag"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
-	"net/http"
 	"os"
 	"runtime/pprof"
 )
@@ -204,15 +194,6 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 		log.Warnf("unable to inject prometheus ipfs/go-metrics exporter; some metrics will be unavailable; err: %s", err)
 	}
 
-	//////////////////////////////////////////
-	//// BEGIN REFACTORED NODE CONSTRUCTION //
-	//////////////////////////////////////////
-	fxProviders := make([]fx.Option, 0)
-	fxInvokes := make([]fx.Option, 28)
-	for i := range fxInvokes {
-		fxInvokes[i] = fx.Options()
-	}
-
 	// repo setup
 	lockedRepo, err := r.Lock(repo.FullNode)
 	if err != nil {
@@ -227,86 +208,32 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 		panic("invalid config from repo")
 	}
 
-	// Refactored into modules
-	var consensusModule fx.Option
-	if build.IsMirConsensus() {
-		consensusModule = mir.Module
-	} else {
-		consensusModule = fx.Provide(
-			fx.Provide(filcns.NewFilecoinExpectedConsensus),
-			fx.Supply(store.WeightFunc(filcns.Weight)),
-			fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(filcns.RewardFunc), fx.As(new(stmgr.Executor)))),
-		)
-	}
-
-	fxProviders = append(fxProviders,
-		lp2p.Module(&cfg.Common),
-		repoModule(lockedRepo),
-		consensusModule,
+	fxProviders := fx.Options(
+		fxmodules.Fullnode(cctx),
+		fxmodules.Libp2p(&cfg.Common),
+		fxmodules.Repository(lockedRepo),
+		fxmodules.Blockstore(cfg),
+		fxmodules.Consensus(fxmodules.MirConsensus),
+		fxmodules.RpcServer(cctx, r, lockedRepo, cfg),
 		// orphaned, but likely belongs in some repo/store module
 		fx.Provide(modules.Datastore(cfg.Backup.DisableMetadataLog)),
-	)
-
-	// node.defaults
-	fxProviders = append(fxProviders, node.FxDefaultsProviders)
-	mergeInvokes(fxInvokes, node.FxDefaultsInvokers())
-
-	// node.Base()
-	fxProviders = append(
-		fxProviders,
-		//node.FxLibP2PProviders,
-		node.FxChainNodeProviders)
-	//mergeInvokes(fxInvokes, node.FxLibP2PInvokers())
-	mergeInvokes(fxInvokes, node.FxChainNodeInvokers())
-
-	// node.Repo()
-	//// providers and invokes
-	fxProviders = append(
-		fxProviders,
-		//node.FxRepoProviders(lockedRepo, cfg),
-		node.FxConfigFullNodeProviders(cfg),
-	)
-	mergeInvokes(fxInvokes, node.FxConfigCommonInvokers(&cfg.Common))
-
-	// misc providers
-	fxProviders = append(
-		fxProviders,
+		// misc providers
 		fx.Supply(isBootstrapper),
 		fx.Supply(dtypes.ShutdownChan(shutdownChan)),
 		genesis,
 		liteModeDeps,
 	)
 
-	//TODO(hmz): leave these for later in the refactoring
-	//node.ApplyIf(func(s *node.Settings) bool { return cctx.IsSet("api") },
-	//	node.Override(node.SetApiEndpointKey, func(lr repo.LockedRepo) error {
-	//		apima, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1/tcp/" +
-	//			cctx.String("api"))
-	//		if err != nil {
-	//			return err
-	//		}
-	//		return lr.SetAPIEndpoint(apima)
-	//	})),
-	//node.ApplyIf(func(s *node.Settings) bool { return !cctx.Bool("bootstrap") },
-	//	node.Unset(node.RunPeerMgrKey),
-	//	node.Unset(new(*peermgr.PeerMgr)),
-	//),
-
-	// Debugging of the dependency graph
-	fxInvokes = append(fxInvokes,
+	var rpcStopper node.StopFunc
+	app := fx.New(
+		fxProviders,
+		fx.Populate(&rpcStopper),
+		fxmodules.Invokes(&cfg.Common, cctx.Bool("bootstrap")),
+		// Debugging of the dependency graph
 		fx.Invoke(
 			func(dotGraph fx.DotGraph) {
 				os.WriteFile("fx.dot", []byte(dotGraph), 0660)
 			}),
-	)
-
-	fxProviders = append(fxProviders, startupModule(cctx, r, lockedRepo, cfg))
-
-	var rpcStopper node.StopFunc
-	app := fx.New(
-		fx.Options(fxProviders...),
-		fx.Options(fxInvokes...),
-		fx.Populate(&rpcStopper),
 	)
 
 	// TODO: we probably should have a 'firewall' for Closing signal
@@ -315,15 +242,6 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 	if err := app.Start(ctx); err != nil {
 		return xerrors.Errorf("starting node: %w", err)
 	}
-	////////////////////////////////////////
-	//// END REFACTORED NODE CONSTRUCTION //
-	////////////////////////////////////////
-
-	//if cctx.String("import-key") != "" {
-	//	if err := importKey(ctx, api, cctx.String("import-key")); err != nil {
-	//		log.Errorf("importing key failed: %+v", err)
-	//	}
-	//}
 
 	// Monitor for shutdown.
 	finishCh := node.MonitorShutdown(shutdownChan,
@@ -334,70 +252,4 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 
 	// TODO: properly parse api endpoint (or make it a URL)
 	return nil
-}
-
-var repoModule = func(lr repo.LockedRepo) fx.Option {
-	return fx.Module("repo",
-		fx.Provide(
-			modules.LockedRepo(lr),
-			modules.KeyStore,
-			modules.APISecret,
-		),
-	)
-}
-
-func startupModule(cctx *cli.Context, r *repo.FsRepo, lr repo.LockedRepo, cfg *config.FullNode) fx.Option {
-	return fx.Module("startup",
-		fx.Provide(newFullNodeHandler),
-		fx.Supply(newServerOptions(cctx.Int("api-max-req-size"))),
-		fx.Supply(r),
-		fx.Supply(lr),
-		fx.Provide(
-			func(api impl.FullNodeAPI, lr repo.LockedRepo, e dtypes.APIEndpoint) lapi.FullNode {
-				lr.SetAPIEndpoint(e)
-				return &api
-			},
-		),
-		fx.Provide(
-			func() (dtypes.APIEndpoint, error) {
-				return multiaddr.NewMultiaddr(cfg.API.ListenAddress)
-			},
-		),
-		fx.Provide(startRPCServer),
-		//func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
-		//	return lr.SetAPIEndpoint(e)
-		//},
-	)
-}
-
-func newServerOptions(maxRequestSize int) []jsonrpc.ServerOption {
-	serverOptions := []jsonrpc.ServerOption{jsonrpc.WithServerErrors(lapi.RPCErrors)}
-	if maxRequestSize > 0 {
-		serverOptions = append(serverOptions, jsonrpc.WithMaxRequestSize(int64(maxRequestSize)))
-	}
-	return serverOptions
-}
-
-func newFullNodeHandler(api lapi.FullNode, serverOptions []jsonrpc.ServerOption) (http.Handler, error) {
-	return node.FullNodeHandler(api, true, serverOptions...)
-}
-
-func startRPCServer(h http.Handler, repo *repo.FsRepo) (node.StopFunc, error) {
-	endpoint, err := repo.APIEndpoint()
-	if err != nil {
-		return nil, xerrors.Errorf("getting api endpoint: %w", err)
-	}
-	return node.ServeRPC(h, "lotus-daemon", endpoint)
-}
-
-func mergeInvokes(into []fx.Option, from []fx.Option) {
-	if len(into) != len(from) {
-		panic("failed to merge invokes due to different lengths")
-	}
-
-	for i, invoke := range from {
-		if invoke != nil {
-			into[i] = invoke
-		}
-	}
 }

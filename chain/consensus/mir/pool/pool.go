@@ -17,7 +17,7 @@ type ModuleConfig = types.ModuleConfig
 // All replicas are expected to use identical module parameters.
 type ModuleParams = types.ModuleParams
 
-// DefaultModuleConfig returns a valid module config with default names for all modules.
+// DefaultModuleConfig returns a valid module config with default names for all fx.
 func DefaultModuleConfig() *ModuleConfig {
 	return &ModuleConfig{
 		Self:   "mempool",
@@ -25,7 +25,7 @@ func DefaultModuleConfig() *ModuleConfig {
 	}
 }
 
-// DefaultModuleParams returns a valid module config with default names for all modules.
+// DefaultModuleParams returns a valid module config with default names for all fx.
 func DefaultModuleParams() *ModuleParams {
 	return &ModuleParams{
 		MaxTransactionsInBatch: 512,

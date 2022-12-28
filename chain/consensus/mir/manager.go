@@ -120,7 +120,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 
 	logger := newManagerLogger(mirID)
 
-	// Create Mir modules.
+	// Create Mir fx.
 	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport: %w", err)

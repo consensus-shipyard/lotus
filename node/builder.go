@@ -184,7 +184,6 @@ var FxDefaultsProviders = fx.Options(
 	fx.Provide(modules.OpenFilesystemJournal),
 	fx.Provide(alerting.NewAlertingSystem),
 	fx.Supply(dtypes.NodeStartTime(time.Now())),
-	fx.Provide(modules.MemoryConstraints),
 	fx.Supply(
 		fx.Annotate(
 			metricsi.CtxScope(context.Background(), "lotus"),
@@ -410,18 +409,6 @@ func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 			If(!cfg.Libp2p.DisableNatPortMap, Override(NatPortMapKey, lp2p.NatPortMap)),
 		),
 		Override(new(dtypes.MetadataDS), modules.Datastore(cfg.Backup.DisableMetadataLog)),
-	)
-}
-
-var FxRepoProviders = func(lr repo.LockedRepo, cfg *config.FullNode) fx.Option {
-	return fx.Options(
-		fx.Provide(modules.LockedRepo(lr)),
-
-		fx.Provide(modules.KeyStore),
-
-		fx.Provide(modules.APISecret),
-
-		//FxConfigFullNodeProviders(cfg),
 	)
 }
 

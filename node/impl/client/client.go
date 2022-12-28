@@ -270,7 +270,7 @@ func (a *API) dealStarter(ctx context.Context, params *api.StartDealParams, isSt
 		ClientSignature: *dealProposalSig,
 	}
 	dStream, err := network.NewFromLibp2pHost(a.Host,
-		// params duplicated from .../node/modules/client.go
+		// params duplicated from .../node/fx/client.go
 		// https://github.com/filecoin-project/lotus/pull/5961#discussion_r629768011
 		network.RetryParameters(time.Second, 5*time.Minute, 15, 5),
 	).NewDealStream(ctx, *mi.PeerId)

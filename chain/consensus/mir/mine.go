@@ -44,7 +44,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		return fmt.Errorf("unable to create a manager: %w", err)
 	}
 
-	// Perform cleanup of Node's modules and
+	// Perform cleanup of Node's fx and
 	// ensure that mir is closed when we stop mining.
 	defer m.Stop()
 
