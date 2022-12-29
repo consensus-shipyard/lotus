@@ -1,223 +1,47 @@
 package node
 
 import (
-	"github.com/filecoin-project/go-fil-markets/discovery"
-	discoveryimpl "github.com/filecoin-project/go-fil-markets/discovery/impl"
-	"github.com/filecoin-project/lotus/chain/beacon"
-	"github.com/filecoin-project/lotus/chain/consensus"
-	"github.com/filecoin-project/lotus/chain/consensus/filcns"
-	"github.com/filecoin-project/lotus/chain/gen/slashfilter"
-	rpcstmgr "github.com/filecoin-project/lotus/chain/stmgr/rpc"
-	"github.com/filecoin-project/lotus/chain/store"
-	"github.com/filecoin-project/lotus/lib/peermgr"
-	"github.com/filecoin-project/lotus/node/hello"
-	"github.com/filecoin-project/lotus/paychmgr"
-	"github.com/filecoin-project/lotus/paychmgr/settler"
-	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
-	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"os"
 
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-fil-markets/discovery"
+	discoveryimpl "github.com/filecoin-project/go-fil-markets/discovery/impl"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain"
+	"github.com/filecoin-project/lotus/chain/beacon"
+	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/exchange"
+	"github.com/filecoin-project/lotus/chain/gen/slashfilter"
 	"github.com/filecoin-project/lotus/chain/market"
 	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/stmgr"
+	rpcstmgr "github.com/filecoin-project/lotus/chain/stmgr/rpc"
+	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	ledgerwallet "github.com/filecoin-project/lotus/chain/wallet/ledger"
 	"github.com/filecoin-project/lotus/chain/wallet/remotewallet"
+	"github.com/filecoin-project/lotus/lib/peermgr"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/hello"
 	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/impl/full"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/paychmgr"
+	"github.com/filecoin-project/lotus/paychmgr/settler"
+	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
-
-var FxChainNodeProviders = fx.Options(
-	// Consensus settings
-	fx.Provide(modules.BuiltinDrandConfig),
-	fx.Provide(modules.UpgradeSchedule),
-	fx.Provide(modules.NetworkName),
-	// this one is only checking if genesis has already been provided
-	//fx.Provide(fx.ErrorGenesis),
-	fx.Provide(modules.SetGenesis),
-	fx.Provide(modules.RandomSchedule),
-
-	// Network bootstrap
-	fx.Provide(modules.BuiltinBootstrap),
-	fx.Provide(modules.DrandBootstrap),
-
-	// Consensus: crypto dependencies
-	fx.Supply(
-		fx.Annotate(
-			ffiwrapper.ProofVerifier,
-			fx.As(new(storiface.Verifier)),
-		),
-	),
-	fx.Supply(
-		fx.Annotate(
-			ffiwrapper.ProofProver,
-			fx.As(new(storiface.Prover)),
-		),
-	),
-
-	// Consensus: LegacyVM
-	fx.Provide(vm.Syscalls),
-
-	// Consensus: Chain storage/access
-	fx.Provide(chain.LoadGenesis),
-	//fx.Supply(filcns.Weight),
-	fx.Provide(chain.NewBadBlockCache),
-	fx.Provide(modules.ChainStore),
-	fx.Provide(modules.StateManager),
-	fx.Provide(modules.ChainBitswap),
-	fx.Provide(modules.ChainBlockService), // todo: unused
-
-	// Consensus: Chain sync
-
-	// We don't want the SyncManagerCtor to be used as an fx constructor, but rather as a value.
-	// It will be called implicitly by the Syncer constructor.
-	fx.Supply(chain.SyncManagerCtor(chain.NewSyncManager)),
-	fx.Provide(modules.NewSyncer),
-	fx.Provide(exchange.NewClient),
-
-	// Chain networking
-	fx.Provide(hello.NewHelloService),
-	fx.Provide(exchange.NewServer),
-	fx.Provide(peermgr.NewPeerMgr),
-
-	// Chain mining API dependencies
-	fx.Provide(modules.NewSlashFilter),
-
-	// Service: Message Pool
-	fx.Provide(modules.NewDefaultMaxFeeFunc),
-	fx.Provide(modules.MessagePool),
-	fx.Supply(new(dtypes.MpoolLocker)),
-
-	// Shared graphsync (markets, serving chain)
-	// already provided later
-	//fx.Provide(fx.Graphsync(config.DefaultFullNode().Client.SimultaneousTransfersForStorage, config.DefaultFullNode().Client.SimultaneousTransfersForRetrieval)),
-
-	// Service: Wallet
-	fx.Provide(messagesigner.NewMessageSigner),
-	fx.Provide(wallet.NewWallet),
-	fx.Provide(
-		fx.Annotate(
-			wallet.NewWallet,
-			fx.As(new(wallet.Default)),
-		),
-	),
-	fx.Provide(
-		func(multiWallet wallet.MultiWallet) api.Wallet {
-			return &multiWallet
-		},
-	),
-
-	// Service: Payment channels
-	fx.Provide(
-		func(in modules.PaychAPI) paychmgr.PaychAPI {
-			return &in
-		},
-	),
-	fx.Provide(modules.NewPaychStore),
-	fx.Provide(modules.NewManager),
-
-	// Markets (common)
-	fx.Provide(modules.NewLocalDiscovery),
-
-	// Markets (retrieval)
-	fx.Provide(modules.RetrievalResolver),
-	fx.Provide(modules.RetrievalBlockstoreAccessor),
-	// already provided later
-	//fx.Provide(fx.RetrievalClient(false)),
-	fx.Provide(modules.NewClientGraphsyncDataTransfer),
-
-	// Markets (storage)
-	fx.Provide(market.NewFundManager),
-	fx.Provide(modules.NewClientDatastore),
-	fx.Provide(modules.StorageBlockstoreAccessor),
-	fx.Provide(modules.StorageClient),
-	fx.Provide(storageadapter.NewClientNodeAdapter),
-
-	fx.Provide(full.NewGasPriceCache),
-
-	// TODO: do this later
-	// Lite node API
-	//ApplyIf(isLiteNode,
-	//	Override(new(messagepool.Provider), messagepool.NewProviderLite),
-	//	Override(new(messagesigner.MpoolNonceAPI), From(new(fx.MpoolNonceAPI))),
-	//	Override(new(full.ChainModuleAPI), From(new(api.Gateway))),
-	//	Override(new(full.GasModuleAPI), From(new(api.Gateway))),
-	//	Override(new(full.MpoolModuleAPI), From(new(api.Gateway))),
-	//	Override(new(full.StateModuleAPI), From(new(api.Gateway))),
-	//	Override(new(stmgr.StateManagerAPI), rpcstmgr.NewRPCStateManager),
-	//),
-
-	// Full node API / service startup
-	//ApplyIf(isFullNode,
-	fx.Provide(messagepool.NewProvider),
-	fx.Provide(
-		fx.Annotate(
-			From(new(*messagepool.MessagePool)),
-			fx.As(new(messagesigner.MpoolNonceAPI)),
-		),
-	),
-	fx.Provide(
-		func(in full.ChainModule) full.ChainModuleAPI {
-			return &in
-		},
-	),
-	fx.Provide(
-		func(in full.GasModule) full.GasModuleAPI {
-			return &in
-		},
-	),
-	fx.Provide(
-		func(in full.MpoolModule) full.MpoolModuleAPI {
-			return &in
-		},
-	),
-	fx.Provide(
-		func(in full.StateModule) full.StateModuleAPI {
-			return &in
-		},
-	),
-	fx.Provide(
-		fx.Annotate(
-			From(new(*stmgr.StateManager)),
-			fx.As(new(stmgr.StateManagerAPI)),
-		),
-	),
-
-	// We're omitting Mir providers and invokers because they are a verbatim
-	// copy of above (why???)
-)
-
-func FxChainNodeInvokers() []fx.Option {
-	invokers := make([]fx.Option, _nInvokes)
-	invokers[SetGenesisKey] = fx.Invoke(modules.DoSetGenesis)
-	invokers[HandlePaymentChannelManagerKey] = fx.Invoke(modules.HandlePaychManager)
-	invokers[SettlePaymentChannelsKey] = fx.Invoke(settler.SettlePaymentChannels)
-	invokers[HandleMigrateClientFundsKey] = fx.Invoke(modules.HandleMigrateClientFunds)
-	invokers[RelayIndexerMessagesKey] = fx.Invoke(modules.RelayIndexerMessages)
-	invokers[RunHelloKey] = fx.Invoke(modules.RunHello)
-	invokers[RunChainExchangeKey] = fx.Invoke(modules.RunChainExchange)
-	invokers[RunPeerMgrKey] = fx.Invoke(modules.RunPeerMgr)
-	invokers[HandleIncomingMessagesKey] = fx.Invoke(modules.HandleIncomingMessages)
-	// TODO(hmz): this invoker shouldn't be created if MirValidator
-	invokers[HandleIncomingBlocksKey] = fx.Invoke(modules.HandleIncomingBlocks)
-	return invokers
-}
 
 // Chain node provides access to the Filecoin blockchain, by setting up a full
 // validator node, or by delegating some actions to other nodes (lite mode)
@@ -269,11 +93,6 @@ var ChainNode = Options(
 	Override(new(exchange.Server), exchange.NewServer),
 	Override(new(*peermgr.PeerMgr), peermgr.NewPeerMgr),
 
-	// Chain networking
-	Override(new(*hello.Service), hello.NewHelloService),
-	Override(new(exchange.Server), exchange.NewServer),
-	Override(new(*peermgr.PeerMgr), peermgr.NewPeerMgr),
-
 	// Chain mining API dependencies
 	Override(new(*slashfilter.SlashFilter), modules.NewSlashFilter),
 
@@ -292,7 +111,7 @@ var ChainNode = Options(
 	Override(new(api.Wallet), From(new(wallet.MultiWallet))),
 
 	// Service: Payment channels
-	//Override(new(paychmgr.PaychAPI), From(new(fx.PaychAPI))),
+	Override(new(paychmgr.PaychAPI), From(new(modules.PaychAPI))),
 	Override(new(*paychmgr.Store), modules.NewPaychStore),
 	Override(new(*paychmgr.Manager), modules.NewManager),
 	Override(HandlePaymentChannelManagerKey, modules.HandlePaychManager),
@@ -347,8 +166,8 @@ var ChainNode = Options(
 		Override(HandleIncomingBlocksKey, modules.HandleIncomingBlocks),
 	),
 
-	//// Mir validators don't handle incoming blocks through pubsub.
-	//// all that is handled by Mir.
+	// Mir validators don't handle incoming blocks through pubsub.
+	// all that is handled by Mir.
 	ApplyIf(isMirvalidator,
 		Override(new(messagepool.Provider), messagepool.NewProvider),
 		Override(new(messagesigner.MpoolNonceAPI), From(new(*messagepool.MessagePool))),
@@ -362,54 +181,9 @@ var ChainNode = Options(
 		Override(RunChainExchangeKey, modules.RunChainExchange),
 		Override(RunPeerMgrKey, modules.RunPeerMgr),
 		Override(HandleIncomingMessagesKey, modules.HandleIncomingMessages),
-		// Override(HandleIncomingBlocksKey, Modules.HandleIncomingBlocks),
+		// Override(HandleIncomingBlocksKey, modules.HandleIncomingBlocks),
 	),
 )
-
-func FxConfigFullNodeProviders(cfg *config.FullNode) fx.Option {
-	return fx.Options(
-		//FxConfigCommonProviders(&cfg.Common),
-		fx.Provide(modules.UniversalBlockstore),
-
-		// TODO(hmz): assuming cfg.Chainstore.EnableSplitstore == false
-		// check if this should always be the case for Eudico
-		fx.Provide(fx.Annotate(modules.ChainFlatBlockstore, fx.As(new(dtypes.BasicChainBlockstore)))),
-		fx.Provide(fx.Annotate(modules.StateFlatBlockstore, fx.As(new(dtypes.BasicStateBlockstore)))),
-		fx.Provide(
-			func(blockstore dtypes.UniversalBlockstore) dtypes.BaseBlockstore {
-				return (dtypes.BaseBlockstore)(blockstore)
-			},
-		),
-		fx.Provide(
-			func(blockstore dtypes.UniversalBlockstore) dtypes.ExposedBlockstore {
-				return (dtypes.ExposedBlockstore)(blockstore)
-			},
-		),
-		fx.Provide(modules.NoopGCReferenceProtector),
-
-		fx.Provide(
-			func(blockstore dtypes.BasicChainBlockstore) dtypes.ChainBlockstore {
-				return (dtypes.ChainBlockstore)(blockstore)
-			},
-		),
-		fx.Provide(
-			func(blockstore dtypes.BasicStateBlockstore) dtypes.StateBlockstore {
-				return (dtypes.StateBlockstore)(blockstore)
-			},
-		),
-
-		fx.Provide(modules.ClientImportMgr),
-
-		fx.Provide(modules.ClientBlockstore),
-
-		fx.Provide(modules.Graphsync(cfg.Client.SimultaneousTransfersForStorage, cfg.Client.SimultaneousTransfersForRetrieval)),
-
-		fx.Provide(modules.RetrievalClient(cfg.Client.OffChainRetrieval)),
-
-		// then assuming that cfg.Client.UseIpfs, cfg.Wallet.RemoteBackend, cfg.Wallet.EnableLedger,
-		// cfg.Wallet.DisableLocal are all false
-	)
-}
 
 func ConfigFullNode(c interface{}) Option {
 	cfg, ok := c.(*config.FullNode)
@@ -500,20 +274,17 @@ func MirValidator(enable bool) FullOption {
 	}
 }
 
-// hmz: Checking that impl.FullNodeAPI implements api.FullNode
-var _ api.FullNode = (*impl.FullNodeAPI)(nil)
-
 func FullAPI(out *api.FullNode, fopts ...FullOption) Option {
 	return Options(
 		func(s *Settings) error {
-			s.NodeType = repo.FullNode
-			s.EnableLibp2pNode = true
+			s.nodeType = repo.FullNode
+			s.enableLibp2pNode = true
 			return nil
 		},
 		Options(fopts...),
 		func(s *Settings) error {
 			resAPI := &impl.FullNodeAPI{}
-			s.Invokes[ExtractApiKey] = fx.Populate(resAPI)
+			s.invokes[ExtractApiKey] = fx.Populate(resAPI)
 			*out = resAPI
 			return nil
 		},

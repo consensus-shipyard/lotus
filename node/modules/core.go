@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	log         = logging.Logger("fx")
+	log         = logging.Logger("modules")
 	logWatchdog = logging.Logger("watchdog")
 )
 

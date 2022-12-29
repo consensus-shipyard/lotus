@@ -3,25 +3,20 @@ package node
 import (
 	"context"
 	"errors"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/journal"
-	"github.com/filecoin-project/lotus/node/impl/net"
-	"github.com/filecoin-project/lotus/storage/paths"
-	"github.com/filecoin-project/lotus/system"
-	metricsi "github.com/ipfs/go-metrics-interface"
-	record "github.com/libp2p/go-libp2p-record"
-	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"time"
 
 	logging "github.com/ipfs/go-log/v2"
+	metricsi "github.com/ipfs/go-metrics-interface"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	record "github.com/libp2p/go-libp2p-record"
 	ci "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/net/conngater"
 	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -29,6 +24,8 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/beacon"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/journal/alerting"
 	"github.com/filecoin-project/lotus/lib/lotuslog"
 	"github.com/filecoin-project/lotus/lib/peermgr"
@@ -37,18 +34,21 @@ import (
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/impl/common"
+	"github.com/filecoin-project/lotus/node/impl/net"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/filecoin-project/lotus/storage/paths"
+	"github.com/filecoin-project/lotus/system"
 )
 
 //nolint:deadcode,varcheck
 var log = logging.Logger("builder")
 
-// special is a type used to give keys to Modules which
+// special is a type used to give keys to modules which
 //
 //	can't really be identified by the returned type
 type special struct{ id int }
@@ -128,25 +128,25 @@ const (
 )
 
 type Settings struct {
-	// Modules is a map of constructors for DI
+	// modules is a map of constructors for DI
 	//
 	// In most cases the index will be a reflect. Type of element returned by
 	// the constructor, but for some 'constructors' it's hard to specify what's
 	// the return type should be (or the constructor returns fx group)
-	Modules map[interface{}]fx.Option
+	modules map[interface{}]fx.Option
 
-	// Invokes are separate from Modules as they can't be referenced by return
+	// invokes are separate from modules as they can't be referenced by return
 	// type, and must be applied in correct order
-	Invokes []fx.Option
+	invokes []fx.Option
 
-	NodeType repo.RepoType
+	nodeType repo.RepoType
 
 	Base         bool // Base option applied
 	Config       bool // Config option applied
 	Lite         bool // Start node in "lite" mode
 	MirValidator bool // Start full node for mir validator.
 
-	EnableLibp2pNode bool
+	enableLibp2pNode bool
 }
 
 // Basic lotus-app services
@@ -178,85 +178,6 @@ func defaults() []Option {
 }
 
 var Defaults = defaults
-
-var FxDefaultsProviders = fx.Options(
-	fx.Provide(journal.EnvDisabledEvents),
-	fx.Provide(modules.OpenFilesystemJournal),
-	fx.Provide(alerting.NewAlertingSystem),
-	fx.Supply(dtypes.NodeStartTime(time.Now())),
-	fx.Supply(
-		fx.Annotate(
-			metricsi.CtxScope(context.Background(), "lotus"),
-			fx.As(new(helpers.MetricsCtx)),
-		),
-	),
-	fx.Provide(func(lc fx.Lifecycle, mctx helpers.MetricsCtx) context.Context {
-		return helpers.LifecycleCtx(mctx, lc)
-	}),
-)
-
-func FxDefaultsInvokers() []fx.Option {
-	invokers := make([]fx.Option, _nInvokes)
-	invokers[CheckFDLimit] = fx.Invoke(modules.CheckFdLimit(build.DefaultFDLimit))
-	invokers[InitMemoryWatchdog] = fx.Invoke(modules.MemoryWatchdog)
-	return invokers
-}
-
-var FxLibP2PProviders = fx.Options(
-	// Host dependencies
-	fx.Provide(lp2p.Peerstore),
-
-	// Host settings
-	fx.Provide(lp2p.DefaultTransports),
-	fx.Provide(lp2p.SmuxTransport()),
-	fx.Provide(lp2p.NoRelay()),
-	fx.Provide(lp2p.Security(true, false)),
-
-	// Host
-	fx.Provide(lp2p.Host),
-	fx.Provide(lp2p.RoutedHost),
-	fx.Provide(lp2p.DHTRouting(dht.ModeAuto)),
-
-	fx.Provide(lp2p.DiscoveryHandler),
-
-	// Routing
-	fx.Provide(modules.RecordValidator),
-	fx.Provide(lp2p.BaseRouting),
-	fx.Provide(lp2p.Routing),
-
-	// Services
-	fx.Provide(lp2p.BandwidthCounter),
-	fx.Provide(lp2p.AutoNATService),
-
-	// Services (pubsub)
-	fx.Provide(lp2p.ScoreKeeper),
-	// these are already provided later
-	//fx.Provide(lp2p.GossipSub),
-	//fx.Provide(func(bs dtypes.Bootstrapper) *config.Pubsub {
-	//	return &config.Pubsub{
-	//		Bootstrapper: bool(bs),
-	//	}
-	//}),
-
-	// Services (connection management)
-	// already provided later
-	//fx.Provide(lp2p.ConnectionManager(50, 200, 20*time.Second, nil)),
-	fx.Provide(lp2p.ConnGater),
-	fx.Provide(lp2p.ConnGaterOption),
-
-	// Services (resource management)
-	// already provided later
-	//fx.Provide(lp2p.ResourceManager(200)),
-	fx.Provide(lp2p.ResourceManagerOption),
-)
-
-func FxLibP2PInvokers() []fx.Option {
-	invokers := make([]fx.Option, _nInvokes)
-	// Host dependencies
-	invokers[PstoreAddSelfKeysKey] = fx.Invoke(lp2p.PstoreAddSelfKeys)
-	invokers[StartListeningKey] = fx.Invoke(lp2p.StartListening(config.DefaultFullNode().Libp2p.ListenAddresses))
-	return invokers
-}
 
 var LibP2P = Options(
 	// Host config
@@ -310,18 +231,18 @@ var LibP2P = Options(
 )
 
 func IsType(t repo.RepoType) func(s *Settings) bool {
-	return func(s *Settings) bool { return s.NodeType == t }
+	return func(s *Settings) bool { return s.nodeType == t }
 }
 
-func isFullOrLiteNode(s *Settings) bool { return s.NodeType == repo.FullNode }
+func isFullOrLiteNode(s *Settings) bool { return s.nodeType == repo.FullNode }
 func isFullNode(s *Settings) bool {
-	return s.NodeType == repo.FullNode && !s.Lite && !s.MirValidator
+	return s.nodeType == repo.FullNode && !s.Lite && !s.MirValidator
 }
 func isLiteNode(s *Settings) bool {
-	return s.NodeType == repo.FullNode && s.Lite
+	return s.nodeType == repo.FullNode && s.Lite
 }
 func isMirvalidator(s *Settings) bool {
-	return s.NodeType == repo.FullNode && s.MirValidator
+	return s.nodeType == repo.FullNode && s.MirValidator
 }
 
 func Base() Option {
@@ -330,34 +251,12 @@ func Base() Option {
 		ApplyIf(func(s *Settings) bool { return s.Config },
 			Error(errors.New("the Base() option must be set before Config option")),
 		),
-		//ApplyIf(func(s *Settings) bool { return s.EnableLibp2pNode },
-		//	LibP2P,
-		//),
+		ApplyIf(func(s *Settings) bool { return s.enableLibp2pNode },
+			LibP2P,
+		),
 		ApplyIf(isFullOrLiteNode, ChainNode),
 		ApplyIf(IsType(repo.StorageMiner), MinerNode),
 	)
-}
-
-func FxConfigCommonProviders(cfg *config.Common) fx.Option {
-	// setup logging early
-	lotuslog.SetLevelsFromConfig(cfg.Logging.SubsystemLevels)
-
-	options := fx.Options(
-		fx.Provide(modules.Datastore(cfg.Backup.DisableMetadataLog)),
-	)
-
-	return options
-}
-
-func FxConfigCommonInvokers(cfg *config.Common) []fx.Option {
-	invokers := make([]fx.Option, _nInvokes)
-	//invokers[SetApiEndpointKey] = fx.Invoke(
-	//	func(lr repo.LockedRepo, e dtypes.APIEndpoint) error {
-	//		return lr.SetAPIEndpoint(e)
-	//	},
-	//)
-	invokers[StartListeningKey] = fx.Invoke(lp2p.StartListening(cfg.Libp2p.ListenAddresses))
-	return invokers
 }
 
 // Config sets up constructors based on the provided Config
@@ -414,7 +313,7 @@ func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 
 func Repo(r repo.Repo) Option {
 	return func(settings *Settings) error {
-		lr, err := r.Lock(settings.NodeType)
+		lr, err := r.Lock(settings.nodeType)
 		if err != nil {
 			return err
 		}
@@ -441,11 +340,55 @@ func Repo(r repo.Repo) Option {
 
 type StopFunc func(context.Context) error
 
+func ConvertToFxOptions(opts ...Option) (fx.Option, error) {
+	settings := Settings{
+		modules: map[interface{}]fx.Option{},
+		invokes: make([]fx.Option, _nInvokes),
+	}
+
+	// apply module options in the right order
+	if err := Options(opts...)(&settings); err != nil {
+		return nil, xerrors.Errorf("applying node options failed: %w", err)
+	}
+
+	// gather constructors for fx.Options
+	ctors := make([]fx.Option, 0, len(settings.modules))
+	for _, opt := range settings.modules {
+		ctors = append(ctors, opt)
+	}
+
+	// fill holes in invokes for use in fx.Options
+	for i, opt := range settings.invokes {
+		if opt == nil {
+			settings.invokes[i] = fx.Options()
+		}
+	}
+
+	return fx.Options(
+		fx.Options(ctors...),
+		fx.Options(settings.invokes...),
+	), nil
+}
+
+func NewFromFxOptions(ctx context.Context, options fx.Option) (StopFunc, error) {
+	app := fx.New(options)
+
+	// TODO: we probably should have a 'firewall' for Closing signal
+	//  on this context, and implement closing logic through lifecycles
+	//  correctly
+	if err := app.Start(ctx); err != nil {
+		// comment fx.NopLogger few lines above for easier debugging
+		return nil, xerrors.Errorf("starting node: %w", err)
+	}
+
+	return app.Stop, nil
+}
+
 // New builds and starts new Filecoin node
 func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 	settings := Settings{
-		Modules: map[interface{}]fx.Option{},
-		Invokes: make([]fx.Option, _nInvokes),
+		modules: map[interface{}]fx.Option{},
+		invokes: make([]fx.Option, _nInvokes),
 	}
 
 	// apply module options in the right order
@@ -454,21 +397,21 @@ func New(ctx context.Context, opts ...Option) (StopFunc, error) {
 	}
 
 	// gather constructors for fx.Options
-	ctors := make([]fx.Option, 0, len(settings.Modules))
-	for _, opt := range settings.Modules {
+	ctors := make([]fx.Option, 0, len(settings.modules))
+	for _, opt := range settings.modules {
 		ctors = append(ctors, opt)
 	}
 
-	// fill holes in Invokes for use in fx.Options
-	for i, opt := range settings.Invokes {
+	// fill holes in invokes for use in fx.Options
+	for i, opt := range settings.invokes {
 		if opt == nil {
-			settings.Invokes[i] = fx.Options()
+			settings.invokes[i] = fx.Options()
 		}
 	}
 
 	app := fx.New(
 		fx.Options(ctors...),
-		fx.Options(settings.Invokes...),
+		fx.Options(settings.invokes...),
 
 		fx.NopLogger,
 	)
@@ -499,21 +442,21 @@ func Test() Option {
 
 func WithRepoType(repoType repo.RepoType) func(s *Settings) error {
 	return func(s *Settings) error {
-		s.NodeType = repoType
+		s.nodeType = repoType
 		return nil
 	}
 }
 
 func WithEnableLibp2pNode(enable bool) func(s *Settings) error {
 	return func(s *Settings) error {
-		s.EnableLibp2pNode = enable
+		s.enableLibp2pNode = enable
 		return nil
 	}
 }
 
 func WithInvokesKey(i invoke, resApi interface{}) func(s *Settings) error {
 	return func(s *Settings) error {
-		s.Invokes[i] = fx.Populate(resApi)
+		s.invokes[i] = fx.Populate(resApi)
 		return nil
 	}
 }

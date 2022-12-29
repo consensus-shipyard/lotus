@@ -13,7 +13,7 @@ $(warning Your Golang version is go$(shell expr $(GOVERSION) / 1000000).$(shell 
 $(error Update Golang to version to at least 1.18.1)
 endif
 
-# git fx that need to be loaded
+# git modules that need to be loaded
 MODULES:=
 
 CLEAN:=
@@ -50,12 +50,12 @@ BUILD_DEPS+=ffi-version-check
 .PHONY: ffi-version-check
 
 $(MODULES): build/.update-modules ;
-# dummy file that marks the last time fx were updated
+# dummy file that marks the last time modules were updated
 build/.update-modules:
 	git submodule update --init --recursive
 	touch $@
 
-# end git fx
+# end git modules
 
 ## MAIN BINARIES
 
@@ -75,9 +75,6 @@ debug: build-devnets
 
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: lotus mir-validator lotus-seed lotus-keygen lotus-shed
-
-spacenet-lotus: GOFLAGS+=-tags=spacenet
-spacenet-lotus: lotus
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:

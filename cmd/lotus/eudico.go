@@ -32,11 +32,11 @@ var EudicoDaemonCmd = func() *cli.Command {
 	cmd := *DaemonCmd
 	cmd.Name = "eudico"
 	cmd.Usage = "Eudico daemon command"
-	cmd.Action = EudicoDaemonAction
+	cmd.Action = eudicoDaemonAction
 	return &cmd
 }()
 
-func EudicoDaemonAction(cctx *cli.Context) error {
+func eudicoDaemonAction(cctx *cli.Context) error {
 	isLite := cctx.Bool("lite")
 	isMirValidator := cctx.Bool("mir-validator")
 	log.Warnf("mir-validator = %v", isMirValidator)

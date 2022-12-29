@@ -236,14 +236,14 @@ func StorageMiner(out *api.StorageMiner, subsystemsCfg config.MinerSubsystemConf
 		),
 
 		func(s *Settings) error {
-			s.NodeType = repo.StorageMiner
-			s.EnableLibp2pNode = subsystemsCfg.EnableMarkets
+			s.nodeType = repo.StorageMiner
+			s.enableLibp2pNode = subsystemsCfg.EnableMarkets
 			return nil
 		},
 
 		func(s *Settings) error {
 			resAPI := &impl.StorageMinerAPI{}
-			s.Invokes[ExtractApiKey] = fx.Populate(resAPI)
+			s.invokes[ExtractApiKey] = fx.Populate(resAPI)
 			*out = resAPI
 			return nil
 		},

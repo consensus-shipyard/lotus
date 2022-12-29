@@ -50,18 +50,18 @@ func If(b bool, opts ...Option) Option {
 func Override(typ, constructor interface{}) Option {
 	return func(s *Settings) error {
 		if i, ok := typ.(invoke); ok {
-			s.Invokes[i] = fx.Invoke(constructor)
+			s.invokes[i] = fx.Invoke(constructor)
 			return nil
 		}
 
 		if c, ok := typ.(special); ok {
-			s.Modules[c] = fx.Provide(constructor)
+			s.modules[c] = fx.Provide(constructor)
 			return nil
 		}
 		ctor := as(constructor, typ)
 		rt := reflect.TypeOf(typ).Elem()
 
-		s.Modules[rt] = fx.Provide(ctor)
+		s.modules[rt] = fx.Provide(ctor)
 		return nil
 	}
 }
@@ -69,17 +69,17 @@ func Override(typ, constructor interface{}) Option {
 func Unset(typ interface{}) Option {
 	return func(s *Settings) error {
 		if i, ok := typ.(invoke); ok {
-			s.Invokes[i] = nil
+			s.invokes[i] = nil
 			return nil
 		}
 
 		if c, ok := typ.(special); ok {
-			delete(s.Modules, c)
+			delete(s.modules, c)
 			return nil
 		}
 		rt := reflect.TypeOf(typ).Elem()
 
-		delete(s.Modules, rt)
+		delete(s.modules, rt)
 		return nil
 	}
 }
