@@ -209,14 +209,12 @@ func refactoredDaemonAction(cctx *cli.Context) error {
 	}
 
 	fxProviders := fx.Options(
-		fxmodules.Fullnode(cctx),
+		fxmodules.Fullnode(cctx, isLite),
 		fxmodules.Libp2p(&cfg.Common),
-		fxmodules.Repository(lockedRepo),
+		fxmodules.Repository(lockedRepo, cfg),
 		fxmodules.Blockstore(cfg),
 		fxmodules.Consensus(fxmodules.MirConsensus),
 		fxmodules.RpcServer(cctx, r, lockedRepo, cfg),
-		// orphaned, but likely belongs in some repo/store module
-		fx.Provide(modules.Datastore(cfg.Backup.DisableMetadataLog)),
 		// misc providers
 		fx.Supply(isBootstrapper),
 		fx.Supply(dtypes.ShutdownChan(shutdownChan)),

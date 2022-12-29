@@ -9,6 +9,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/stmgr"
+	rpcstmgr "github.com/filecoin-project/lotus/chain/stmgr/rpc"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/filecoin-project/lotus/journal"
@@ -29,8 +30,16 @@ import (
 	"time"
 )
 
-func Fullnode(cctx *cli.Context) fx.Option {
+func Fullnode(cctx *cli.Context, isLite bool) fx.Option {
+	var nodeAPIProviders fx.Option
+	if isLite {
+		nodeAPIProviders = liteNodeAPIProviders
+	} else {
+		nodeAPIProviders = fullNodeAPIProviders
+	}
+
 	return fx.Module("fullnode",
+		nodeAPIProviders,
 		// Consensus: crypto dependencies
 		fx.Supply(
 			fx.Annotate(
@@ -124,42 +133,6 @@ func Fullnode(cctx *cli.Context) fx.Option {
 			storageadapter.NewClientNodeAdapter,
 
 			full.NewGasPriceCache,
-
-			// TODO: do this later
-			// Lite node API
-			//ApplyIf(isLiteNode,
-			//	Override(new(messagepool.Provider), messagepool.NewProviderLite),
-			//	Override(new(messagesigner.MpoolNonceAPI), From(new(fx.MpoolNonceAPI))),
-			//	Override(new(full.ChainModuleAPI), From(new(api.Gateway))),
-			//	Override(new(full.GasModuleAPI), From(new(api.Gateway))),
-			//	Override(new(full.MpoolModuleAPI), From(new(api.Gateway))),
-			//	Override(new(full.StateModuleAPI), From(new(api.Gateway))),
-			//	Override(new(stmgr.StateManagerAPI), rpcstmgr.NewRPCStateManager),
-			//),
-
-			// Full node API / service startup
-			//ApplyIf(isFullNode,
-			messagepool.NewProvider,
-			fx.Annotate(
-				modules.MessagePool,
-				fx.As(new(messagesigner.MpoolNonceAPI)),
-			),
-			func(in full.ChainModule) full.ChainModuleAPI {
-				return &in
-			},
-			func(in full.GasModule) full.GasModuleAPI {
-				return &in
-			},
-			func(in full.MpoolModule) full.MpoolModuleAPI {
-				return &in
-			},
-			func(in full.StateModule) full.StateModuleAPI {
-				return &in
-			},
-			fx.Annotate(
-				stmgr.NewStateManager,
-				fx.As(new(stmgr.StateManagerAPI)),
-			),
 		),
 
 		// Defaults
@@ -180,3 +153,31 @@ func Fullnode(cctx *cli.Context) fx.Option {
 		),
 	)
 }
+
+// Providers exclusive to lite node
+var fullNodeAPIProviders = fx.Provide(
+	messagepool.NewProvider,
+	fx.Annotate(modules.MessagePool, fx.As(new(messagesigner.MpoolNonceAPI))),
+	fx.Annotate(stmgr.NewStateManager, fx.As(new(stmgr.StateManagerAPI))),
+	func(
+		chainModule full.ChainModule,
+		gasModule full.GasModule,
+		mpoolModule full.MpoolModule,
+		stateModule full.StateModule,
+	) (full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI) {
+		return &chainModule, &gasModule, &mpoolModule, &stateModule
+	},
+)
+
+// Providers exclusive to full node
+var liteNodeAPIProviders = fx.Provide(
+	messagepool.NewProviderLite,
+	fx.Annotate(rpcstmgr.NewRPCStateManager, fx.As(new(stmgr.StateManagerAPI))),
+	func(nonceAPI modules.MpoolNonceAPI) messagesigner.MpoolNonceAPI {
+		return &nonceAPI
+	},
+	func(gateway api.Gateway) (
+		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI) {
+		return gateway, gateway, gateway, gateway
+	},
+)
