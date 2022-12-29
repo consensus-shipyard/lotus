@@ -29,7 +29,7 @@ func main() {
 
 	local := []*cli.Command{
 		DaemonCmd,
-		RefactoredDaemonCmd,
+		EudicoDaemonCmd,
 		backupCmd,
 		configCmd,
 	}

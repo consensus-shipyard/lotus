@@ -28,15 +28,15 @@ import (
 	"runtime/pprof"
 )
 
-var RefactoredDaemonCmd = func() *cli.Command {
+var EudicoDaemonCmd = func() *cli.Command {
 	cmd := *DaemonCmd
-	cmd.Name = "ddd"
-	cmd.Usage = "Refactored daemon command"
-	cmd.Action = refactoredDaemonAction
+	cmd.Name = "eudico"
+	cmd.Usage = "Eudico daemon command"
+	cmd.Action = EudicoDaemonAction
 	return &cmd
 }()
 
-func refactoredDaemonAction(cctx *cli.Context) error {
+func EudicoDaemonAction(cctx *cli.Context) error {
 	isLite := cctx.Bool("lite")
 	isMirValidator := cctx.Bool("mir-validator")
 	log.Warnf("mir-validator = %v", isMirValidator)
