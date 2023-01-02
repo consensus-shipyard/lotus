@@ -123,7 +123,9 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if err != nil {
 		return xerrors.Errorf("failed to get chain head: %w", err)
 	}
-	log.With("miner", sm.MirManager.ValidatorID).Debugf("Trying to mine new block over base: %s", base.Key())
+	log.With("validator", sm.MirManager.ValidatorID).Debugf("Trying to mine new block over base: %s", base.Key())
+``
+same here?
 
 	nextHeight := base.Height() + 1
 	log.With("miner", sm.MirManager.ValidatorID).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
