@@ -1085,26 +1085,20 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
-func (n *Ensemble) AddMirValidatorsToFile(fname string, miners ...*TestMiner) {
-	f, err := os.OpenFile(fname,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	require.NoError(n.t, err)
-	defer func() {
-		err = f.Close()
-		require.NoError(n.t, err)
-	}()
-
+func (n *Ensemble) AppendMirValidatorsToMembershipFile(membershipFile string, miners ...*TestMiner) {
 	for _, m := range miners {
 		id, err := NodeLibp2pAddr(m.mirHost)
 		require.NoError(n.t, err)
-		_, err = f.WriteString(fmt.Sprintf("%s@%s\n", m.mirAddr, id))
+		val, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", m.mirAddr, id))
+		require.NoError(n.t, err)
+		err = val.AppendToFile(membershipFile)
 		require.NoError(n.t, err)
 	}
 }
 
-func (n *Ensemble) StoreMirValidatorsToMembersipFile(fname string, miners ...*TestMiner) {
-	f, err := os.OpenFile(fname,
-		os.O_CREATE|os.O_WRONLY, 0666)
+func (n *Ensemble) StoreMirValidatorsToMembershipFile(membershipFile string, miners ...*TestMiner) {
+	f, err := os.OpenFile(membershipFile,
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	require.NoError(n.t, err)
 	defer func() {
 		err = f.Close()
@@ -1142,8 +1136,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 			m.mirDB = NewTestDB()
 			m.checkpointPeriod = len(miners) + len(faultyMiners)
 			cfg := mir.Config{
-				CheckpointPeriod: m.checkpointPeriod,
-				SegmentLength:    1,
+				SegmentLength: 1,
 			}
 			membership := validator.StringMembership(membershipString)
 			if i > len(miners) && delay > 0 {
@@ -1170,8 +1163,7 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, con
 			m.mirDB = NewTestDB()
 			m.checkpointPeriod = checkpoint
 			cfg := mir.Config{
-				CheckpointPeriod: checkpoint,
-				SegmentLength:    1,
+				SegmentLength: 1,
 			}
 			membership := validator.FileMembership{FileName: configFileName}
 
@@ -1207,8 +1199,7 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				m.mirDB = NewTestDB()
 			}
 			cfg := mir.Config{
-				CheckpointPeriod: m.checkpointPeriod,
-				SegmentLength:    1,
+				SegmentLength: 1,
 			}
 			membership := validator.StringMembership(m.mirMembership)
 

@@ -57,11 +57,6 @@ var runCmd = &cli.Command{
 			Usage: "pass initial checkpoint as a file (it overwrites 'init-height' flag)",
 		},
 		&cli.IntFlag{
-			Name:  "checkpoint-period",
-			Usage: "Checkpoint period",
-			Value: 8,
-		},
-		&cli.IntFlag{
 			Name:  "segment-length",
 			Usage: "The length of an ISS segment. Must not be negative",
 			Value: 1,
@@ -126,9 +121,6 @@ var runCmd = &cli.Command{
 		// TODO: Make this configurable.
 		membershipFile := filepath.Join(cctx.String("repo"), MembershipPath)
 
-		// Checkpoint period.
-		checkpointPeriod := cctx.Int("checkpoint-period")
-
 		// Segment length period.
 		segmentLength := cctx.Int("segment-length")
 
@@ -171,7 +163,6 @@ var runCmd = &cli.Command{
 
 		cfg := mir.NewConfig(
 			dbPath,
-			checkpointPeriod,
 			initCh,
 			cctx.String("checkpoints-repo"),
 			segmentLength,

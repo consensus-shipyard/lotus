@@ -32,8 +32,7 @@ const (
 )
 
 type Config struct {
-	DatastorePath    string
-	CheckpointPeriod int
+	DatastorePath string
 	// InitialCheckpoint from which to start the validator.
 	InitialCheckpoint *checkpoint.StableCheckpoint
 	// CheckpointRepo determines the path where Mir checkpoints
@@ -45,14 +44,12 @@ type Config struct {
 
 func NewConfig(
 	dbPath string,
-	checkpointPeriod int,
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 	segmentLength int,
 ) *Config {
 	return &Config{
 		DatastorePath:     dbPath,
-		CheckpointPeriod:  checkpointPeriod,
 		InitialCheckpoint: initCheck,
 		CheckpointRepo:    checkpointRepo,
 		SegmentLength:     segmentLength,

@@ -48,8 +48,6 @@ var (
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
-	GetValidators validator.MembershipReader
-
 	// Lotus types.
 	NetName     dtypes.NetworkName
 	ValidatorID address.Address
