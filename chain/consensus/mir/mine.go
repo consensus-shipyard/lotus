@@ -68,7 +68,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		// because if `ctx` has been closed then `api.ChainHead(ctx)` returns an error,
 		// and we will be in the infinite loop due to `continue`.
 		if ctx.Err() != nil {
-			log.With("miner", addr).Debug("Mir miner: context closed")
+			log.With("validator", addr).Debug("Mir miner: context closed")
 			return nil
 		}
 
