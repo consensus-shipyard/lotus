@@ -157,7 +157,7 @@ func Fullnode(cctx *cli.Context, isLite bool) fx.Option {
 // Providers exclusive to lite node
 var fullNodeAPIProviders = fx.Provide(
 	messagepool.NewProvider,
-	fx.Annotate(modules.MessagePool, fx.As(new(messagesigner.MpoolNonceAPI))),
+	fx.Annotate(modules.MessagePool, fx.As(new(messagepool.MpoolNonceAPI))),
 	fx.Annotate(stmgr.NewStateManager, fx.As(new(stmgr.StateManagerAPI))),
 	func(
 		chainModule full.ChainModule,
@@ -173,7 +173,7 @@ var fullNodeAPIProviders = fx.Provide(
 var liteNodeAPIProviders = fx.Provide(
 	messagepool.NewProviderLite,
 	fx.Annotate(rpcstmgr.NewRPCStateManager, fx.As(new(stmgr.StateManagerAPI))),
-	func(nonceAPI modules.MpoolNonceAPI) messagesigner.MpoolNonceAPI {
+	func(nonceAPI modules.MpoolNonceAPI) messagepool.MpoolNonceAPI {
 		return &nonceAPI
 	},
 	func(gateway api.Gateway) (
