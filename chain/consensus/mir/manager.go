@@ -239,18 +239,18 @@ func (m *Manager) Start(ctx context.Context) chan error {
 
 // Stop stops the manager and all its components.
 func (m *Manager) Stop() {
-	log.With("miner", m.MirID).Infof("Mir manager shutting down")
-	defer log.With("miner", m.MirID).Info("Mir manager stopped")
+	log.With("validator", m.MirID).Infof("Mir manager shutting down")
+	defer log.With("validator", m.MirID).Info("Mir manager stopped")
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
-			log.With("miner", m.MirID).Errorf("Could not close interceptor: %s", err)
+			log.With("validator", m.MirID).Errorf("Could not close interceptor: %s", err)
 		}
-		log.With("miner", m.MirID).Info("Interceptor closed")
+		log.With("validator", m.MirID).Info("Interceptor closed")
 	}
 
 	m.Net.Stop()
-	log.With("miner", m.MirID).Info("Network transport stopped")
+	log.With("validator", m.MirID).Info("Network transport stopped")
 
 	close(m.stopCh)
 	m.MirNode.Stop()
@@ -327,7 +327,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
 		if !m.Pool.IsTargetRequest(clientID, nonce) {
-			log.With("miner", m.MirID).Warnf("batchSignedMessage: target request not found for client ID")
+			log.With("validator", m.MirID).Warnf("batchSignedMessage: target request not found for client ID")
 			continue
 		}
 
