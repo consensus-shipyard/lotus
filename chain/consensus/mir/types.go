@@ -39,6 +39,8 @@ type Config struct {
 	// CheckpointRepo determines the path where Mir checkpoints
 	// will be (optionally) persisted.
 	CheckpointRepo string
+	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
+	SegmentLength int
 }
 
 func NewConfig(
@@ -46,12 +48,14 @@ func NewConfig(
 	checkpointPeriod int,
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
+	segmentLength int,
 ) *Config {
 	return &Config{
 		DatastorePath:     dbPath,
 		CheckpointPeriod:  checkpointPeriod,
 		InitialCheckpoint: initCheck,
 		CheckpointRepo:    checkpointRepo,
+		SegmentLength:     segmentLength,
 	}
 }
 

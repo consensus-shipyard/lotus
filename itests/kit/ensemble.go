@@ -1143,6 +1143,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 			m.checkpointPeriod = len(miners) + len(faultyMiners)
 			cfg := mir.Config{
 				CheckpointPeriod: m.checkpointPeriod,
+				SegmentLength:    1,
 			}
 			membership := validator.StringMembership(membershipString)
 			if i > len(miners) && delay > 0 {
@@ -1170,6 +1171,7 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, con
 			m.checkpointPeriod = checkpoint
 			cfg := mir.Config{
 				CheckpointPeriod: checkpoint,
+				SegmentLength:    1,
 			}
 			membership := validator.FileMembership{FileName: configFileName}
 
@@ -1206,6 +1208,7 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 			}
 			cfg := mir.Config{
 				CheckpointPeriod: m.checkpointPeriod,
+				SegmentLength:    1,
 			}
 			membership := validator.StringMembership(m.mirMembership)
 

@@ -130,6 +130,10 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 		}
 	}
 
+	if cfg.SegmentLength < 0 {
+		return nil, fmt.Errorf("segment length must not be negative")
+	}
+
 	m := Manager{
 		stopCh:              make(chan struct{}),
 		ValidatorID:         validatorID,
@@ -143,7 +147,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 		InitialValidatorSet: initialValidatorSet,
 		ToMir:               make(chan chan []*mirproto.Request),
 		checkpointRepo:      cfg.CheckpointRepo,
-		segmentLength:       1,
+		segmentLength:       cfg.SegmentLength,
 	}
 
 	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)

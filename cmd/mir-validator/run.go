@@ -61,6 +61,11 @@ var runCmd = &cli.Command{
 			Usage: "Checkpoint period",
 			Value: 8,
 		},
+		&cli.IntFlag{
+			Name:  "segment-length",
+			Usage: "The length of an ISS segment. Must not be negative",
+			Value: 1,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx, _ := tag.New(lcli.DaemonContext(cctx),
@@ -124,6 +129,9 @@ var runCmd = &cli.Command{
 		// Checkpoint period.
 		checkpointPeriod := cctx.Int("checkpoint-period")
 
+		// Segment length period.
+		segmentLength := cctx.Int("segment-length")
+
 		h, err := newLp2pHost(cctx.String("repo"))
 		if err != nil {
 			return err
@@ -166,6 +174,7 @@ var runCmd = &cli.Command{
 			checkpointPeriod,
 			initCh,
 			cctx.String("checkpoints-repo"),
+			segmentLength,
 		)
 
 		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
