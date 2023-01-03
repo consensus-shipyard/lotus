@@ -286,7 +286,7 @@ func (ts *itestsConsensusSuite) testMirWithReconfiguration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log(">>> remove the last added validator from membership")
-	ens.StoreMirValidatorsToMembershipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.OverwriteMirValidatorsInMembershipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())

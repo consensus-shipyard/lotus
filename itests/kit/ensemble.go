@@ -1096,7 +1096,7 @@ func (n *Ensemble) AppendMirValidatorsToMembershipFile(membershipFile string, mi
 	}
 }
 
-func (n *Ensemble) StoreMirValidatorsToMembershipFile(membershipFile string, miners ...*TestMiner) {
+func (n *Ensemble) OverwriteMirValidatorsInMembershipFile(membershipFile string, miners ...*TestMiner) {
 	f, err := os.OpenFile(membershipFile,
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	require.NoError(n.t, err)
