@@ -209,7 +209,7 @@ func eudicoDaemonAction(cctx *cli.Context) error {
 	}
 
 	fxProviders := fx.Options(
-		fxmodules.Fullnode(cctx, isLite),
+		fxmodules.Fullnode(cctx.Bool("bootstrap"), isLite),
 		fxmodules.Libp2p(&cfg.Common),
 		fxmodules.Repository(lockedRepo, cfg),
 		fxmodules.Blockstore(cfg),

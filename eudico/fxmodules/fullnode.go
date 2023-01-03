@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/journal/alerting"
 	"github.com/filecoin-project/lotus/lib/peermgr"
+	"github.com/filecoin-project/lotus/markets/retrievaladapter"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
 	"github.com/filecoin-project/lotus/node/hello"
 	"github.com/filecoin-project/lotus/node/impl/full"
@@ -25,12 +26,11 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	metricsi "github.com/ipfs/go-metrics-interface"
-	"github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 	"time"
 )
 
-func Fullnode(cctx *cli.Context, isLite bool) fx.Option {
+func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 	var nodeAPIProviders fx.Option
 	if isLite {
 		nodeAPIProviders = liteNodeAPIProviders
@@ -56,7 +56,7 @@ func Fullnode(cctx *cli.Context, isLite bool) fx.Option {
 
 			new(dtypes.MpoolLocker),
 		),
-		optionalProvide(peermgr.NewPeerMgr, cctx.Bool("bootstrap")),
+		optionalProvide(peermgr.NewPeerMgr, isBootstrap),
 		fx.Provide(
 			// Consensus settings
 			modules.BuiltinDrandConfig,
@@ -98,7 +98,8 @@ func Fullnode(cctx *cli.Context, isLite bool) fx.Option {
 			modules.MessagePool,
 
 			// Service: Wallet
-			messagesigner.NewMessageSigner,
+			fx.Annotate(messagesigner.NewMessageSigner, fx.As(new(messagesigner.MsgSigner))),
+			//func(ms *messagesigner.MessageSigner) messagesigner.MsgSigner { return ms },
 			wallet.NewWallet,
 			fx.Annotate(
 				wallet.NewWallet,
@@ -131,7 +132,7 @@ func Fullnode(cctx *cli.Context, isLite bool) fx.Option {
 			modules.StorageBlockstoreAccessor,
 			modules.StorageClient,
 			storageadapter.NewClientNodeAdapter,
-
+			retrievaladapter.NewAPIBlockstoreAdapter,
 			full.NewGasPriceCache,
 		),
 
