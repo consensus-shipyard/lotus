@@ -1,20 +1,6 @@
-<p align="center">
-  <a href="https://lotus.filecoin.io/" title="Filecoin Docs">
-    <img src="documentation/images/lotus_logo_h.png" alt="Project Lotus Logo" width="244" />
-  </a>
-</p>
+<h1 align="center">[Archived] Project Eudico</h1>
 
-<h1 align="center">Project Lotus - 莲</h1>
-
-<p align="center">
-  <a href="https://circleci.com/gh/filecoin-project/lotus"><img src="https://circleci.com/gh/filecoin-project/lotus.svg?style=svg"></a>
-  <a href="https://codecov.io/gh/filecoin-project/lotus"><img src="https://codecov.io/gh/filecoin-project/lotus/branch/master/graph/badge.svg"></a>
-  <a href="https://goreportcard.com/report/github.com/filecoin-project/lotus"><img src="https://goreportcard.com/badge/github.com/filecoin-project/lotus" /></a>  
-  <a href=""><img src="https://img.shields.io/badge/golang-%3E%3D1.18.8-blue.svg" /></a>
-  <br>
-</p>
-
-Lotus is an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io).
+Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-project/lotus), itself an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io). This is a work-in-progress, intended to enable easier experimentation with future protocol features, and is not meant to be used in the production network.
 
 ## Building & Documentation
 
