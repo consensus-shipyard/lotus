@@ -1,4 +1,4 @@
-<h1 align="center">[Archived] Project Eudico</h1>
+<h1 align="center">Project Eudico</h1>
 
 Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-project/lotus), itself an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io). This is a work-in-progress, intended to enable easier experimentation with future protocol features, and is not meant to be used in the production network.
 
