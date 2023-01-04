@@ -1090,6 +1090,9 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, wg *sync.WaitGro
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miners ...*TestMiner) {
 	n.BeginMirMiningWithDelay(ctx, wg, 0, miners...)
+	// once validators start mining mark the network as bootstrapped so no
+	// new genesis are generated.
+	n.bootstrapped = true
 }
 
 func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg *sync.WaitGroup, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
