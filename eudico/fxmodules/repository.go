@@ -1,10 +1,11 @@
 package fxmodules
 
 import (
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/repo"
-	"go.uber.org/fx"
 )
 
 func Repository(lr repo.LockedRepo, cfg *config.FullNode) fx.Option {

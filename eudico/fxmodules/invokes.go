@@ -1,12 +1,13 @@
 package fxmodules
 
 import (
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/lp2p"
 	"github.com/filecoin-project/lotus/paychmgr/settler"
-	"go.uber.org/fx"
 )
 
 func Invokes(cfg *config.Common, isBootstrap bool, isMirValidator bool) fx.Option {

@@ -1,13 +1,14 @@
 package fxmodules
 
 import (
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/tspow"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
-	"go.uber.org/fx"
 )
 
 type ConsensusAlgorithm int

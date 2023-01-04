@@ -3,7 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"runtime/pprof"
+
+	metricsprom "github.com/ipfs/go-metrics-prometheus"
+	"github.com/mitchellh/go-homedir"
+	"github.com/urfave/cli/v2"
+	"go.opencensus.io/plugin/runmetrics"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
+	"go.uber.org/fx"
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-paramfetch"
+
 	"github.com/filecoin-project/lotus/build"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico/fxmodules"
@@ -15,17 +29,6 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/node/repo"
-	metricsprom "github.com/ipfs/go-metrics-prometheus"
-	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli/v2"
-	"go.opencensus.io/plugin/runmetrics"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
-	"go.uber.org/fx"
-	"golang.org/x/xerrors"
-	"os"
-	"runtime/pprof"
 )
 
 var EudicoDaemonCmd = func() *cli.Command {

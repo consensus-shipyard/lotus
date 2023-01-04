@@ -2,6 +2,11 @@ package fxmodules
 
 import (
 	"context"
+	"time"
+
+	metricsi "github.com/ipfs/go-metrics-interface"
+	"go.uber.org/fx"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain"
 	"github.com/filecoin-project/lotus/chain/exchange"
@@ -25,9 +30,6 @@ import (
 	"github.com/filecoin-project/lotus/paychmgr"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
-	metricsi "github.com/ipfs/go-metrics-interface"
-	"go.uber.org/fx"
-	"time"
 )
 
 func Fullnode(isBootstrap bool, isLite bool) fx.Option {

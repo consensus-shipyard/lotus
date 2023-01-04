@@ -1,14 +1,16 @@
 package fxmodules
 
 import (
-	"github.com/filecoin-project/lotus/node/config"
-	"github.com/filecoin-project/lotus/node/modules"
-	"github.com/filecoin-project/lotus/node/modules/lp2p"
+	"time"
+
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	ci "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/fx"
-	"time"
+
+	"github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/modules"
+	"github.com/filecoin-project/lotus/node/modules/lp2p"
 )
 
 func Libp2p(cfg *config.Common) fx.Option {
