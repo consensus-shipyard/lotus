@@ -696,7 +696,7 @@ func (n *Ensemble) Start() *Ensemble {
 		copy.FullNode = modules.MakeUuidWrapper(copy.FullNode)
 		m.FullNode = &copy
 
-		//m.FullNode.FullNode = modules.MakeUuidWrapper(fn.FullNode)
+		// m.FullNode.FullNode = modules.MakeUuidWrapper(fn.FullNode)
 
 		opts := []node.Option{
 			node.StorageMiner(&m.StorageMiner, cfg.Subsystems),
@@ -705,8 +705,8 @@ func (n *Ensemble) Start() *Ensemble {
 			node.Test(),
 
 			node.If(m.options.disableLibp2p, node.MockHost(n.mn)),
-			//node.Override(new(v1api.RawFullNodeAPI), func() api.FullNode { return modules.MakeUuidWrapper(m.FullNode) }),
-			//node.Override(new(v1api.RawFullNodeAPI), modules.MakeUuidWrapper),
+			// node.Override(new(v1api.RawFullNodeAPI), func() api.FullNode { return modules.MakeUuidWrapper(m.FullNode) }),
+			// node.Override(new(v1api.RawFullNodeAPI), modules.MakeUuidWrapper),
 			node.Override(new(v1api.RawFullNodeAPI), m.FullNode),
 			node.Override(new(*lotusminer.Miner), lotusminer.NewTestMiner(mineBlock, m.ActorAddr)),
 
@@ -1092,7 +1092,13 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miner
 	n.BeginMirMiningWithDelay(ctx, wg, 0, miners...)
 	// once validators start mining mark the network as bootstrapped so no
 	// new genesis are generated.
+	n.Bootstrap()
+}
+
+// Bootstrap explicitly sets the ensemble as bootstrapped.
+func (n *Ensemble) Bootstrap() *Ensemble {
 	n.bootstrapped = true
+	return n
 }
 
 func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg *sync.WaitGroup, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
