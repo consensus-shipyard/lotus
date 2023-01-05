@@ -443,6 +443,7 @@ func (n *Ensemble) Start() *Ensemble {
 			fx.Invoke(func(fullNode impl.FullNodeAPI) {
 				full.FullNode = &fullNode
 			}),
+			fx.NopLogger,
 		)
 		err = app.Start(ctx)
 		require.NoError(n.t, err)
