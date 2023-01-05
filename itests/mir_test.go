@@ -80,6 +80,7 @@ func runMirConsensusTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
 	t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+	t.Run("testGenesisBlocksOfValidatorsAndLearners", ts.testGenesisBlocksOfValidatorsAndLearners)
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
 	// Commenting for now, it is flaky and needs some love.
 	// t.Run("testMirMessageFromLearner", ts.testMirMessageFromLearner)
@@ -220,15 +221,52 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	var learners []*kit.TestFullNode
 	for i := 0; i < MirLearnersNumber; i++ {
 		var learner kit.TestFullNode
-		ens.FullNode(&learner, kit.LearnerNode()).Start().InterconnectFullNodes()
+		ens.FullNode(&learner, kit.LearnerNode())
 		require.Equal(t, true, learner.IsLearner())
 		learners = append(learners, &learner)
 	}
+
+	ens.Start().InterconnectFullNodes()
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, learners...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], learners...)...)
 	require.NoError(t, err)
+}
+
+func (ts *itestsConsensusSuite) testGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+	}()
+
+	nodes, _, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	ens.Bootstrapped()
+
+	genesis, err := nodes[0].ChainGetGenesis(ctx)
+	require.NoError(t, err)
+	for i := range nodes[1:] {
+		gen, err := nodes[i].ChainGetGenesis(ctx)
+		require.NoError(t, err)
+		require.Equal(t, genesis.String(), gen.String())
+	}
+
+	var learners []*kit.TestFullNode
+	for i := 0; i < MirLearnersNumber; i++ {
+		var learner kit.TestFullNode
+		ens.FullNode(&learner, kit.LearnerNode()).Start()
+		require.Equal(t, true, learner.IsLearner())
+		learners = append(learners, &learner)
+	}
+
+	ens.Start()
+
+	for i := range learners {
+		gen, err := learners[i].ChainGetGenesis(ctx)
+		require.NoError(t, err)
+		require.Equal(t, genesis.String(), gen.String())
+	}
 }
 
 // testMirMessageFromLearner tests that messages can be sent from learners and validators,
@@ -250,10 +288,12 @@ func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
 	var learners []*kit.TestFullNode
 	for i := 0; i < MirLearnersNumber; i++ {
 		var learner kit.TestFullNode
-		ens.FullNode(&learner, kit.LearnerNode()).Start().InterconnectFullNodes()
+		ens.FullNode(&learner, kit.LearnerNode())
 		require.Equal(t, true, learner.IsLearner())
 		learners = append(learners, &learner)
 	}
+
+	ens.Start().InterconnectFullNodes()
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
