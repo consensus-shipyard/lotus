@@ -13,7 +13,7 @@ func Blockstore(cfg *config.FullNode) fx.Option {
 		fx.Provide(
 			modules.UniversalBlockstore,
 
-			// TODO(hmz): assuming cfg.Chainstore.EnableSplitstore == false
+			// TODO(hmoniz): assuming cfg.Chainstore.EnableSplitstore == false
 			// check if this should always be the case for Eudico
 			fx.Annotate(modules.ChainFlatBlockstore, fx.As(new(dtypes.BasicChainBlockstore))),
 			fx.Annotate(modules.StateFlatBlockstore, fx.As(new(dtypes.BasicStateBlockstore))),
@@ -42,6 +42,7 @@ func Blockstore(cfg *config.FullNode) fx.Option {
 
 			// then assuming that cfg.Client.UseIpfs, cfg.Wallet.RemoteBackend, cfg.Wallet.EnableLedger,
 			// cfg.Wallet.DisableLocal are all false
+			// TODO(hmoniz): fix so we don't depend on this assumption
 		),
 	)
 }

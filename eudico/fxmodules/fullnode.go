@@ -64,8 +64,7 @@ func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 			modules.BuiltinDrandConfig,
 			modules.UpgradeSchedule,
 			modules.NetworkName,
-			// this one is only checking if genesis has already been provided
-			//fx.Provide(fx.ErrorGenesis),
+
 			modules.SetGenesis,
 			modules.RandomSchedule,
 
@@ -124,8 +123,6 @@ func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 			// Markets (retrieval)
 			modules.RetrievalResolver,
 			modules.RetrievalBlockstoreAccessor,
-			// already provided later
-			//fx.Provide(fx.RetrievalClient(false)),
 			modules.NewClientGraphsyncDataTransfer,
 
 			// Markets (storage)
@@ -157,7 +154,7 @@ func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 	)
 }
 
-// Providers exclusive to lite node
+// Providers exclusive to full node
 var fullNodeAPIProviders = fx.Provide(
 	messagepool.NewProvider,
 	fx.Annotate(modules.MessagePool, fx.As(new(messagepool.MpoolNonceAPI))),
@@ -172,7 +169,7 @@ var fullNodeAPIProviders = fx.Provide(
 	},
 )
 
-// Providers exclusive to full node
+// Providers exclusive to lite node
 var liteNodeAPIProviders = fx.Provide(
 	messagepool.NewProviderLite,
 	fx.Annotate(rpcstmgr.NewRPCStateManager, fx.As(new(stmgr.StateManagerAPI))),
