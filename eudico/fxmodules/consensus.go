@@ -20,16 +20,16 @@ const (
 )
 
 func Consensus(algorithm ConsensusAlgorithm) fx.Option {
-	switch algorithm {
-	case ExpectedConsensus:
-		return filecoinExpectedConsensusModule
-	case MirConsensus:
-		return mirConsensusModule
-	case TSPoWConsensus:
-		return tspowModule
-	default:
+	module := fxCase(algorithm,
+		map[ConsensusAlgorithm]fx.Option{
+			ExpectedConsensus: filecoinExpectedConsensusModule,
+			MirConsensus:      mirConsensusModule,
+			TSPoWConsensus:    tspowModule,
+		})
+	if module == nil {
 		panic("Unsupported consensus algorithm")
 	}
+	return module
 }
 
 var filecoinExpectedConsensusModule = fx.Module("filecoinExpectedConsensus",
