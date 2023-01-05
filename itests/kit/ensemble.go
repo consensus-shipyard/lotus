@@ -21,6 +21,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -42,23 +43,23 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
-	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/stmgr"
-	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/cmd/lotus-seed/seed"
 	"github.com/filecoin-project/lotus/cmd/lotus-worker/sealworker"
+	"github.com/filecoin-project/lotus/eudico/fxmodules"
 	"github.com/filecoin-project/lotus/genesis"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/markets/idxprov/idxprov_test"
 	lotusminer "github.com/filecoin-project/lotus/miner"
 	"github.com/filecoin-project/lotus/node"
 	"github.com/filecoin-project/lotus/node/config"
+	"github.com/filecoin-project/lotus/node/impl"
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	testing2 "github.com/filecoin-project/lotus/node/modules/testing"
@@ -415,58 +416,40 @@ func (n *Ensemble) Start() *Ensemble {
 		})
 		require.NoError(n.t, err)
 
-		err = lr.Close()
-		require.NoError(n.t, err)
-
-		opts := []node.Option{
-			node.FullAPI(&full.FullNode, node.Lite(full.options.lite), node.MirValidator(!full.options.learner)),
-			node.Base(),
-			node.Repo(r),
-			node.If(full.options.disableLibp2p, node.MockHost(n.mn)),
-			node.Test(),
-
-			// so that we subscribe to pubsub topics immediately
-			node.Override(new(dtypes.Bootstrapper), dtypes.Bootstrapper(true)),
-
-			// upgrades
-			node.Override(new(stmgr.UpgradeSchedule), n.options.upgradeSchedule),
-
-			node.ApplyIf(
-				func(s *node.Settings) bool { return build.IsMirConsensus() },
-				node.Override(new(consensus.Consensus), mir.NewConsensus),
-				node.Override(new(store.WeightFunc), mir.Weight),
-				node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
-			),
-		}
-
-		// append any node builder options.
-		opts = append(opts, full.options.extraNodeOpts...)
-
-		// Either generate the genesis or inject it.
+		genesisProvider := fx.Options()
 		if i == 0 && !n.bootstrapped {
-			opts = append(opts, node.Override(new(modules.Genesis), testing2.MakeGenesisMem(&n.genesisBlock, *gtempl)))
+			genesisProvider = fx.Provide(testing2.MakeGenesisMem(&n.genesisBlock, *gtempl))
 		} else {
-			opts = append(opts, node.Override(new(modules.Genesis), modules.LoadGenesis(n.genesisBlock.Bytes())))
+			genesisProvider = fx.Provide(modules.LoadGenesis(n.genesisBlock.Bytes()))
 		}
 
-		// Are we mocking proofs?
-		if n.options.mockProofs {
-			opts = append(opts,
-				node.Override(new(storiface.Verifier), mock.MockVerifier),
-				node.Override(new(storiface.Prover), mock.MockProver),
-			)
-		}
+		fxProviders := fx.Options(
+			fxmodules.Fullnode(false, full.options.lite),
+			fxmodules.Libp2p(&cfg.Common),
+			fxmodules.Repository(lr, cfg),
+			fxmodules.Blockstore(cfg),
+			fxmodules.Consensus(fxmodules.MirConsensus),
+			// misc providers
+			fx.Supply(dtypes.Bootstrapper(true)),
+			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),
+			genesisProvider,
+			fx.Replace(n.options.upgradeSchedule),
+			fx.Decorate(testing2.RandomBeacon),
+		)
 
-		// Call option builders, passing active nodes as the parameter
-		for _, bopt := range full.options.optBuilders {
-			opts = append(opts, bopt(n.active.fullnodes))
-		}
-
-		// Construct the full node.
-		stop, err := node.New(ctx, opts...)
-		full.Stop = stop
-
+		app := fx.New(
+			fxProviders,
+			fxmodules.Invokes(&cfg.Common, false, !full.options.learner),
+			fx.Invoke(func(fullNode impl.FullNodeAPI) {
+				full.FullNode = &fullNode
+			}),
+			fx.NopLogger,
+		)
+		err = app.Start(ctx)
 		require.NoError(n.t, err)
+
+		stop := app.Stop
+		full.Stop = stop
 
 		addr, err := full.WalletImport(context.Background(), &full.DefaultKey.KeyInfo)
 		require.NoError(n.t, err)
