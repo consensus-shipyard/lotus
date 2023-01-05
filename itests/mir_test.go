@@ -67,7 +67,7 @@ func runDraftTest(t *testing.T, opts ...interface{}) {
 }
 
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
-	ts := itestsConsensusSuite{opts: optpeds}
+	ts := itestsConsensusSuite{opts: opts}
 
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
