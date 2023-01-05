@@ -439,7 +439,7 @@ func (n *Ensemble) Start() *Ensemble {
 
 		app := fx.New(
 			fxProviders,
-			fxmodules.Invokes(&cfg.Common, false, true),
+			fxmodules.Invokes(&cfg.Common, false, !full.options.learner),
 			fx.Invoke(func(fullNode impl.FullNodeAPI) {
 				full.FullNode = &fullNode
 			}),
