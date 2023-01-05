@@ -67,7 +67,7 @@ func runDraftTest(t *testing.T, opts ...interface{}) {
 }
 
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
-	ts := itestsConsensusSuite{opts: opts}
+	ts := itestsConsensusSuite{opts: optpeds}
 
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
@@ -242,7 +242,7 @@ func (ts *itestsConsensusSuite) testGenesisBlocksOfValidatorsAndLearners(t *test
 	}()
 
 	nodes, _, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
-	ens.Bootstrap()
+	ens.Bootstrapped()
 
 	genesis, err := nodes[0].ChainGetGenesis(ctx)
 	require.NoError(t, err)
