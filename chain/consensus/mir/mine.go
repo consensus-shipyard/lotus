@@ -99,7 +99,9 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 				continue
 			}
 
-			log.With("validator", addr).Infof("new validator set - size: %d", newValidatorSet.Size())
+			log.With("validator", addr).
+				Infof("new validator set: size: %d, members: %v", newValidatorSet.Size(), newValidatorSet.GetValidatorIDs())
+
 			lastValidatorSet = newValidatorSet
 
 			if req := m.ReconfigurationRequest(newValidatorSet); req != nil {

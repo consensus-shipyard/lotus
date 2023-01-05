@@ -1234,6 +1234,17 @@ func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*Tes
 	}
 }
 
+func (n *Ensemble) StopMirMiners(ctx context.Context, miners ...*TestMiner) {
+	for _, m := range miners {
+		m.stopMir()
+		// FIXME: Mir won't close the transport correctly,
+		// and if we crash the node we need to close the libp2p
+		// host to prevent other mir validators from considering
+		// the crash validator as "online".
+		// m.mirHost.Close()
+	}
+}
+
 func (n *Ensemble) generateGenesis() *genesis.Template {
 	var verifRoot = gen.DefaultVerifregRootkeyActor
 	if k := n.options.verifiedRoot.key; k != nil {

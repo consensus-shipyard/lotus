@@ -226,6 +226,13 @@ func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) err
 	if err != nil {
 		return err
 	}
+	_, inMembership := mbs[t.NodeID(sm.MirManager.MirID)]
+	fmt.Println(sm.MirManager.MirID, "UpdateNextMembership", inMembership, mbs)
+
+	if !inMembership {
+		panic(1111)
+		sm.MirManager.Stop()
+	}
 	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
 	return nil
 }

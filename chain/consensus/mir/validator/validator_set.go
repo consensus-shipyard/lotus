@@ -8,6 +8,8 @@ import (
 
 	"github.com/ipfs/go-cid"
 	u "github.com/ipfs/go-ipfs-util"
+
+	"github.com/filecoin-project/go-address"
 )
 
 type ValidatorSet struct {
@@ -54,6 +56,12 @@ func (set *ValidatorSet) Hash() ([]byte, error) {
 
 func (set *ValidatorSet) GetValidators() []Validator {
 	return set.Validators
+}
+func (set *ValidatorSet) GetValidatorIDs() (ids []address.Address) {
+	for _, v := range set.Validators {
+		ids = append(ids, v.Addr)
+	}
+	return
 }
 
 func (set *ValidatorSet) HasValidatorWithID(id string) bool {
