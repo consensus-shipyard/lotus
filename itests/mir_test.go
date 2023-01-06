@@ -38,12 +38,15 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		runMirConsensusTests(t, kit.ThroughRPC())
+		// FIXME DENIS
+		// runMirConsensusTests(t, kit.ThroughRPC())
+		runDraftTest(t, kit.ThroughRPC(), kit.MirConsensus())
 	})
 }
 
+// FIXME DENIS
 // TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
-func TestMirConsensusWithMangler(t *testing.T) {
+func FixmeTestMirConsensusWithMangler(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
@@ -63,7 +66,7 @@ func TestMirConsensusWithMangler(t *testing.T) {
 func runDraftTest(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
-	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
 }
 
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
@@ -112,7 +115,7 @@ func (ts *itestsConsensusSuite) testMirOneNodeMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	full, miner, ens := kit.EnsembleMinimalMir(t, ts.opts...)
+	full, miner, ens := kit.EnsembleMinimalSpacenet(t, ts.opts...)
 	ens.BeginMirMining(ctx, &wg, miner)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, full)

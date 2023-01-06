@@ -11,24 +11,28 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
-func Mine(ctx context.Context, miner address.Address, api v1api.FullNode) error {
+func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
+	log.With("validator", addr).Infof("PoW started")
+	defer log.With("validator", addr).Infof("PoW completed")
+
 	head, err := api.ChainHead(ctx)
 	if err != nil {
 		return fmt.Errorf("getting head: %w", err)
 	}
 
-	log.Info("starting PoW mining on @", head.Height())
+	log.With("validator", addr).Info("starting PoW mining on @", head.Height())
 
 	for {
 		select {
 		case <-ctx.Done():
+			log.With("validator", addr).Debug("PoW validator: context closed")
 			return nil
 		default:
 		}
 
 		base, err := api.ChainHead(ctx)
 		if err != nil {
-			log.Errorw("creating block failed", "error", err)
+			log.With("validator", addr).Errorw("creating block failed", "error", err)
 			continue
 		}
 		base, _ = types.NewTipSet([]*types.BlockHeader{BestWorkBlock(base)})
@@ -51,11 +55,11 @@ func Mine(ctx context.Context, miner address.Address, api v1api.FullNode) error 
 
 		msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
 		if err != nil {
-			log.Errorw("selecting messages failed", "error", err)
+			log.With("validator", addr).Errorw("selecting messages failed", "error", err)
 		}
 
 		bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
-			Miner:            miner,
+			Miner:            addr,
 			Parents:          types.NewTipSetKey(BestWorkBlock(base).Cid()),
 			BeaconValues:     nil,
 			Ticket:           &types.Ticket{VRFProof: diffb},
@@ -65,14 +69,14 @@ func Mine(ctx context.Context, miner address.Address, api v1api.FullNode) error 
 			WinningPoStProof: nil,
 		})
 		if err != nil {
-			log.Errorw("creating block failed", "error", err)
+			log.With("validator", addr).Errorw("creating block failed", "error", err)
 			continue
 		}
 		if bh == nil {
 			continue
 		}
 
-		log.Info("try PoW mining at @", base.Height(), base.String())
+		log.With("validator", addr).Debug("try PoW mining at @", base.Height(), base.String())
 
 		err = api.SyncSubmitBlock(ctx, &types.BlockMsg{
 			Header:        bh.Header,
@@ -84,6 +88,6 @@ func Mine(ctx context.Context, miner address.Address, api v1api.FullNode) error 
 			continue
 		}
 
-		log.Info("PoW mined a block! ", bh.Cid())
+		log.With("validator", addr).Info("PoW mined a block! ", bh.Cid())
 	}
 }

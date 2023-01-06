@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/eudico/fxmodules"
 
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/stmgr"
@@ -24,6 +25,8 @@ type ensembleOpts struct {
 	mockProofs   bool
 
 	upgradeSchedule stmgr.UpgradeSchedule
+
+	consensus fxmodules.ConsensusAlgorithm
 }
 
 var DefaultEnsembleOpts = ensembleOpts{
@@ -32,6 +35,22 @@ var DefaultEnsembleOpts = ensembleOpts{
 		Height:  -1,
 		Network: build.TestNetworkVersion,
 	}},
+}
+
+// MirConsensus sets consensus protocol to Mir.
+func MirConsensus() EnsembleOpt {
+	return func(opts *ensembleOpts) error {
+		opts.consensus = fxmodules.MirConsensus
+		return nil
+	}
+}
+
+// PoWConsensus sets consensus protocol to TSPoW.
+func PoWConsensus() EnsembleOpt {
+	return func(opts *ensembleOpts) error {
+		opts.consensus = fxmodules.TSPoWConsensus
+		return nil
+	}
 }
 
 // MockProofs activates mock proofs for the entire ensemble.

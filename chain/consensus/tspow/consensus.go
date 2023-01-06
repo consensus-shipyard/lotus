@@ -5,9 +5,10 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/filecoin-project/lotus/lib/async"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
+
+	"github.com/filecoin-project/lotus/lib/async"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -42,7 +43,7 @@ type TSPoW struct {
 	genesis *types.TipSet
 }
 
-func NewTSPoWConsensus(
+func NewConsensus(
 	sm *stmgr.StateManager,
 	beacon beacon.Schedule,
 	genesis chain.Genesis,
@@ -150,7 +151,7 @@ func (tsp *TSPoW) ValidateBlock(ctx context.Context, b *types.FullBlock) (err er
 		}
 	}
 
-	pweight, err := Weight(context.TODO(), nil, baseTs)
+	pweight, err := Weight(ctx, nil, baseTs)
 	if err != nil {
 		return fmt.Errorf("getting parent weight: %w", err)
 	}

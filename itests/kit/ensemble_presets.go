@@ -51,8 +51,8 @@ func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
 	miner.mirMultiAddr = h.Addrs()
 }
 
-// EnsembleMinimalMir creates and starts an Ensemble suitable for Mir.
-func EnsembleMinimalMir(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMiner, *Ensemble) {
+// EnsembleMinimalSpacenet creates and starts an Ensemble adapted for Spacenet.
+func EnsembleMinimalSpacenet(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMiner, *Ensemble) {
 	opts = append(opts, WithAllSubsystems())
 
 	eopts, nopts := siftOptions(t, opts)

@@ -78,17 +78,30 @@ debug: build-devnets
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: lotus mir-validator lotus-seed lotus-keygen lotus-shed
 
-spacenet-test: GOFLAGS+=-tags=spacenet
-spacenet-test:
+mir-test: GOFLAGS+=-tags=spacenet
+mir-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/tspow_test.go
-.PHONY: spacenet-test
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
+.PHONY: mir-test
 
-spacenet-test-race: GOFLAGS+=-tags=spacenet
-spacenet-test-race:
+mir-test-race: GOFLAGS+=-tags=spacenet
+mir-test-race:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
 	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
-.PHONY: spacenet-test-race
+.PHONY: mir-test-race
+
+pow-test: GOFLAGS+=-tags=spacenet
+pow-test:
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m ./itests/tspow_test.go
+.PHONY: pow-test
+
+pow-test-race: GOFLAGS+=-tags=spacenet
+pow-test-race:
+	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=10m ./itests/tspow_test.go
+.PHONY: pow-test-race
+
+spacenet-test: mir-test pow-test
+.PHONY: spacenet-test
 
 calibnet: GOFLAGS+=-tags=calibnet
 calibnet: build-devnets

@@ -21,7 +21,10 @@ import (
 
 // TODO: Consider moving this to build params and differentiate
 // between testing (low diff) and deployment (high diff).
-const GenesisPoWTarget = "2019783675352289407433363"
+
+// FIXME DENIS
+// const GenesisPoWTarget = "2019783675352289407433363"
+const GenesisPoWTarget = "20197836753522"
 
 // const GenesisPoWTarget = "4519783675352289407433363"
 

@@ -285,7 +285,8 @@ func (t *TipSetExecutor) ExecuteTipSet(ctx context.Context,
 	fbmsgs := make([]FilecoinBlockMessages, len(blkmsgs))
 	for i := range fbmsgs {
 		fbmsgs[i].BlockMessages = blkmsgs[i]
-		fbmsgs[i].WinCount = ts.Blocks()[i].ElectionProof.WinCount
+		// FIXME DENIS
+		// fbmsgs[i].WinCount = ts.Blocks()[i].ElectionProof.WinCount
 	}
 	baseFee := blks[0].ParentBaseFee
 

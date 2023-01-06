@@ -202,7 +202,9 @@ func (n *Ensemble) FullNode(full *TestFullNode, opts ...NodeOpt) *Ensemble {
 		require.NoError(n.t, err)
 	}
 
-	key, err := key.GenerateKey(types.KTBLS)
+	// FIXME DENIS
+	// key, err := key.GenerateKey(types.KTBLS)
+	key, err := key.GenerateKey(types.KTSecp256k1)
 	require.NoError(n.t, err)
 
 	if !n.bootstrapped && !options.balance.IsZero() {
@@ -412,7 +414,6 @@ func (n *Ensemble) Start() *Ensemble {
 				PrivateKey: pk,
 			})
 			require.NoError(n.t, err)
-
 		}
 
 		c, err := lr.Config()
@@ -443,7 +444,9 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Libp2p(&cfg.Common),
 			fxmodules.Repository(lr, cfg),
 			fxmodules.Blockstore(cfg),
-			fxmodules.Consensus(fxmodules.MirConsensus),
+			// FIXME DENIS
+			// fxmodules.Consensus(fxmodules.MirConsensus),
+			fxmodules.Consensus(n.options.consensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
 			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),

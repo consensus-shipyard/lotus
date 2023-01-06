@@ -44,8 +44,9 @@ var mirConsensusModule = fx.Module("mirConsensus",
 	fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(mir.RewardFunc), fx.As(new(stmgr.Executor)))),
 )
 
+// FIXME DENIS: all modules names should be consistent. Fix it if tests work
 var tspowModule = fx.Module("tspowModule",
-	fx.Provide(fx.Annotate(tspow.NewTSPoWConsensus), fx.As(new(consensus.Consensus))),
+	fx.Provide(fx.Annotate(tspow.NewConsensus, fx.As(new(consensus.Consensus)))),
 	fx.Supply(store.WeightFunc(tspow.Weight)),
 	fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(tspow.RewardFunc), fx.As(new(stmgr.Executor)))),
 )

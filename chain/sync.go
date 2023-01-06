@@ -1140,7 +1140,7 @@ func persistMessages(ctx context.Context, bs bstore.Blockstore, bst *exchange.Co
 	defer span.End()
 
 	for _, m := range bst.Bls {
-		//log.Infof("putting BLS message: %s", m.Cid())
+		// log.Infof("putting BLS message: %s", m.Cid())
 		if _, err := store.PutMessage(ctx, bs, m); err != nil {
 			log.Errorf("failed to persist messages: %+v", err)
 			return xerrors.Errorf("BLS message processing failed: %w", err)
@@ -1150,7 +1150,7 @@ func persistMessages(ctx context.Context, bs bstore.Blockstore, bst *exchange.Co
 		if m.Signature.Type != crypto.SigTypeSecp256k1 {
 			return xerrors.Errorf("unknown signature type on message %s: %q", m.Cid(), m.Signature.Type)
 		}
-		//log.Infof("putting secp256k1 message: %s", m.Cid())
+		// log.Infof("putting secp256k1 message: %s", m.Cid())
 		if _, err := store.PutMessage(ctx, bs, m); err != nil {
 			log.Errorf("failed to persist messages: %+v", err)
 			return xerrors.Errorf("secp256k1 message processing failed: %w", err)

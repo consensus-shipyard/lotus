@@ -10,15 +10,10 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 )
 
-// TestMirConsensus tests that Mir operates normally.
-//
-// Notes:
-//   - It is assumed that the first F of N nodes can be byzantine
-//   - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
-//     and nodes[MirFaultyValidatorNumber:] are honest nodes.
+// TestTSPoWConsensus tests that PoW operates normally.
 func TestTSPoWConsensus(t *testing.T) {
 	t.Run("tspow", func(t *testing.T) {
-		runTSPoWConsensusTests(t, kit.ThroughRPC())
+		runTSPoWConsensusTests(t, kit.ThroughRPC(), kit.PoWConsensus())
 	})
 }
 
@@ -42,9 +37,9 @@ func (ts *itestsTSpoWConsensusSuite) testTSPoWMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	full, miner, ens := kit.EnsembleMinimalMir(t, ts.opts...)
+	full, miner, ens := kit.EnsembleMinimalSpacenet(t, ts.opts...)
 	ens.BeginTSPoWMining(ctx, &wg, miner)
 
-	err := kit.AdvanceChain(ctx, 3, full)
+	err := kit.AdvanceChain(ctx, 5, full)
 	require.NoError(t, err)
 }
