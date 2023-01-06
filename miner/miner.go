@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/filecoin-project/lotus/eudico/fxmodules"
 	"os"
 	"sync"
 	"time"
@@ -148,7 +149,7 @@ func (m *Miner) Start(_ context.Context) error {
 
 	// block production only enabled in lotus-miner for
 	// FilecoinEC consensus.
-	if build.Consensus == build.FilecoinEC {
+	if fxmodules.InjectedConsensusAlgorithm == fxmodules.ExpectedConsensus {
 		go m.mine(context.TODO())
 	} else {
 		// handle the stop of lotus-miner for the case that

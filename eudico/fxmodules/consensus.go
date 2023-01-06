@@ -14,10 +14,19 @@ import (
 type ConsensusAlgorithm int
 
 const (
-	ExpectedConsensus ConsensusAlgorithm = iota
+	none ConsensusAlgorithm = iota
+	ExpectedConsensus
 	MirConsensus
 	TSPoWConsensus
 )
+
+// InjectedConsensusAlgorithm is an ugly hack to replace the deprecated
+// build.Consensus constant, which was used as throughout the code in conditional
+// expressions that execute depending on its value. Ideally, we would be not depend
+// on a global variable for conditional code execution, but refactoring the code
+// to avoid that is out of our current scope.
+// TODO: refactor code to avoid the need for this
+var InjectedConsensusAlgorithm = none
 
 func Consensus(algorithm ConsensusAlgorithm) fx.Option {
 	module := fxCase(algorithm,
@@ -29,6 +38,10 @@ func Consensus(algorithm ConsensusAlgorithm) fx.Option {
 	if module == nil {
 		panic("Unsupported consensus algorithm")
 	}
+	if InjectedConsensusAlgorithm != none {
+		panic("Consensus module can only be loaded once")
+	}
+	InjectedConsensusAlgorithm = algorithm
 	return module
 }
 

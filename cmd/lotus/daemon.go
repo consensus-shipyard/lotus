@@ -329,7 +329,12 @@ var DaemonCmd = &cli.Command{
 			liteModeDeps,
 
 			node.ApplyIf(
-				func(s *node.Settings) bool { return build.IsMirConsensus() },
+				func(s *node.Settings) bool {
+					// This used to return the deprecated build.IsMirConsensus()
+					// Since this command will essentially also be deprecated,
+					// it now simply returns true.
+					return true
+				},
 				node.Override(new(consensus.Consensus), mir.NewConsensus),
 				node.Override(new(store.WeightFunc), mir.Weight),
 				node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
