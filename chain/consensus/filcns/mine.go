@@ -32,7 +32,7 @@ func (filec *FilecoinEC) CreateBlock(ctx context.Context, w api.Wallet, bt *api.
 		return nil, xerrors.Errorf("failed to process messages from block template: %w", err)
 	}
 
-	if err := signBlock(ctx, w, worker, next); err != nil {
+	if err := consensus.SignBlock(ctx, w, worker, next); err != nil {
 		return nil, xerrors.Errorf("failed to sign new block: %w", err)
 	}
 

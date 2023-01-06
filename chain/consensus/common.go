@@ -482,3 +482,21 @@ func validateMsgMeta(ctx context.Context, msg *types.BlockMsg) error {
 
 	return nil
 }
+
+func SignBlock(ctx context.Context, w api.Wallet,
+	addr address.Address, next *types.BlockHeader) error {
+
+	nosigbytes, err := next.SigningBytes()
+	if err != nil {
+		return xerrors.Errorf("failed to get signing bytes for block: %w", err)
+	}
+
+	sig, err := w.WalletSign(ctx, addr, nosigbytes, api.MsgMeta{
+		Type: api.MTBlock,
+	})
+	if err != nil {
+		return xerrors.Errorf("failed to sign new block: %w", err)
+	}
+	next.BlockSig = sig
+	return nil
+}
