@@ -32,6 +32,7 @@ import (
 	"github.com/filecoin-project/go-state-types/exitcode"
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/go-statestore"
+	"github.com/filecoin-project/lotus/chain/consensus/tspow"
 	mapi "github.com/filecoin-project/mir"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	power3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/power"
@@ -223,7 +224,7 @@ func (n *Ensemble) FullNode(full *TestFullNode, opts ...NodeOpt) *Ensemble {
 	return n
 }
 
-// Miner enrolls a new miner, using the provided full node for chain
+// MinerEnroll enrolls a new miner, using the provided full node for chain
 // interactions.
 func (n *Ensemble) MinerEnroll(minerNode *TestMiner, full *TestFullNode, opts ...NodeOpt) *Ensemble {
 	require.NotNil(n.t, full, "full node required when instantiating miner")
@@ -347,6 +348,20 @@ func (n *Ensemble) Worker(minerNode *TestMiner, worker *TestWorker, opts ...Node
 	n.inactive.workers = append(n.inactive.workers, worker)
 
 	return n
+}
+
+// EnsembleFullNodeOnly creates and starts a EudicoEnsemble with a single full node.
+// It is used with Eudico consensus protocols that implementation is different from Filecoin one.
+func EnsembleFullNodeOnly(t *testing.T, opts ...interface{}) (*TestFullNode, *Ensemble) {
+	opts = append(opts, WithAllSubsystems())
+
+	eopts, nopts := siftOptions(t, opts)
+
+	var (
+		full TestFullNode
+	)
+	ens := NewEnsemble(t, eopts...).FullNode(&full, nopts...).Start()
+	return &full, ens
 }
 
 // Start starts all enrolled nodes.
@@ -1105,6 +1120,25 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 				RandomDelay(delay)
 			}
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, &cfg)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(ctx, i, m)
+	}
+}
+
+func (n *Ensemble) BeginTSPoWMining(ctx context.Context, wg *sync.WaitGroup, miners ...*TestMiner) {
+
+	for i, m := range miners {
+		ctx, cancel := context.WithCancel(ctx)
+		m.stopMir = cancel
+
+		wg.Add(1)
+
+		go func(ctx context.Context, i int, m *TestMiner) {
+			defer wg.Done()
+			err := tspow.Mine(ctx, m.FullNode.DefaultKey.Address, m.FullNode)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
