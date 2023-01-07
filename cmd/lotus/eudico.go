@@ -17,6 +17,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-paramfetch"
+	"github.com/filecoin-project/lotus/chain/consensus"
 
 	"github.com/filecoin-project/lotus/build"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -216,7 +217,7 @@ func eudicoDaemonAction(cctx *cli.Context) error {
 		fxmodules.Libp2p(&cfg.Common),
 		fxmodules.Repository(lockedRepo, cfg),
 		fxmodules.Blockstore(cfg),
-		fxmodules.Consensus(fxmodules.MirConsensus),
+		fxmodules.Consensus(consensus.Mir),
 		fxmodules.RpcServer(cctx, r, lockedRepo, cfg),
 		// misc providers
 		fx.Supply(isBootstrapper),

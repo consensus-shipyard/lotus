@@ -4,9 +4,8 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
-
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 )
@@ -26,7 +25,7 @@ type ensembleOpts struct {
 
 	upgradeSchedule stmgr.UpgradeSchedule
 
-	consensus fxmodules.ConsensusAlgorithm
+	consensus consensus.Algorithm
 }
 
 var DefaultEnsembleOpts = ensembleOpts{
@@ -40,7 +39,7 @@ var DefaultEnsembleOpts = ensembleOpts{
 // MirConsensus sets consensus protocol to Mir.
 func MirConsensus() EnsembleOpt {
 	return func(opts *ensembleOpts) error {
-		opts.consensus = fxmodules.MirConsensus
+		opts.consensus = consensus.Mir
 		return nil
 	}
 }
@@ -48,7 +47,7 @@ func MirConsensus() EnsembleOpt {
 // PoWConsensus sets consensus protocol to TSPoW.
 func PoWConsensus() EnsembleOpt {
 	return func(opts *ensembleOpts) error {
-		opts.consensus = fxmodules.TSPoWConsensus
+		opts.consensus = consensus.TSPoW
 		return nil
 	}
 }

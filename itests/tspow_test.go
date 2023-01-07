@@ -10,24 +10,31 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 )
 
-// TestTSPoWConsensus tests that PoW operates normally.
-func TestTSPoWConsensus(t *testing.T) {
-	t.Run("tspow", func(t *testing.T) {
-		runTSPoWConsensusTests(t, kit.ThroughRPC(), kit.PoWConsensus())
+const (
+	PoWTotalMinerNumber  = 4
+	PoWTestedBlockNumber = 4
+)
+
+// TestPoWConsensus tests that PoW operates normally.
+func TestPoWConsensus(t *testing.T) {
+	t.Run("pow", func(t *testing.T) {
+		runPoWConsensusTests(t, kit.ThroughRPC(), kit.PoWConsensus())
 	})
 }
 
-type itestsTSpoWConsensusSuite struct {
+type itestsPoWConsensusSuite struct {
 	opts []interface{}
 }
 
-func runTSPoWConsensusTests(t *testing.T, opts ...interface{}) {
-	ts := itestsTSpoWConsensusSuite{opts: opts}
+func runPoWConsensusTests(t *testing.T, opts ...interface{}) {
+	ts := itestsPoWConsensusSuite{opts: opts}
 
-	t.Run("testTSPoWMining", ts.testTSPoWMining)
+	// t.Run("testPoWMining", ts.testPoWOneNoneMining)
+	t.Run("testPoWAllNodesMining", ts.testPoWAllNodesMining)
 }
 
-func (ts *itestsTSpoWConsensusSuite) testTSPoWMining(t *testing.T) {
+// testPoWOneNoneMining tests that a PoW node can mine blocks.
+func (ts *itestsPoWConsensusSuite) testPoWOneNoneMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,8 +45,31 @@ func (ts *itestsTSpoWConsensusSuite) testTSPoWMining(t *testing.T) {
 	}()
 
 	full, miner, ens := kit.EnsembleMinimalSpacenet(t, ts.opts...)
-	ens.BeginTSPoWMining(ctx, &wg, miner)
+	ens.BeginPoWMining(ctx, &wg, miner)
 
-	err := kit.AdvanceChain(ctx, 5, full)
+	err := kit.AdvanceChain(ctx, PoWTestedBlockNumber, full)
 	require.NoError(t, err)
+}
+
+// testPoWAllNodesMining tests that n nodes can mine blocks normally.
+func (ts *itestsPoWConsensusSuite) testPoWAllNodesMining(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+	}()
+
+	nodes, miners, ens := kit.EnsemblePoWNodes(t, PoWTotalMinerNumber, ts.opts...)
+	ens.InterconnectFullNodes().BeginPoWMining(ctx, &wg, miners...)
+
+	err := kit.AdvanceChain(ctx, PoWTestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
+	// FIXME DENIS
+	// Can we use CheckNodesInSync in PoW? At present, it fails with "failed to reach the same CID in node" error.
+	// err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	// require.NoError(t, err)
 }

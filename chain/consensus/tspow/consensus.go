@@ -8,11 +8,11 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/lotus/lib/async"
-
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/lib/async"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain"
@@ -32,10 +32,10 @@ const (
 	MaxHeightDrift = 5
 )
 
-var (
-	_   consensus.Consensus = &TSPoW{}
-	log                     = logging.Logger("tspow-consensus")
-)
+var log = logging.Logger("tspow-consensus")
+
+// TSPoW implements consensus.Consensus.
+var _ consensus.Consensus = &TSPoW{}
 
 type TSPoW struct {
 	beacon  beacon.Schedule

@@ -444,8 +444,6 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Libp2p(&cfg.Common),
 			fxmodules.Repository(lr, cfg),
 			fxmodules.Blockstore(cfg),
-			// FIXME DENIS
-			// fxmodules.Consensus(fxmodules.MirConsensus),
 			fxmodules.Consensus(n.options.consensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
@@ -1131,7 +1129,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 	}
 }
 
-func (n *Ensemble) BeginTSPoWMining(ctx context.Context, wg *sync.WaitGroup, miners ...*TestMiner) {
+func (n *Ensemble) BeginPoWMining(ctx context.Context, wg *sync.WaitGroup, miners ...*TestMiner) {
 
 	for i, m := range miners {
 		ctx, cancel := context.WithCancel(ctx)

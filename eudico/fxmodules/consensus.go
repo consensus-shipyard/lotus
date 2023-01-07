@@ -11,22 +11,14 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 )
 
-type ConsensusAlgorithm int
-
-const (
-	ExpectedConsensus ConsensusAlgorithm = iota
-	MirConsensus
-	TSPoWConsensus
-)
-
-func Consensus(algorithm ConsensusAlgorithm) fx.Option {
+func Consensus(algorithm consensus.Algorithm) fx.Option {
 	switch algorithm {
-	case ExpectedConsensus:
+	case consensus.Expected:
 		return filecoinExpectedConsensusModule
-	case MirConsensus:
+	case consensus.Mir:
 		return mirConsensusModule
-	case TSPoWConsensus:
-		return tspowModule
+	case consensus.TSPoW:
+		return tspowConsensusModule
 	default:
 		panic("Unsupported consensus algorithm")
 	}
@@ -44,8 +36,7 @@ var mirConsensusModule = fx.Module("mirConsensus",
 	fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(mir.RewardFunc), fx.As(new(stmgr.Executor)))),
 )
 
-// FIXME DENIS: all modules names should be consistent. Fix it if tests work
-var tspowModule = fx.Module("tspowModule",
+var tspowConsensusModule = fx.Module("tspowConsensus",
 	fx.Provide(fx.Annotate(tspow.NewConsensus, fx.As(new(consensus.Consensus)))),
 	fx.Supply(store.WeightFunc(tspow.Weight)),
 	fx.Supply(fx.Annotate(consensus.NewTipSetExecutor(tspow.RewardFunc), fx.As(new(stmgr.Executor)))),

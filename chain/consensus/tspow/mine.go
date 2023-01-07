@@ -61,8 +61,9 @@ func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
 		bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
 			Miner:            addr,
 			Parents:          types.NewTipSetKey(BestWorkBlock(base).Cid()),
-			BeaconValues:     nil,
 			Ticket:           &types.Ticket{VRFProof: diffb},
+			Eproof:           &types.ElectionProof{},
+			BeaconValues:     nil,
 			Messages:         msgs,
 			Epoch:            base.Height() + 1,
 			Timestamp:        uint64(time.Now().Unix()),

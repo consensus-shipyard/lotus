@@ -23,7 +23,7 @@ const (
 	MirReferenceSyncingNode  = MirFaultyValidatorNumber // The first non-faulty node is a syncing node.
 	MirHonestValidatorNumber = MirTotalValidatorNumber - MirFaultyValidatorNumber
 	MirLearnersNumber        = MirFaultyValidatorNumber + 1
-	TestedBlockNumber        = 10
+	MirTestedBlockNumber     = 10
 	MaxDelay                 = 30
 )
 
@@ -38,15 +38,12 @@ func TestMirConsensus(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	t.Run("mir", func(t *testing.T) {
-		// FIXME DENIS
-		// runMirConsensusTests(t, kit.ThroughRPC())
-		runDraftTest(t, kit.ThroughRPC(), kit.MirConsensus())
+		runMirConsensusTests(t, kit.ThroughRPC(), kit.MirConsensus())
 	})
 }
 
-// FIXME DENIS
 // TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
-func FixmeTestMirConsensusWithMangler(t *testing.T) {
+func T1estMirConsensusWithMangler(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
@@ -58,7 +55,7 @@ func FixmeTestMirConsensusWithMangler(t *testing.T) {
 	}()
 
 	t.Run("mirWithMangler", func(t *testing.T) {
-		runMirManglingTests(t, kit.ThroughRPC())
+		runMirManglingTests(t, kit.ThroughRPC(), kit.MirConsensus())
 	})
 }
 
@@ -66,7 +63,7 @@ func FixmeTestMirConsensusWithMangler(t *testing.T) {
 func runDraftTest(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
-	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
+	t.Run("testMirOneNodeMining", ts.testMirAllNodesMining)
 }
 
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
@@ -118,7 +115,7 @@ func (ts *itestsConsensusSuite) testMirOneNodeMining(t *testing.T) {
 	full, miner, ens := kit.EnsembleMinimalSpacenet(t, ts.opts...)
 	ens.BeginMirMining(ctx, &wg, miner)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, full)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, full)
 	require.NoError(t, err)
 }
 
@@ -155,7 +152,7 @@ func (ts *itestsConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 
 	ens.Connect(n1, n2).BeginMirMining(ctx, &wg, m1, m2)
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, n1, n2)
+	err = kit.AdvanceChain(ctx, MirTestedBlockNumber, n1, n2)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, n1, n2)
 	require.NoError(t, err)
@@ -175,7 +172,7 @@ func (ts *itestsConsensusSuite) testMirAllNodesMining(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
@@ -195,7 +192,7 @@ func (ts *itestsConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirHonestValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
@@ -216,7 +213,7 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Log(">>> learners join")
@@ -231,7 +228,7 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 
 	ens.Start().InterconnectFullNodes()
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, learners...)
+	err = kit.AdvanceChain(ctx, MirTestedBlockNumber, learners...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], append(nodes[1:], learners...)...)
 	require.NoError(t, err)
@@ -298,7 +295,7 @@ func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
 
 	ens.Start().InterconnectFullNodes()
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	// send funds to learners so they can send a message themselves
@@ -321,7 +318,7 @@ func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err = kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	for range learners {
@@ -367,7 +364,7 @@ func (ts *itestsConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMiningWithDelay(ctx, &wg, MaxDelay, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
@@ -388,7 +385,7 @@ func (ts *itestsConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMiningWithDelayForFaultyNodes(ctx, &wg, MaxDelay, miners[MirFaultyValidatorNumber:], miners[:MirFaultyValidatorNumber]...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
@@ -446,20 +443,20 @@ func (ts *itestsConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
 
 	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.ChainHeightCheckWithFaultyNodes(ctx, MirTestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
 	restoreConnections()
 
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// err = kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	// require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
@@ -481,20 +478,20 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.ChainHeightCheckWithFaultyNodes(ctx, MirTestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
 	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// err = kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	// require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
@@ -525,7 +522,7 @@ func (ts *itestsConsensusSuite) testMirStartStop(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 }
 
@@ -545,19 +542,19 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.ChainHeightCheckWithFaultyNodes(ctx, MirTestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithEmptyState(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err = kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Log(">>> checking nodes are in sync")
@@ -580,19 +577,19 @@ func (ts *itestsConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> crash %d nodes", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, MaxDelay, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.ChainHeightCheckWithFaultyNodes(ctx, MirTestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err = kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
@@ -615,7 +612,7 @@ func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
@@ -624,14 +621,14 @@ func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.ChainHeightCheckWithFaultyNodes(ctx, MirTestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Log(">>> restoring network connections")
 	restoreConnections()
 
 	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	// err = kit.AdvanceChain(ctx, MirTestedBlockNumber, nodes...)
 	// require.NoError(t, err)
 	time.Sleep(10 * time.Second)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
