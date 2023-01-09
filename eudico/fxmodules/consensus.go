@@ -11,20 +11,12 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 )
 
-type ConsensusAlgorithm int
-
-const (
-	ExpectedConsensus ConsensusAlgorithm = iota
-	MirConsensus
-	TSPoWConsensus
-)
-
-func Consensus(algorithm ConsensusAlgorithm) fx.Option {
+func Consensus(algorithm consensus.Algorithm) fx.Option {
 	module := fxCase(algorithm,
-		map[ConsensusAlgorithm]fx.Option{
-			ExpectedConsensus: filecoinExpectedConsensusModule,
-			MirConsensus:      mirConsensusModule,
-			TSPoWConsensus:    tspowConsensusModule,
+		map[consensus.Algorithm]fx.Option{
+			consensus.Expected: filecoinExpectedConsensusModule,
+			consensus.Mir:      mirConsensusModule,
+			consensus.TSPoW:    tspowConsensusModule,
 		})
 	if module == nil {
 		panic("Unsupported consensus algorithm")
