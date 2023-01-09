@@ -199,11 +199,6 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	// Sanity check.
-	if nr != sm.currentEpoch+1 {
-		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
-	}
-
 	// The base membership is the last one membership.
 	newMembership := maputil.Copy(sm.memberships[nr+ConfigOffset])
 
