@@ -15,26 +15,8 @@ const (
 	PoWTestedBlockNumber = 4
 )
 
-// TestPoWConsensus tests that PoW operates normally.
-func TestPoWConsensus(t *testing.T) {
-	t.Run("pow", func(t *testing.T) {
-		runPoWConsensusTests(t, kit.ThroughRPC(), kit.PoWConsensus())
-	})
-}
-
-type itestsPoWConsensusSuite struct {
-	opts []interface{}
-}
-
-func runPoWConsensusTests(t *testing.T, opts ...interface{}) {
-	ts := itestsPoWConsensusSuite{opts: opts}
-
-	// t.Run("testPoWMining", ts.testPoWOneNoneMining)
-	t.Run("testPoWAllNodesMining", ts.testPoWAllNodesMining)
-}
-
-// testPoWOneNoneMining tests that a PoW node can mine blocks.
-func (ts *itestsPoWConsensusSuite) testPoWOneNoneMining(t *testing.T) {
+// TestPoWOneNodeMining tests that PoW operates normally on one node.
+func TestPoWOneNodeMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -44,15 +26,15 @@ func (ts *itestsPoWConsensusSuite) testPoWOneNoneMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	full, miner, ens := kit.EnsembleMinimalSpacenet(t, ts.opts...)
+	full, miner, ens := kit.EnsembleMinimalSpacenet(t, kit.ThroughRPC(), kit.PoWConsensus())
 	ens.BeginPoWMining(ctx, &wg, miner)
 
 	err := kit.AdvanceChain(ctx, PoWTestedBlockNumber, full)
 	require.NoError(t, err)
 }
 
-// testPoWAllNodesMining tests that n nodes can mine blocks normally.
-func (ts *itestsPoWConsensusSuite) testPoWAllNodesMining(t *testing.T) {
+// TestPoWAllNodesMining tests that PoW operates normally on N nodes.
+func TestPoWAllNodesMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -62,7 +44,7 @@ func (ts *itestsPoWConsensusSuite) testPoWAllNodesMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsemblePoWNodes(t, PoWTotalMinerNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsemblePoWNodes(t, PoWTotalMinerNumber, kit.ThroughRPC(), kit.PoWConsensus())
 	ens.InterconnectFullNodes().BeginPoWMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, PoWTestedBlockNumber, nodes...)
