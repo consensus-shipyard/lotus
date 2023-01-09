@@ -3,7 +3,7 @@ package rand
 import (
 	"context"
 	"encoding/binary"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico/global"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -114,7 +114,7 @@ type stateRand struct {
 func NewStateRand(cs *store.ChainStore, blks []cid.Cid, b beacon.Schedule, networkVersionGetter NetworkVersionGetter) vm.Rand {
 	// we don't use winningPoSt and we use fake windowPoSt when running
 	// mir consensus (at least for now)
-	if fxmodules.InjectedConsensusAlgorithm == fxmodules.MirConsensus {
+	if global.InjectedConsensusAlgorithm == global.MirConsensus {
 		log.Warn("=================================================================================")
 		log.Warn("DANGER ZONE! YOU ARE USING FAKE RANDOMNESS FOR YOUR VM AND PROOFS. USE WITH CARE!")
 		log.Warn("=================================================================================")

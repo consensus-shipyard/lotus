@@ -3,7 +3,7 @@ package consensus
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico/global"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -428,7 +428,7 @@ func decodeAndCheckBlock(msg *pubsub.Message) (*types.BlockMsg, string, error) {
 	}
 
 	// make sure we have a signature
-	if fxmodules.InjectedConsensusAlgorithm != fxmodules.MirConsensus {
+	if global.InjectedConsensusAlgorithm != global.MirConsensus {
 		if blk.Header.BlockSig == nil {
 			return nil, "missing_signature", fmt.Errorf("block without a signature")
 		}

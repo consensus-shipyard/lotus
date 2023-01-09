@@ -2,7 +2,7 @@ package types
 
 import (
 	"bytes"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico/global"
 	"math/big"
 
 	block "github.com/ipfs/go-block-format"
@@ -72,7 +72,7 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 		return nil, err
 	}
 
-	if fxmodules.InjectedConsensusAlgorithm == fxmodules.MirConsensus {
+	if global.InjectedConsensusAlgorithm == global.MirConsensus {
 		// make a copy
 		bblk := *blk
 		bblk.ElectionProof = &ElectionProof{}

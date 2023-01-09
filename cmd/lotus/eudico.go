@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/filecoin-project/lotus/eudico/global"
 	"os"
 	"runtime/pprof"
 
@@ -216,7 +217,7 @@ func eudicoDaemonAction(cctx *cli.Context) error {
 		fxmodules.Libp2p(&cfg.Common),
 		fxmodules.Repository(lockedRepo, cfg),
 		fxmodules.Blockstore(cfg),
-		fxmodules.Consensus(fxmodules.MirConsensus),
+		fxmodules.Consensus(global.MirConsensus),
 		fxmodules.RpcServer(cctx, r, lockedRepo, cfg),
 		// misc providers
 		fx.Supply(isBootstrapper),

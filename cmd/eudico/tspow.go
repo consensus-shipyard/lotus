@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico/global"
 
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
@@ -17,7 +17,7 @@ var tpowCmd = &cli.Command{
 	Usage: "TipSet PoW consensus testbed",
 	Subcommands: []*cli.Command{
 		tpowMinerCmd,
-		daemonCmd(fxmodules.TSPoWConsensus),
+		daemonCmd(global.TSPoWConsensus),
 	},
 }
 

@@ -2,7 +2,7 @@ package modules
 
 import (
 	"context"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico/global"
 	"os"
 	"strconv"
 	"time"
@@ -199,7 +199,7 @@ func HandleIncomingMessages(mctx helpers.MetricsCtx, lc fx.Lifecycle, ps *pubsub
 	// see https://github.com/consensus-shipyard/lotus/issues/24 and how
 	// the block timestamp is set in chain/consensus/mir/consensus.go for
 	// context.
-	if bool(bootstrapper) || fxmodules.InjectedConsensusAlgorithm == fxmodules.MirConsensus {
+	if bool(bootstrapper) || global.InjectedConsensusAlgorithm == global.MirConsensus {
 		subscribe()
 		return
 	}

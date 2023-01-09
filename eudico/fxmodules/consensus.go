@@ -1,6 +1,7 @@
 package fxmodules
 
 import (
+	"github.com/filecoin-project/lotus/eudico/global"
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/chain/consensus"
@@ -11,37 +12,20 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 )
 
-type ConsensusAlgorithm int
-
-const (
-	none ConsensusAlgorithm = iota
-	ExpectedConsensus
-	MirConsensus
-	TSPoWConsensus
-)
-
-// InjectedConsensusAlgorithm is an ugly hack to replace the deprecated
-// build.Consensus constant, which was used as throughout the code in conditional
-// expressions that execute depending on its value. Ideally, we would be not depend
-// on a global variable for conditional code execution, but refactoring the code
-// to avoid that is out of our current scope.
-// TODO: refactor code to avoid the need for this
-var InjectedConsensusAlgorithm = none
-
-func Consensus(algorithm ConsensusAlgorithm) fx.Option {
+func Consensus(algorithm global.ConsensusAlgorithm) fx.Option {
 	module := fxCase(algorithm,
-		map[ConsensusAlgorithm]fx.Option{
-			ExpectedConsensus: filecoinExpectedConsensusModule,
-			MirConsensus:      mirConsensusModule,
-			TSPoWConsensus:    tspowModule,
+		map[global.ConsensusAlgorithm]fx.Option{
+			global.ExpectedConsensus: filecoinExpectedConsensusModule,
+			global.MirConsensus:      mirConsensusModule,
+			global.TSPoWConsensus:    tspowModule,
 		})
 	if module == nil {
 		panic("Unsupported consensus algorithm")
 	}
-	if InjectedConsensusAlgorithm != none {
+	if global.InjectedConsensusAlgorithm != global.None {
 		panic("Consensus module can only be loaded once")
 	}
-	InjectedConsensusAlgorithm = algorithm
+	global.InjectedConsensusAlgorithm = algorithm
 	return module
 }
 

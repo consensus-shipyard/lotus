@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/lotus/node"
@@ -57,7 +58,7 @@ var daemonStopCmd = &cli.Command{
 }
 
 // DaemonCmd is the `eudico daemon` command
-func daemonCmd(consensusAlgorithm fxmodules.ConsensusAlgorithm) *cli.Command {
+func daemonCmd(consensusAlgorithm global.ConsensusAlgorithm) *cli.Command {
 	return &cli.Command{
 		Name:  "daemon",
 		Usage: "Start a eudico daemon process",
@@ -137,7 +138,7 @@ func daemonCmd(consensusAlgorithm fxmodules.ConsensusAlgorithm) *cli.Command {
 	}
 }
 
-func EudicoDaemonAction(consensusAlgorithm fxmodules.ConsensusAlgorithm) func(*cli.Context) error {
+func EudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.Context) error {
 	return func(cctx *cli.Context) error {
 		isLite := cctx.Bool("lite")
 		isMirValidator := cctx.Bool("mir-validator")
@@ -235,22 +236,7 @@ func EudicoDaemonAction(consensusAlgorithm fxmodules.ConsensusAlgorithm) func(*c
 		chainfile := cctx.String("import-chain")
 		snapshot := cctx.String("import-snapshot")
 		if chainfile != "" || snapshot != "" {
-			if chainfile != "" && snapshot != "" {
-				return fmt.Errorf("cannot specify both 'import-snapshot' and 'import-chain'")
-			}
-			var issnapshot bool
-			if chainfile == "" {
-				chainfile = snapshot
-				issnapshot = true
-			}
-
-			if err := ImportChain(ctx, r, chainfile, issnapshot); err != nil {
-				return err
-			}
-			if cctx.Bool("halt-after-import") {
-				fmt.Println("Chain import complete, halting as requested...")
-				return nil
-			}
+			panic("import chain or snapshot is not supported")
 		}
 
 		genesis := fx.Options()
@@ -343,116 +329,4 @@ func EudicoDaemonAction(consensusAlgorithm fxmodules.ConsensusAlgorithm) func(*c
 		// TODO: properly parse api endpoint (or make it a URL)
 		return nil
 	}
-}
-
-func ImportChain(ctx context.Context, r repo.Repo, fname string, snapshot bool) (err error) {
-	/*	var rd io.Reader
-		var l int64
-		if strings.HasPrefix(fname, "http://") || strings.HasPrefix(fname, "https://") {
-			resp, err := http.Get(fname) //nolint:gosec
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close() //nolint:errcheck
-
-			if resp.StatusCode != http.StatusOK {
-				return xerrors.Errorf("fetching chain CAR failed with non-200 response: %d", resp.StatusCode)
-			}
-
-			rd = resp.Body
-			l = resp.ContentLength
-		} else {
-			fname, err = homedir.Expand(fname)
-			if err != nil {
-				return err
-			}
-
-			fi, err := os.Open(fname)
-			if err != nil {
-				return err
-			}
-			defer fi.Close() //nolint:errcheck
-
-			st, err := os.Stat(fname)
-			if err != nil {
-				return err
-			}
-
-			rd = fi
-			l = st.Size()
-		}
-
-		lr, err := r.Lock(repo.FullNode)
-		if err != nil {
-			return err
-		}
-		defer lr.Close() //nolint:errcheck
-
-		bs, err := lr.Blockstore(ctx, repo.UniversalBlockstore)
-		if err != nil {
-			return xerrors.Errorf("failed to open blockstore: %w", err)
-		}
-
-		mds, err := lr.Datastore(context.TODO(), "/metadata")
-		if err != nil {
-			return err
-		}
-
-		j, err := journal.OpenFSJournal(lr, journal.EnvDisabledEvents())
-		if err != nil {
-			return xerrors.Errorf("failed to open journal: %w", err)
-		}
-	*/
-	panic("weight todo")
-	/*cst := store.NewChainStore(bs, bs, mds, nil, j)
-	defer cst.Close() //nolint:errcheck
-
-	log.Infof("importing chain from %s...", fname)
-
-	bufr := bufio.NewReaderSize(rd, 1<<20)
-
-	bar := pb.New64(l)
-	br := bar.NewProxyReader(bufr)
-	bar.ShowTimeLeft = true
-	bar.ShowPercent = true
-	bar.ShowSpeed = true
-	bar.Units = pb.U_BYTES
-
-	bar.Start()
-	ts, err := cst.Import(br)
-	bar.Finish()
-
-	if err != nil {
-		return xerrors.Errorf("importing chain failed: %w", err)
-	}
-
-	if err := cst.FlushValidationCache(); err != nil {
-		return xerrors.Errorf("flushing validation cache failed: %w", err)
-	}
-
-	gb, err := cst.GetTipsetByHeight(ctx, 0, ts, true)
-	if err != nil {
-		return err
-	}
-
-	err = cst.SetGenesis(gb.Blocks()[0])
-	if err != nil {
-		return err
-	}
-
-	stm, _ := stmgr.NewStateManager(cst, vm.Syscalls(ffiwrapper.ProofVerifier))
-
-	if !snapshot {
-		log.Infof("validating imported chain...")
-		if err := stm.ValidateChain(ctx, ts); err != nil {
-			return xerrors.Errorf("chain validation failed: %w", err)
-		}
-	}
-
-	log.Infof("accepting %s as new head", ts.Cids())
-	if err := cst.ForceHeadSilent(ctx, ts); err != nil {
-		return err
-	}
-	return nil
-	*/
 }

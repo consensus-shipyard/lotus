@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/filecoin-project/lotus/eudico/global"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -428,7 +429,7 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Libp2p(&cfg.Common),
 			fxmodules.Repository(lr, cfg),
 			fxmodules.Blockstore(cfg),
-			fxmodules.Consensus(fxmodules.MirConsensus),
+			fxmodules.Consensus(global.MirConsensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
 			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),
@@ -860,7 +861,7 @@ func (n *Ensemble) Start() *Ensemble {
 	err = n.mn.LinkAll()
 	require.NoError(n.t, err)
 
-	if fxmodules.InjectedConsensusAlgorithm != fxmodules.MirConsensus &&
+	if global.InjectedConsensusAlgorithm != global.MirConsensus &&
 		!n.bootstrapped && len(n.active.miners) > 0 {
 		// We have *just* bootstrapped, so mine 2 blocks to setup some CE stuff in some actors
 		var wait sync.Mutex
