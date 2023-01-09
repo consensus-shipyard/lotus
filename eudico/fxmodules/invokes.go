@@ -26,7 +26,7 @@ func Invokes(cfg *config.Common, isBootstrap bool, isMirValidator bool) fx.Optio
 			modules.RelayIndexerMessages,                    // 15
 			settler.SettlePaymentChannels,                   // 24
 		),
-		optionalInvoke(modules.RunPeerMgr, isBootstrap),               // 10
-		optionalInvoke(modules.HandleIncomingBlocks, !isMirValidator), // 11
+		fxOptional(isBootstrap, fx.Invoke(modules.RunPeerMgr)),               // 10
+		fxOptional(!isMirValidator, fx.Invoke(modules.HandleIncomingBlocks)), // 11
 	)
 }

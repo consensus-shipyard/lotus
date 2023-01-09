@@ -58,7 +58,7 @@ func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 
 			new(dtypes.MpoolLocker),
 		),
-		optionalProvide(peermgr.NewPeerMgr, isBootstrap),
+		fxOptional(isBootstrap, fx.Provide(peermgr.NewPeerMgr)),
 		fx.Provide(
 			// Consensus settings
 			modules.BuiltinDrandConfig,
