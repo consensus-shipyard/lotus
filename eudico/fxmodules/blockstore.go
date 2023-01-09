@@ -10,34 +10,45 @@ import (
 
 func Blockstore(cfg *config.FullNode) fx.Option {
 	return fx.Module("blockstore",
+		fxEitherOr(cfg.Chainstore.EnableSplitstore,
+			fx.Options(
+				fxCase(cfg.Chainstore.Splitstore.ColdStoreType,
+					map[string]fx.Option{
+						"universal": fx.Provide(fx.Annotate(modules.UniversalBlockstore, fx.As(new(dtypes.ColdBlockstore)))),
+						"messages":  fx.Provide(fx.Annotate(modules.UniversalBlockstore, fx.As(new(dtypes.ColdBlockstore)))),
+						"discard":   fx.Provide(modules.DiscardColdBlockstore),
+					}),
+				fxOptional(cfg.Chainstore.Splitstore.HotStoreType == "badger", fx.Provide(modules.BadgerHotBlockstore)),
+				fx.Provide(
+					modules.SplitBlockstore(&cfg.Chainstore),
+					fx.Annotate(modules.ChainSplitBlockstore, fx.As(new(dtypes.BasicChainBlockstore))),
+					modules.StateSplitBlockstore,
+					modules.ExposedSplitBlockstore,
+					modules.SplitBlockstoreGCReferenceProtector,
+					func(blockstore dtypes.SplitBlockstore) dtypes.BaseBlockstore { return blockstore },
+				),
+			),
+			fx.Provide(
+				fx.Annotate(modules.ChainFlatBlockstore, fx.As(new(dtypes.BasicChainBlockstore))),
+				modules.StateFlatBlockstore,
+				func(blockstore dtypes.UniversalBlockstore) (dtypes.BaseBlockstore, dtypes.ExposedBlockstore) {
+					return blockstore, blockstore
+				},
+				modules.NoopGCReferenceProtector,
+			),
+		),
 		fx.Provide(
 			modules.UniversalBlockstore,
 
-			// TODO(hmoniz): assuming cfg.Chainstore.EnableSplitstore == false
-			// check if this should always be the case for Eudico
-			fx.Annotate(modules.ChainFlatBlockstore, fx.As(new(dtypes.BasicChainBlockstore))),
-			fx.Annotate(modules.StateFlatBlockstore, fx.As(new(dtypes.BasicStateBlockstore))),
-			func(blockstore dtypes.UniversalBlockstore) dtypes.BaseBlockstore {
-				return (dtypes.BaseBlockstore)(blockstore)
-			},
-			func(blockstore dtypes.UniversalBlockstore) dtypes.ExposedBlockstore {
-				return (dtypes.ExposedBlockstore)(blockstore)
-			},
-			modules.NoopGCReferenceProtector,
-
 			func(blockstore dtypes.BasicChainBlockstore) dtypes.ChainBlockstore {
-				return (dtypes.ChainBlockstore)(blockstore)
+				return blockstore
 			},
 			func(blockstore dtypes.BasicStateBlockstore) dtypes.StateBlockstore {
-				return (dtypes.StateBlockstore)(blockstore)
+				return blockstore
 			},
-
 			modules.ClientImportMgr,
-
 			modules.ClientBlockstore,
-
 			modules.Graphsync(cfg.Client.SimultaneousTransfersForStorage, cfg.Client.SimultaneousTransfersForRetrieval),
-
 			modules.RetrievalClient(cfg.Client.OffChainRetrieval),
 
 			// then assuming that cfg.Client.UseIpfs, cfg.Wallet.RemoteBackend, cfg.Wallet.EnableLedger,
