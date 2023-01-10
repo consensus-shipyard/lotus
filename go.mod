@@ -255,7 +255,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
-	github.com/kisielk/godepgraph v0.0.0-20221115040737-2d0831789458 // indirect
 	github.com/klauspost/compress v1.15.10 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
 	github.com/koron/go-ssdp v0.0.3 // indirect
