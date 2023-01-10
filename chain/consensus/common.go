@@ -3,7 +3,7 @@ package consensus
 import (
 	"context"
 	"fmt"
-	"github.com/filecoin-project/lotus/eudico/global"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"

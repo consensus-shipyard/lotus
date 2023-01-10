@@ -2,7 +2,7 @@ package fxmodules
 
 import (
 	"github.com/filecoin-project/lotus/chain/consensus"
-	"github.com/filecoin-project/lotus/eudico/global"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"go.uber.org/fx"
 
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"

@@ -6,7 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"github.com/filecoin-project/lotus/eudico/global"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"os"
 	"sync"
 	"time"

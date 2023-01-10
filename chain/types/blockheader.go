@@ -2,7 +2,7 @@ package types
 
 import (
 	"bytes"
-	"github.com/filecoin-project/lotus/eudico/global"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"math/big"
 
 	block "github.com/ipfs/go-block-format"

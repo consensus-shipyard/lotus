@@ -3,7 +3,7 @@ package rand
 import (
 	"context"
 	"encoding/binary"
-	"github.com/filecoin-project/lotus/eudico/global"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"

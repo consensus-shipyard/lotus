@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/filecoin-project/lotus/eudico/global"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	_ "net/http/pprof"
 	"path/filepath"
 
