@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/filecoin-project/lotus/eudico-core/global"
 	_ "net/http/pprof"
 	"path/filepath"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 )

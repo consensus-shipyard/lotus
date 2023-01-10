@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/urfave/cli/v2"
+
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 var mirCmd = &cli.Command{

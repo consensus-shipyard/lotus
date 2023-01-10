@@ -3,7 +3,6 @@ package rand
 import (
 	"context"
 	"encoding/binary"
-	"github.com/filecoin-project/lotus/eudico-core/global"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -19,6 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 var log = logging.Logger("rand")

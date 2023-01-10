@@ -1,15 +1,15 @@
 package fxmodules
 
 import (
-	"github.com/filecoin-project/lotus/chain/consensus"
-	"github.com/filecoin-project/lotus/eudico-core/global"
 	"go.uber.org/fx"
 
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/tspow"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 func Consensus(algorithm global.ConsensusAlgorithm) fx.Option {

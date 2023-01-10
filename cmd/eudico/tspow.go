@@ -1,15 +1,15 @@
 package main
 
 import (
-	"github.com/filecoin-project/lotus/eudico-core/global"
-
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+
 	"github.com/filecoin-project/lotus/chain/consensus/tspow"
 	lcli "github.com/filecoin-project/lotus/cli"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 var tpowCmd = &cli.Command{

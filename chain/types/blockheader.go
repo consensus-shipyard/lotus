@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"github.com/filecoin-project/lotus/eudico-core/global"
 	"math/big"
 
 	block "github.com/ipfs/go-block-format"
@@ -16,6 +15,7 @@ import (
 	"github.com/filecoin-project/go-state-types/proof"
 
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 type Ticket struct {
