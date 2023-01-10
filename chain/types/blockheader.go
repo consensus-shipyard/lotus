@@ -72,7 +72,7 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 		return nil, err
 	}
 
-	if global.InjectedConsensusAlgorithm == global.MirConsensus {
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
 		// make a copy
 		bblk := *blk
 		bblk.ElectionProof = &ElectionProof{}

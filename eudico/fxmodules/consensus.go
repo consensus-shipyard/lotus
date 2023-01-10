@@ -1,10 +1,10 @@
 package fxmodules
 
 import (
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/eudico/global"
 	"go.uber.org/fx"
 
-	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/tspow"
@@ -22,10 +22,7 @@ func Consensus(algorithm global.ConsensusAlgorithm) fx.Option {
 	if module == nil {
 		panic("Unsupported consensus algorithm")
 	}
-	if global.InjectedConsensusAlgorithm != global.None {
-		panic("Consensus module can only be loaded once")
-	}
-	global.InjectedConsensusAlgorithm = algorithm
+	global.SetConsensusAlgorithm(algorithm)
 	return module
 }
 

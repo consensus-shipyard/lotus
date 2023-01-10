@@ -101,7 +101,7 @@ interopnet: build-devnets
 
 eudico: $(BUILD_DEPS)
 	rm -f eu
-	$(GOCC) build $(GOFLAGS) -o eu ./cmd/eudico
+	$(GOCC) build $(GOFLAGS) -o bin/eudico ./cmd/eudico
 
 lotus: $(BUILD_DEPS)
 	rm -f lotus

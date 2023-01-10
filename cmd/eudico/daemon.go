@@ -131,14 +131,14 @@ func daemonCmd(consensusAlgorithm global.ConsensusAlgorithm) *cli.Command {
 				Usage: "config file to use when restoring from backup",
 			},
 		},
-		Action: EudicoDaemonAction(consensusAlgorithm),
+		Action: eudicoDaemonAction(consensusAlgorithm),
 		Subcommands: []*cli.Command{
 			daemonStopCmd,
 		},
 	}
 }
 
-func EudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.Context) error {
+func eudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.Context) error {
 	return func(cctx *cli.Context) error {
 		isLite := cctx.Bool("lite")
 		isMirValidator := cctx.Bool("mir-validator")

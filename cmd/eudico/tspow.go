@@ -23,7 +23,7 @@ var tpowCmd = &cli.Command{
 
 var tpowMinerCmd = &cli.Command{
 	Name:  "miner",
-	Usage: "run tspow conesensus miner",
+	Usage: "run tspow consensus miner",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "default-key",

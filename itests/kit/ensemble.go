@@ -861,7 +861,7 @@ func (n *Ensemble) Start() *Ensemble {
 	err = n.mn.LinkAll()
 	require.NoError(n.t, err)
 
-	if global.InjectedConsensusAlgorithm != global.MirConsensus &&
+	if global.IsConsensusAlgorithm(global.MirConsensus) &&
 		!n.bootstrapped && len(n.active.miners) > 0 {
 		// We have *just* bootstrapped, so mine 2 blocks to setup some CE stuff in some actors
 		var wait sync.Mutex

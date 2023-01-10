@@ -18,10 +18,10 @@ export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 export GOLOG_LOG_LEVEL=$LOG_LEVEL
 
-./lotus wait-api
+./bin/eudico wait-api
 
 # Copy mir config and import keys
-./lotus wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
+./bin/eudico wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
 cp ./scripts/mir/mir-config/node$INDEX/* $LOTUS_PATH
 mkdir $LOTUS_PATH/mir.db
 

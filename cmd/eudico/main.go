@@ -68,16 +68,16 @@ func main() {
 	interactiveDef := isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 
 	app := &cli.App{
-		Name:                 "lotus",
+		Name:                 "eudico",
 		Usage:                "Filecoin decentralized storage network client",
 		Version:              build.UserVersion(),
 		EnableBashCompletion: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "repo",
-				EnvVars: []string{"EUDICO_PATH"},
+				EnvVars: []string{"LOTUS_PATH"},
 				Hidden:  true,
-				Value:   "~/.eudico", // TODO: Consider XDG_DATA_HOME
+				Value:   "~/.lotus", // TODO: Consider XDG_DATA_HOME
 			},
 			&cli.BoolFlag{
 				Name:  "interactive",

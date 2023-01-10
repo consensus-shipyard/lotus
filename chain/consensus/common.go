@@ -428,7 +428,7 @@ func decodeAndCheckBlock(msg *pubsub.Message) (*types.BlockMsg, string, error) {
 	}
 
 	// make sure we have a signature
-	if global.InjectedConsensusAlgorithm != global.MirConsensus {
+	if !global.IsConsensusAlgorithm(global.MirConsensus) {
 		if blk.Header.BlockSig == nil {
 			return nil, "missing_signature", fmt.Errorf("block without a signature")
 		}

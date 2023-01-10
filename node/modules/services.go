@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/eudico/global"
 	"os"
 	"strconv"
@@ -24,7 +25,6 @@ import (
 	"github.com/filecoin-project/lotus/chain"
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/beacon/drand"
-	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/exchange"
 	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/stmgr"
@@ -199,7 +199,7 @@ func HandleIncomingMessages(mctx helpers.MetricsCtx, lc fx.Lifecycle, ps *pubsub
 	// see https://github.com/consensus-shipyard/lotus/issues/24 and how
 	// the block timestamp is set in chain/consensus/mir/consensus.go for
 	// context.
-	if bool(bootstrapper) || global.InjectedConsensusAlgorithm == global.MirConsensus {
+	if bool(bootstrapper) || global.IsConsensusAlgorithm(global.MirConsensus) {
 		subscribe()
 		return
 	}

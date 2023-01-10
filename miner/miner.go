@@ -149,7 +149,7 @@ func (m *Miner) Start(_ context.Context) error {
 
 	// block production only enabled in lotus-miner for
 	// FilecoinEC consensus.
-	if global.InjectedConsensusAlgorithm == global.ExpectedConsensus {
+	if global.IsConsensusAlgorithm(global.ExpectedConsensus) {
 		go m.mine(context.TODO())
 	} else {
 		// handle the stop of lotus-miner for the case that
