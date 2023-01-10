@@ -35,7 +35,11 @@ func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
 			log.With("validator", addr).Errorw("creating block failed", "error", err)
 			continue
 		}
-		base, _ = types.NewTipSet([]*types.BlockHeader{BestWorkBlock(base)})
+		base, err = types.NewTipSet([]*types.BlockHeader{BestWorkBlock(base)})
+		if err != nil {
+			log.With("validator", addr).Errorw("creating tipset failed", "error", err)
+			continue
+		}
 
 		expDiff := GenesisWorkTarget
 		if base.Height()+1 >= MaxDiffLookback {
@@ -56,6 +60,7 @@ func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
 		msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
 		if err != nil {
 			log.With("validator", addr).Errorw("selecting messages failed", "error", err)
+			continue
 		}
 
 		bh, err := api.MinerCreateBlock(ctx, &lapi.BlockTemplate{
