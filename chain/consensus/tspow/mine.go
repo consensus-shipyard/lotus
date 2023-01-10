@@ -25,14 +25,14 @@ func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.With("validator", addr).Debug("PoW validator: context closed")
+			log.With("miner", addr).Debug("PoW validator: context closed")
 			return nil
 		default:
 		}
 
 		base, err := api.ChainHead(ctx)
 		if err != nil {
-			log.With("validator", addr).Errorw("creating block failed", "error", err)
+			log.With("miner", addr).Errorw("creating block failed", "error", err)
 			continue
 		}
 		base, _ = types.NewTipSet([]*types.BlockHeader{BestWorkBlock(base)})
@@ -62,7 +62,6 @@ func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
 			Miner:            addr,
 			Parents:          types.NewTipSetKey(BestWorkBlock(base).Cid()),
 			Ticket:           &types.Ticket{VRFProof: diffb},
-			Eproof:           &types.ElectionProof{},
 			BeaconValues:     nil,
 			Messages:         msgs,
 			Epoch:            base.Height() + 1,

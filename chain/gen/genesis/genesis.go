@@ -38,6 +38,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/system"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
 	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/consensus/tspow"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -632,6 +633,29 @@ func MakeGenesisBlock(ctx context.Context, j journal.Journal, bs bstore.Blocksto
 		return nil, xerrors.Errorf("failed writing filecoin genesis block to blockstore: %w", err)
 	}
 
+	proof := make([]byte, 32)
+	// set initial difficulty for PoW
+	proof, err = tspow.GenesisWorkTarget.Bytes()
+	if err != nil {
+		panic(err) // panic if we can't set genesis
+	}
+	genesisticket = &types.Ticket{
+		VRFProof: proof,
+	}
+
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+	fmt.Println(">>>>>>>>>>>> INITIALIZING genesisTicket", genesisticket.VRFProof)
+
 	b := &types.BlockHeader{
 		Miner:                 system.Address,
 		Ticket:                genesisticket,
@@ -653,6 +677,7 @@ func MakeGenesisBlock(ctx context.Context, j journal.Journal, bs bstore.Blocksto
 		},
 		ParentBaseFee: abi.NewTokenAmount(build.InitialBaseFee),
 	}
+	fmt.Println("========= TICKET", b.Ticket)
 
 	sb, err := b.ToStorageBlock()
 	if err != nil {

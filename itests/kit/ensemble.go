@@ -455,7 +455,8 @@ func (n *Ensemble) Start() *Ensemble {
 
 		app := fx.New(
 			fxProviders,
-			fxmodules.Invokes(&cfg.Common, false, !full.options.learner),
+			// fxmodules.Invokes(&cfg.Common, false, (!full.options.learner && n.options.consensus == consensus.Mir)),
+			fxmodules.Invokes(&cfg.Common, false, false),
 			fx.Invoke(func(fullNode impl.FullNodeAPI) {
 				full.FullNode = &fullNode
 			}),

@@ -21,12 +21,7 @@ import (
 
 // TODO: Consider moving this to build params and differentiate
 // between testing (low diff) and deployment (high diff).
-
-// FIXME DENIS
-// With this value the test passes and blocks are mined.
-const GenesisPoWTarget = "20197836753522894074"
-
-// const GenesisPoWTarget = "2019783675352289407433363"
+const GenesisPoWTarget = "2019783675352289407433363"
 
 // const GenesisPoWTarget = "4519783675352289407433363"
 
