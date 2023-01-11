@@ -19,7 +19,7 @@ import (
 var log = logging.Logger("mir-validator-cli")
 
 func main() {
-	api.RunningNodeType = api.NodeFull
+	api.RunningNodeType = api.NodeMiner
 
 	lotuslog.SetupLogLevels()
 
