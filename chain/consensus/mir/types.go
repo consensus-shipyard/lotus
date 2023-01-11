@@ -17,7 +17,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/systems/smr"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
@@ -241,7 +241,7 @@ func UnwrapCheckpointSnapshot(ch *checkpoint.StableCheckpoint) (*Checkpoint, err
 
 // Get stable checkpoint by height from datastore.
 func GetCheckpointByHeight(ctx context.Context, ds db.DB,
-	height abi.ChainEpoch, params *smr.Params) (*checkpoint.StableCheckpoint, error) {
+	height abi.ChainEpoch, params *trantor.Params) (*checkpoint.StableCheckpoint, error) {
 
 	var (
 		b   []byte
@@ -253,7 +253,7 @@ func GetCheckpointByHeight(ctx context.Context, ds db.DB,
 		if err != nil {
 			if err == datastore.ErrNotFound {
 				if params != nil {
-					return smr.GenesisCheckpoint([]byte{}, *params), nil
+					return trantor.GenesisCheckpoint([]byte{}, *params), nil
 				} else {
 					return nil, xerrors.Errorf("no checkpoint for height %d or latest checkpoint found in db", height)
 				}

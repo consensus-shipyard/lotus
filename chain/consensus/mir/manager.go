@@ -24,7 +24,7 @@ import (
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/simplewal"
-	"github.com/filecoin-project/mir/pkg/systems/smr"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -165,7 +165,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		pool.DefaultModuleParams(),
 	)
 
-	params := smr.DefaultParams(initialMembership)
+	params := trantor.DefaultParams(initialMembership)
 	// configure SegmentLength for specific checkpoint period.
 	m.segmentLength, err = segmentForCheckpointPeriod(cfg.CheckpointPeriod, initialMembership)
 	if err != nil {
@@ -184,9 +184,9 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		}
 	}
 
-	smrSystem, err := smr.New(
+	smrSystem, err := trantor.New(
 		t.NodeID(mirID),
-		h,
+		netTransport,
 		initCh,
 		m.CryptoManager,
 		m.StateManager,
@@ -284,7 +284,7 @@ func (m *Manager) ID() string {
 	return m.Addr.String()
 }
 
-func (m *Manager) initCheckpoint(params smr.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
+func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
 	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params)
 }
 
