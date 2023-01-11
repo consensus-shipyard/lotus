@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/fatih/color"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 
@@ -44,6 +45,10 @@ func main() {
 				_ = jaeger.Shutdown(cctx.Context)
 			}
 			jaeger = tracing.SetupJaegerTracing("lotus/" + cmd.Name)
+
+			if cctx.IsSet("color") {
+				color.NoColor = !cctx.Bool("color")
+			}
 
 			if originBefore != nil {
 				return originBefore(cctx)
