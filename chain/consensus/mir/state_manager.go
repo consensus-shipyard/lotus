@@ -44,7 +44,12 @@ type StateManager struct {
 	currentEpoch t.EpochNr
 
 	// For each epoch number, stores the corresponding membership.
+	// It stores the current membership and the memberships of ConfigOffset following epochs.
+	// It is updated by the NewEpoch function called by Mir on epoch transition (and on state transfer).
 	memberships map[t.EpochNr]map[t.NodeID]t.NodeAddress
+
+	// Next membership to return from NewEpoch.
+	nextNewMembership map[t.NodeID]t.NodeAddress
 
 	MirManager *Manager
 
@@ -57,26 +62,22 @@ type StateManager struct {
 }
 
 func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
-	// Initialize the membership for the first epochs.
-	// We use configOffset+2 memberships to account for:
-	// - The first epoch (epoch 0)
-	// - The configOffset epochs that already have a fixed membership (epochs 1 to configOffset)
-	// - The membership of the following epoch (configOffset+1) initialized with the same membership,
-	//   but potentially replaced during the first epoch (epoch 0) through special configuration requests.
-	memberships := make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, ConfigOffset+2)
-	for e := 0; e < ConfigOffset+2; e++ {
-		memberships[t.EpochNr(e)] = initialMembership
-	}
-
 	sm := StateManager{
 		ctx:                  ctx,
 		NextCheckpoint:       make(chan *checkpoint.StableCheckpoint, 1),
 		MirManager:           m,
-		memberships:          memberships,
 		currentEpoch:         0,
 		reconfigurationVotes: make(map[t.EpochNr]map[string]int),
 		api:                  api,
 	}
+
+	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
+	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
+	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, ConfigOffset+1)
+	for e := 0; e < ConfigOffset+1; e++ {
+		sm.memberships[t.EpochNr(e)] = initialMembership
+	}
+	sm.nextNewMembership = initialMembership
 
 	// Initialize manager checkpoint state with the corresponding latest
 	// checkpoint
@@ -114,16 +115,26 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	config := checkpoint.Snapshot.EpochData.EpochConfig
 	sm.currentEpoch = t.EpochNr(config.EpochNr)
-	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
 
-	for e, membership := range config.Memberships {
-		// skew membership to current epoch, we are starting from a checkpoint
-		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = make(map[t.NodeID]t.NodeAddress)
-		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
+	// Sanity check.
+	if len(config.Memberships) != ConfigOffset+1 {
+		return fmt.Errorf("checkpoint contains %d memberships, expected %d (ConfigOffset=%d)",
+			len(config.Memberships), ConfigOffset+1, ConfigOffset)
 	}
 
-	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
-	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
+	// Set memberships for the current epoch and ConfigOffset following ones.
+	// Note that sm.memberships[i+sm.currentEpoch] will almost immediately be overwritten by the first call to NewEpoch.
+	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
+	for i, membership := range config.Memberships {
+		sm.memberships[t.EpochNr(i)+sm.currentEpoch] = t.Membership(membership)
+	}
+
+	// The next membership is initially just a copy of the last known membership.
+	// It may be replaced by another one during this epoch.
+	sm.nextNewMembership = maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
+
+	// Remove all outdated reconfiguration vote data.
+	sm.reconfigurationVotes = make(map[t.EpochNr]map[string]int)
 
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
@@ -288,32 +299,30 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	log.Debugf("current epoch triggered in new epoch: %d", sm.currentEpoch)
-	// Sanity check.
-	if nr != sm.currentEpoch+1 {
-		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
+	log.Debugf("New epoch: updating %d to %d", sm.currentEpoch, nr)
+
+	// Sanity check. Generally, the new epoch is always the current epoch plus 1.
+	// At initialization and right after state transfer, sm.currentEpoch already has been initialized
+	// to the current epoch number.
+	if nr != sm.currentEpoch && nr != sm.currentEpoch+1 {
+		return nil, xerrors.Errorf("expected next epoch to be %d or %d, got %d",
+			sm.currentEpoch, sm.currentEpoch+1, nr)
 	}
 
-	// The base membership is the last one membership.
-	newMembership := maputil.Copy(sm.memberships[nr+ConfigOffset])
-
-	// Append a new membership data structure to be modified throughout the new epoch.
-	sm.memberships[nr+ConfigOffset+1] = newMembership
+	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
+	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
+	sm.memberships[nr+ConfigOffset] = sm.nextNewMembership
+	sm.nextNewMembership = maputil.Copy(sm.nextNewMembership)
 
 	// Update current epoch number.
-	oldEpoch := sm.currentEpoch
 	sm.currentEpoch = nr
 
-	// Remove old membership.
-	delete(sm.memberships, oldEpoch)
-	delete(sm.reconfigurationVotes, oldEpoch)
+	// Garbage-collect previous membership and old voting data.
+	// Note that at initialization and after state transfer, these entries do not exist.
+	delete(sm.memberships, sm.currentEpoch-1)
+	delete(sm.reconfigurationVotes, sm.currentEpoch-1)
 
-	// reconfigure node.
-	if err := sm.MirManager.ReconfigureMirNode(sm.ctx, newMembership); err != nil {
-		return nil, xerrors.Errorf("error reconfiguring mir node: %w", err)
-	}
-
-	return newMembership, nil
+	return sm.nextNewMembership, nil
 }
 
 func (sm *StateManager) UpdateNextMembership(valSet *ValidatorSet) error {
@@ -321,7 +330,7 @@ func (sm *StateManager) UpdateNextMembership(valSet *ValidatorSet) error {
 	if err != nil {
 		return err
 	}
-	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
+	sm.nextNewMembership = mbs
 	return nil
 }
 
