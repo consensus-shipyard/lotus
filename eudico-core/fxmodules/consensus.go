@@ -9,26 +9,20 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/tspow"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
-type ConsensusAlgorithm int
-
-const (
-	ExpectedConsensus ConsensusAlgorithm = iota
-	MirConsensus
-	TSPoWConsensus
-)
-
-func Consensus(algorithm ConsensusAlgorithm) fx.Option {
+func Consensus(algorithm global.ConsensusAlgorithm) fx.Option {
 	module := fxCase(algorithm,
-		map[ConsensusAlgorithm]fx.Option{
-			ExpectedConsensus: filecoinExpectedConsensusModule,
-			MirConsensus:      mirConsensusModule,
-			TSPoWConsensus:    tspowModule,
+		map[global.ConsensusAlgorithm]fx.Option{
+			global.ExpectedConsensus: filecoinExpectedConsensusModule,
+			global.MirConsensus:      mirConsensusModule,
+			global.TSPoWConsensus:    tspowModule,
 		})
 	if module == nil {
 		panic("Unsupported consensus algorithm")
 	}
+	global.SetConsensusAlgorithm(algorithm)
 	return module
 }
 

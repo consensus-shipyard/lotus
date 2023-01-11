@@ -31,6 +31,7 @@ import (
 	lrand "github.com/filecoin-project/lotus/chain/rand"
 	"github.com/filecoin-project/lotus/chain/types"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/journal"
 )
 
@@ -148,7 +149,7 @@ func (m *Miner) Start(_ context.Context) error {
 
 	// block production only enabled in lotus-miner for
 	// FilecoinEC consensus.
-	if build.Consensus == build.FilecoinEC {
+	if global.IsConsensusAlgorithm(global.ExpectedConsensus) {
 		go m.mine(context.TODO())
 	} else {
 		// handle the stop of lotus-miner for the case that

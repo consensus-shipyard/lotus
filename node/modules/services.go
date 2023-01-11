@@ -30,6 +30,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/sub"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/journal/fsjournal"
 	"github.com/filecoin-project/lotus/lib/peermgr"
@@ -198,7 +199,7 @@ func HandleIncomingMessages(mctx helpers.MetricsCtx, lc fx.Lifecycle, ps *pubsub
 	// see https://github.com/consensus-shipyard/lotus/issues/24 and how
 	// the block timestamp is set in chain/consensus/mir/consensus.go for
 	// context.
-	if bool(bootstrapper) || build.IsMirConsensus() {
+	if bool(bootstrapper) || global.IsConsensusAlgorithm(global.MirConsensus) {
 		subscribe()
 		return
 	}

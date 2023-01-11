@@ -85,5 +85,3 @@ const BootstrapPeerThreshold = 2
 const Eip155ChainId = 3141592
 
 var WhitelistedBlock = cid.Undef
-
-const Consensus ConsensusType = FilecoinEC

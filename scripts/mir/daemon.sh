@@ -30,5 +30,5 @@ rm -rf $LOTUS_PATH
 #    rm ./scripts/mir/devgen.car
 #    ./lotus daemon --lotus-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX --mir-validator
 # else
-./lotus daemon --genesis=./scripts/mir/devgen.car --bootstrap=false --api=123$INDEX --mir-validator
+./bin/eudico mir daemon --genesis=./scripts/mir/devgen.car --bootstrap=false --api=123$INDEX
 # fi
