@@ -100,8 +100,9 @@ interopnet: GOFLAGS+=-tags=interopnet
 interopnet: build-devnets
 
 eudico: $(BUILD_DEPS)
-	rm -f eu
+	rm -f eudico
 	$(GOCC) build $(GOFLAGS) -o eudico ./cmd/eudico
+BINS+=eudico
 
 lotus: $(BUILD_DEPS)
 	rm -f lotus
