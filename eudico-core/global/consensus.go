@@ -5,25 +5,21 @@ package global
 // its value. Ideally, we would be not depend  on a global variable for conditional code
 // execution, but refactoring the code to avoid that is out of our current scope.
 // TODO: refactor code to avoid the need for this
-var injectedConsensusAlgorithm = None
+var injectedConsensusAlgorithm = none
 
 type ConsensusAlgorithm int
 
 const (
-	None ConsensusAlgorithm = iota
+	none ConsensusAlgorithm = iota
 	ExpectedConsensus
 	MirConsensus
 	TSPoWConsensus
 )
 
 func SetConsensusAlgorithm(algorithm ConsensusAlgorithm) {
-	//if injectedConsensusAlgorithm != None {
-	//	panic("consensus algorithm can only be set once")
-	//}
 	injectedConsensusAlgorithm = algorithm
 }
 
 func IsConsensusAlgorithm(algorithm ConsensusAlgorithm) bool {
-	//return injectedConsensusAlgorithm == algorithm
-	return algorithm == MirConsensus
+	return injectedConsensusAlgorithm == algorithm
 }
