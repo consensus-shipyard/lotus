@@ -15,8 +15,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 )
 
-const Consensus ConsensusType = Mir
-
 var NetworkBundle = "devnet"
 var BundleOverrides map[actorstypes.Version]string
 var ActorDebugging = false

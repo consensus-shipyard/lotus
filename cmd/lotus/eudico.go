@@ -17,11 +17,10 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-paramfetch"
-	"github.com/filecoin-project/lotus/chain/consensus"
-
 	"github.com/filecoin-project/lotus/build"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico-core/fxmodules"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/lotus/node"
@@ -217,7 +216,7 @@ func eudicoDaemonAction(cctx *cli.Context) error {
 		fxmodules.Libp2p(&cfg.Common),
 		fxmodules.Repository(lockedRepo, cfg),
 		fxmodules.Blockstore(cfg),
-		fxmodules.Consensus(consensus.Mir),
+		fxmodules.Consensus(global.MirConsensus),
 		fxmodules.RpcServer(cctx, r, lockedRepo, cfg),
 		// misc providers
 		fx.Supply(isBootstrapper),

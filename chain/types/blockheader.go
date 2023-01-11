@@ -15,6 +15,7 @@ import (
 	"github.com/filecoin-project/go-state-types/proof"
 
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 type Ticket struct {
@@ -71,7 +72,7 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 		return nil, err
 	}
 
-	if build.Consensus == build.Mir {
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
 		// make a copy
 		bblk := *blk
 		bblk.ElectionProof = &ElectionProof{}

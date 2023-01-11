@@ -11,7 +11,6 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/lotus/lib/async"
 
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -20,6 +19,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/lib/async"
 	"github.com/filecoin-project/lotus/lib/sigs"
 )
 
@@ -32,10 +32,10 @@ const (
 	MaxHeightDrift = 5
 )
 
-var log = logging.Logger("tspow-consensus")
-
-// TSPoW implements consensus.Consensus.
-var _ consensus.Consensus = &TSPoW{}
+var (
+	_   consensus.Consensus = &TSPoW{}
+	log                     = logging.Logger("tspow-consensus")
+)
 
 type TSPoW struct {
 	beacon  beacon.Schedule
@@ -151,7 +151,7 @@ func (tsp *TSPoW) ValidateBlock(ctx context.Context, b *types.FullBlock) (err er
 		}
 	}
 
-	pweight, err := Weight(ctx, nil, baseTs)
+	pweight, err := Weight(context.TODO(), nil, baseTs)
 	if err != nil {
 		return fmt.Errorf("getting parent weight: %w", err)
 	}

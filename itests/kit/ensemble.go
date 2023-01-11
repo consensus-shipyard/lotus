@@ -53,7 +53,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/cmd/lotus-seed/seed"
 	"github.com/filecoin-project/lotus/cmd/lotus-worker/sealworker"
-	"github.com/filecoin-project/lotus/eudico/fxmodules"
+	"github.com/filecoin-project/lotus/eudico-core/fxmodules"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/genesis"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/markets/idxprov/idxprov_test"
@@ -876,7 +877,7 @@ func (n *Ensemble) Start() *Ensemble {
 	err = n.mn.LinkAll()
 	require.NoError(n.t, err)
 
-	if !build.IsMirConsensus() &&
+	if !global.IsConsensusAlgorithm(global.MirConsensus) &&
 		!n.bootstrapped && len(n.active.miners) > 0 {
 		// We have *just* bootstrapped, so mine 2 blocks to setup some CE stuff in some actors
 		var wait sync.Mutex

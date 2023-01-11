@@ -28,6 +28,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/async"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/metrics"
@@ -427,7 +428,7 @@ func decodeAndCheckBlock(msg *pubsub.Message) (*types.BlockMsg, string, error) {
 	}
 
 	// make sure we have a signature
-	if build.Consensus != build.Mir {
+	if !global.IsConsensusAlgorithm(global.MirConsensus) {
 		if blk.Header.BlockSig == nil {
 			return nil, "missing_signature", fmt.Errorf("block without a signature")
 		}

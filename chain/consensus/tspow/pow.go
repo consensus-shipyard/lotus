@@ -10,18 +10,17 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
+
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/reward"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
-	"github.com/filecoin-project/specs-actors/v8/actors/builtin"
 )
 
-// TODO: Consider moving this to build params and differentiate
-// between testing (low diff) and deployment (high diff).
-
+// TODO: Consider making this a config param.
 const GenesisPoWTarget = "2019783675352289407433363"
 
 var RewardFunc = func(ctx context.Context, vmi vm.Interface, em stmgr.ExecMonitor,

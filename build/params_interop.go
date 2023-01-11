@@ -119,5 +119,3 @@ const PropagationDelaySecs = uint64(6)
 const BootstrapPeerThreshold = 2
 
 var WhitelistedBlock = cid.Undef
-
-const Consensus ConsensusType = FilecoinEC
