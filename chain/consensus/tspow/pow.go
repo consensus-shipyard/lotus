@@ -23,6 +23,9 @@ import (
 // TODO: Consider making this a config param.
 const GenesisPoWTarget = "2019783675352289407433363"
 
+// example of increased difficulty
+// const GenesisPoWTarget = "4519783675352289407433363"
+
 var RewardFunc = func(ctx context.Context, vmi vm.Interface, em stmgr.ExecMonitor,
 	epoch abi.ChainEpoch, ts *types.TipSet, params *reward.AwardBlockRewardParams) error {
 	rwMsg := &types.Message{

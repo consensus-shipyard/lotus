@@ -54,6 +54,7 @@ import (
 	"github.com/filecoin-project/lotus/cmd/lotus-seed/seed"
 	"github.com/filecoin-project/lotus/cmd/lotus-worker/sealworker"
 	"github.com/filecoin-project/lotus/eudico-core/fxmodules"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/genesis"
 	"github.com/filecoin-project/lotus/markets/idxprov"
 	"github.com/filecoin-project/lotus/markets/idxprov/idxprov_test"
@@ -202,9 +203,14 @@ func (n *Ensemble) FullNode(full *TestFullNode, opts ...NodeOpt) *Ensemble {
 		require.NoError(n.t, err)
 	}
 
-	// FIXME DENIS
-	// key, err := key.GenerateKey(types.KTBLS)
-	key, err := key.GenerateKey(types.KTSecp256k1)
+	dkey, err := key.GenerateKey(types.KTBLS)
+	// pow only supports only secpk keys. If we use bls keys it leads
+	// to an error where for certain blocks there is the same ticket
+	// for several miners, preventing the validation of certain blocks.
+	// we would have to make some fixes if we want to use bls keys for pow
+	if n.options.consensus == global.TSPoWConsensus {
+		dkey, err = key.GenerateKey(types.KTSecp256k1)
+	}
 	require.NoError(n.t, err)
 
 	if !n.bootstrapped && !options.balance.IsZero() {
@@ -214,13 +220,13 @@ func (n *Ensemble) FullNode(full *TestFullNode, opts ...NodeOpt) *Ensemble {
 		genacc := genesis.Actor{
 			Type:    genesis.TAccount,
 			Balance: options.balance,
-			Meta:    (&genesis.AccountMeta{Owner: key.Address}).ActorMeta(),
+			Meta:    (&genesis.AccountMeta{Owner: dkey.Address}).ActorMeta(),
 		}
 
 		n.genesis.accounts = append(n.genesis.accounts, genacc)
 	}
 
-	*full = TestFullNode{t: n.t, options: options, DefaultKey: key}
+	*full = TestFullNode{t: n.t, options: options, DefaultKey: dkey}
 
 	n.inactive.fullnodes = append(n.inactive.fullnodes, full)
 	return n
@@ -455,7 +461,7 @@ func (n *Ensemble) Start() *Ensemble {
 
 		app := fx.New(
 			fxProviders,
-			fxmodules.Invokes(&cfg.Common, false, !full.options.learner),
+			fxmodules.Invokes(&cfg.Common, false, n.options.consensus == global.MirConsensus && !full.options.learner),
 			fx.Invoke(func(fullNode impl.FullNodeAPI) {
 				full.FullNode = &fullNode
 			}),
@@ -876,32 +882,28 @@ func (n *Ensemble) Start() *Ensemble {
 	err = n.mn.LinkAll()
 	require.NoError(n.t, err)
 
-	// FIXME ALFONSO
-	/*
-		if !global.IsConsensusAlgorithm(global.MirConsensus) &&
-			!n.bootstrapped && len(n.active.miners) > 0 {
-			// We have *just* bootstrapped, so mine 2 blocks to setup some CE stuff in some actors
-			var wait sync.Mutex
-			wait.Lock()
+	if global.IsConsensusAlgorithm(global.ExpectedConsensus) &&
+		!n.bootstrapped && len(n.active.miners) > 0 {
+		// We have *just* bootstrapped, so mine 2 blocks to setup some CE stuff in some actors
+		var wait sync.Mutex
+		wait.Lock()
 
-			observer := n.active.fullnodes[0]
+		observer := n.active.fullnodes[0]
 
-			bm := NewBlockMiner(n.t, n.active.miners[0])
-			n.t.Cleanup(bm.Stop)
+		bm := NewBlockMiner(n.t, n.active.miners[0])
+		n.t.Cleanup(bm.Stop)
 
-			bm.MineUntilBlock(ctx, observer, func(epoch abi.ChainEpoch) {
-				wait.Unlock()
-			})
+		bm.MineUntilBlock(ctx, observer, func(epoch abi.ChainEpoch) {
+			wait.Unlock()
+		})
 
-			wait.Lock()
-			bm.MineUntilBlock(ctx, observer, func(epoch abi.ChainEpoch) {
-				wait.Unlock()
-			})
-			wait.Lock()
-			n.bootstrapped = true
-		}
-
-	*/
+		wait.Lock()
+		bm.MineUntilBlock(ctx, observer, func(epoch abi.ChainEpoch) {
+			wait.Unlock()
+		})
+		wait.Lock()
+		n.bootstrapped = true
+	}
 
 	return n
 }

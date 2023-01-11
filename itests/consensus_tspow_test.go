@@ -50,8 +50,6 @@ func TestPoWAllNodesMining(t *testing.T) {
 	err := kit.AdvanceChain(ctx, PoWTestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
-	// FIXME DENIS
-	// Can we use CheckNodesInSync in PoW? At present, it fails with "failed to reach the same CID in node" error.
-	// err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
-	// require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
 }
