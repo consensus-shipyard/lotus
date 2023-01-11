@@ -32,10 +32,9 @@ const (
 	MaxHeightDrift = 5
 )
 
-var (
-	_   consensus.Consensus = &TSPoW{}
-	log                     = logging.Logger("tspow-consensus")
-)
+var log = logging.Logger("tspow-consensus")
+
+var _ consensus.Consensus = &TSPoW{}
 
 type TSPoW struct {
 	beacon  beacon.Schedule

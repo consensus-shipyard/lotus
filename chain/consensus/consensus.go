@@ -16,14 +16,6 @@ import (
 	"github.com/filecoin-project/lotus/metrics"
 )
 
-type Algorithm int
-
-const (
-	Expected Algorithm = iota
-	Mir
-	TSPoW
-)
-
 // RewardFunc parametrizes the logic for rewards when a message is executed.
 //
 // Each consensus implementation can set their own reward function.

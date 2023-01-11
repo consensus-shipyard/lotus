@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 // EnsembleMinimal creates and starts an Ensemble with a single full node and a single miner.
@@ -66,7 +67,9 @@ func EnsembleMinimalSpacenet(t *testing.T, opts ...interface{}) (*TestFullNode, 
 	ens.active.miners = []*TestMiner{}
 	ens.Start()
 
-	adaptForMir(t, &full, &miner)
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
+		adaptForMir(t, &full, &miner)
+	}
 
 	return &full, &miner, ens
 }

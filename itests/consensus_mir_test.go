@@ -43,7 +43,7 @@ func TestMirConsensus(t *testing.T) {
 }
 
 // TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
-func T1estMirConsensusWithMangler(t *testing.T) {
+func TestMirConsensusWithMangler(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
