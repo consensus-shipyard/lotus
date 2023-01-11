@@ -20,11 +20,11 @@ import (
 	"github.com/filecoin-project/lotus/chain/vm"
 )
 
-// TODO: Consider making this a config param.
-const GenesisPoWTarget = "2019783675352289407433363"
-
-// example of increased difficulty
+// TODO Consider making GenesisPoWTarget as a config param.
+// example of increased difficulty for not testing purposes.
 // const GenesisPoWTarget = "4519783675352289407433363"
+
+const GenesisPoWTarget = "2019783675352289407433363"
 
 var RewardFunc = func(ctx context.Context, vmi vm.Interface, em stmgr.ExecMonitor,
 	epoch abi.ChainEpoch, ts *types.TipSet, params *reward.AwardBlockRewardParams) error {
@@ -54,7 +54,7 @@ var RewardFunc = func(ctx context.Context, vmi vm.Interface, em stmgr.ExecMonito
 	return nil
 }
 
-func Weight(ctx context.Context, stateBs bstore.Blockstore, ts *types.TipSet) (types.BigInt, error) {
+func Weight(_ context.Context, _ bstore.Blockstore, ts *types.TipSet) (types.BigInt, error) {
 	if ts == nil {
 		return types.NewInt(0), nil
 	}

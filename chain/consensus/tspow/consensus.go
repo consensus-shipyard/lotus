@@ -150,7 +150,7 @@ func (tsp *TSPoW) ValidateBlock(ctx context.Context, b *types.FullBlock) (err er
 		}
 	}
 
-	pweight, err := Weight(context.TODO(), nil, baseTs)
+	pweight, err := Weight(ctx, nil, baseTs)
 	if err != nil {
 		return fmt.Errorf("getting parent weight: %w", err)
 	}

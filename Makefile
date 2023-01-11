@@ -97,7 +97,7 @@ pow-test:
 
 pow-test-race: GOFLAGS+=-tags=spacenet
 pow-test-race:
-	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=10m ./itests/Ocnsensus_tspow_test.go
+	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=10m ./itests/consensus_tspow_test.go
 .PHONY: pow-test-race
 
 spacenet-test: mir-test pow-test
