@@ -94,6 +94,6 @@ func Mine(ctx context.Context, addr address.Address, api v1api.FullNode) error {
 			continue
 		}
 
-		log.With("validator", addr).Info("PoW mined a block! ", bh.Cid())
+		log.With("validator", addr).Infof("PoW mined a block! CID=%s, h=%d", bh.Cid(), bh.Header.Height)
 	}
 }
