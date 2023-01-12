@@ -76,7 +76,7 @@ debug: build-devnets
 2k: build-devnets
 
 spacenet: GOFLAGS+=-tags=spacenet
-spacenet: eudico lotus mir-validator lotus-seed lotus-keygen lotus-shed
+spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
