@@ -38,10 +38,10 @@ var initCmd = &cli.Command{
 			// check if validator has been initialized.
 			isCfg, err := isConfigured(cctx.String("repo"))
 			if err == nil {
-				return fmt.Errorf("validator already configured. Run `./mir-validator config init -f` if you want to overwrite the current config")
+				return fmt.Errorf("validator already configured. Run `./eudico mir validator config init -f` if you want to overwrite the current config")
 			}
 			if isCfg && err != nil {
-				return fmt.Errorf("validator configured and config corrupted: %v. Backup the config files you want to keep and run `./mir-validator init -f`", err)
+				return fmt.Errorf("validator configured and config corrupted: %v. Backup the config files you want to keep and run `./eudico mir validator init -f`", err)
 			}
 		}
 
@@ -63,7 +63,7 @@ var initCmd = &cli.Command{
 				return fmt.Errorf("error exporting membership config: %s", err)
 			}
 		} else {
-			log.Infof("Creating empty membership cfg at %s. Remember to run ./mir-validator add-validator to add more membership validators", mp)
+			log.Infof("Creating empty membership cfg at %s. Remember to run ./eudico mir validator add-validator to add more membership validators", mp)
 			if _, err := os.Create(mp); err != nil {
 				return fmt.Errorf("error creating empty membership config in %s", mp)
 			}
@@ -75,7 +75,7 @@ var initCmd = &cli.Command{
 			return fmt.Errorf("error initializing mir datastore in path %s: %s", LevelDSPath, err)
 		}
 
-		log.Infow("Initialized mir validator. Run ./mir-validator run to start validator process")
+		log.Infow("Initialized mir validator. run ./eudico mir validator run to start validator process")
 		return nil
 	},
 }

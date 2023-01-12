@@ -35,9 +35,9 @@ func initCheck(path string) error {
 	isCfg, err := isConfigured(path)
 	if err != nil {
 		if isCfg {
-			return fmt.Errorf("validator configured and config corrupted: %v. Backup the config files you want to keep and run `./mir-validator init -f`", err)
+			return fmt.Errorf("validator configured and config corrupted: %v. Backup the config files you want to keep and run `./eudico mir validator init -f`", err)
 		}
-		return fmt.Errorf("validator not configured. Run `./mir-validator config init`")
+		return fmt.Errorf("validator not configured. Run `./eudico mir validator config init`")
 	}
 	return nil
 }
