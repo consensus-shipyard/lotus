@@ -328,12 +328,9 @@ var DaemonCmd = &cli.Command{
 			genesis,
 			liteModeDeps,
 
-			node.ApplyIf(
-				func(s *node.Settings) bool { return build.IsMirConsensus() },
-				node.Override(new(consensus.Consensus), mir.NewConsensus),
-				node.Override(new(store.WeightFunc), mir.Weight),
-				node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
-			),
+			node.Override(new(consensus.Consensus), mir.NewConsensus),
+			node.Override(new(store.WeightFunc), mir.Weight),
+			node.Override(new(stmgr.Executor), consensus.NewTipSetExecutor(mir.RewardFunc)),
 
 			node.ApplyIf(func(s *node.Settings) bool { return cctx.IsSet("api") },
 				node.Override(node.SetApiEndpointKey, func(lr repo.LockedRepo) error {

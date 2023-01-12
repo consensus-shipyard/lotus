@@ -20,6 +20,7 @@ import (
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -63,6 +64,8 @@ var runCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
+		global.SetConsensusAlgorithm(global.MirConsensus)
+
 		ctx, _ := tag.New(lcli.DaemonContext(cctx),
 			tag.Insert(metrics.Version, build.BuildVersion),
 			tag.Insert(metrics.Commit, build.CurrentCommit),

@@ -20,12 +20,11 @@ import (
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/smr"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	t "github.com/filecoin-project/mir/pkg/types"
-	"github.com/filecoin-project/mir/pkg/util/maputil"
 )
 
-var _ smr.AppLogic = &StateManager{}
+var _ trantor.AppLogic = &StateManager{}
 
 type Message []byte
 
@@ -44,7 +43,14 @@ type StateManager struct {
 	currentEpoch t.EpochNr
 
 	// For each epoch number, stores the corresponding membership.
+	// It stores the current membership and the memberships of ConfigOffset following epochs.
+	// It is updated by the NewEpoch function called by Mir on epoch transition (and on state transfer).
 	memberships map[t.EpochNr]map[t.NodeID]t.NodeAddress
+
+	// Next membership to return from NewEpoch.
+	// Attention: No in-place modifications of this field are allowed.
+	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
+	nextNewMembership map[t.NodeID]t.NodeAddress
 
 	MirManager *Manager
 
@@ -54,31 +60,25 @@ type StateManager struct {
 
 	// Channel to send checkpoints to assemble them in blocks
 	NextCheckpoint chan *checkpoint.StableCheckpoint
-
-	height abi.ChainEpoch
 }
 
 func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
-	// Initialize the membership for the first epochs.
-	// We use configOffset+2 memberships to account for:
-	// - The first epoch (epoch 0)
-	// - The configOffset epochs that already have a fixed membership (epochs 1 to configOffset)
-	// - The membership of the following epoch (configOffset+1) initialized with the same membership,
-	//   but potentially replaced during the first epoch (epoch 0) through special configuration requests.
-	memberships := make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, ConfigOffset+2)
-	for e := 0; e < ConfigOffset+2; e++ {
-		memberships[t.EpochNr(e)] = initialMembership
-	}
-
 	sm := StateManager{
 		ctx:                  ctx,
 		NextCheckpoint:       make(chan *checkpoint.StableCheckpoint, 1),
 		MirManager:           m,
-		memberships:          memberships,
 		currentEpoch:         0,
 		reconfigurationVotes: make(map[t.EpochNr]map[string]int),
 		api:                  api,
 	}
+
+	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
+	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
+	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, ConfigOffset+1)
+	for e := 0; e < ConfigOffset+1; e++ {
+		sm.memberships[t.EpochNr(e)] = initialMembership
+	}
+	sm.nextNewMembership = initialMembership
 
 	// Initialize manager checkpoint state with the corresponding latest
 	// checkpoint
@@ -93,168 +93,6 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
 
 	return &sm, nil
-}
-
-// ApplyTXs applies transactions received from the availability layer to the app state
-// and creates a Lotus block from the delivered batch.
-func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
-	var mirMsgs []Message
-
-	sm.height++
-
-	// For each request in the batch
-	for _, req := range txs {
-		switch req.Type {
-		case TransportType:
-			mirMsgs = append(mirMsgs, req.Data)
-		case ReconfigurationType:
-			err := sm.applyConfigMsg(req)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	batch := &Batch{
-		Messages: mirMsgs,
-	}
-
-	base, err := sm.api.ChainHead(sm.ctx)
-	if err != nil {
-		return xerrors.Errorf("failed to get chain head: %w", err)
-	}
-	log.With("validator", sm.MirManager.ValidatorID).Debugf("Trying to mine new block over base: %s", base.Key())
-
-	nextHeight := base.Height() + 1
-	log.With("validator", sm.MirManager.ValidatorID).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
-
-	msgs := sm.MirManager.GetMessages(batch)
-	log.With("validator", sm.MirManager.ValidatorID).With("epoch", nextHeight).
-		Infof("try to create a block: msgs - %d", len(msgs))
-
-	// include checkpoint in VRF proof field?
-	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
-	eproofCheckpoint := &ltypes.ElectionProof{}
-	if ch := sm.pollCheckpoint(); ch != nil {
-		eproofCheckpoint, err = CertAsElectionProof(ch)
-		if err != nil {
-			return xerrors.Errorf("error setting eproof from checkpoint certificate: %w", err)
-		}
-		vrfCheckpoint, err = CheckpointAsVRFProof(ch)
-		if err != nil {
-			return xerrors.Errorf("error setting vrfproof from checkpoint: %w", err)
-		}
-		log.With("validator", sm.MirManager.ValidatorID).Infof("Including Mir checkpoint for in block %d", nextHeight)
-	}
-
-	bh, err := sm.api.MinerCreateBlock(sm.ctx, &lapi.BlockTemplate{
-		// mir blocks are created by all miners. We use system actor as miner of the block
-		Miner:            builtin.SystemActorAddr,
-		Parents:          base.Key(),
-		BeaconValues:     nil,
-		Ticket:           vrfCheckpoint,
-		Eproof:           eproofCheckpoint,
-		Epoch:            base.Height() + 1,
-		Timestamp:        uint64(base.Height() + 1),
-		WinningPoStProof: nil,
-		Messages:         msgs,
-	})
-	if err != nil {
-		return xerrors.Errorf("creating a block failed: %w", err)
-	}
-	if bh == nil {
-		log.With("validator", sm.MirManager.ValidatorID).With("epoch", nextHeight).Debug("created a nil block")
-		return nil
-	}
-
-	err = sm.api.SyncSubmitBlock(sm.ctx, &types.BlockMsg{
-		Header:        bh.Header,
-		BlsMessages:   bh.BlsMessages,
-		SecpkMessages: bh.SecpkMessages,
-	})
-	if err != nil {
-		return xerrors.Errorf("unable to sync a block: %w", err)
-	}
-
-	log.With("validator", sm.MirManager.ValidatorID).With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
-	return nil
-}
-
-func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
-	var newValSet validator.ValidatorSet
-	if err := newValSet.UnmarshalCBOR(bytes.NewReader(in.Data)); err != nil {
-		return err
-	}
-	voted, err := sm.UpdateAndCheckVotes(&newValSet)
-	if err != nil {
-		return err
-	}
-	if voted {
-		err = sm.UpdateNextMembership(&newValSet)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	// Sanity check.
-	if nr != sm.currentEpoch+1 {
-		return nil, xerrors.Errorf("expected next epoch to be %d, got %d", sm.currentEpoch+1, nr)
-	}
-
-	// The base membership is the last one membership.
-	newMembership := maputil.Copy(sm.memberships[nr+ConfigOffset])
-
-	// Append a new membership data structure to be modified throughout the new epoch.
-	sm.memberships[nr+ConfigOffset+1] = newMembership
-
-	// Update current epoch number.
-	oldEpoch := sm.currentEpoch
-	sm.currentEpoch = nr
-
-	// Remove old membership.
-	delete(sm.memberships, oldEpoch)
-	delete(sm.reconfigurationVotes, oldEpoch)
-
-	return newMembership, nil
-}
-
-func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) error {
-	_, mbs, err := validator.Membership(valSet.GetValidators())
-	if err != nil {
-		return err
-	}
-	_, inMembership := mbs[t.NodeID(sm.MirManager.MirID)]
-	fmt.Println(sm.MirManager.MirID, "UpdateNextMembership", inMembership, mbs)
-
-	if !inMembership {
-		panic(1111)
-		sm.MirManager.Stop()
-	}
-	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
-	return nil
-}
-
-// UpdateAndCheckVotes votes for the valSet and returns true if it has enough votes for this valSet.
-func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (bool, error) {
-	h, err := valSet.Hash()
-	if err != nil {
-		return false, err
-	}
-	_, ok := sm.reconfigurationVotes[sm.currentEpoch]
-	if !ok {
-		sm.reconfigurationVotes[sm.currentEpoch] = make(map[string]int)
-	}
-	sm.reconfigurationVotes[sm.currentEpoch][string(h)]++
-	votes := sm.reconfigurationVotes[sm.currentEpoch][string(h)]
-	nodes := len(sm.memberships[sm.currentEpoch])
-
-	if votes < weakQuorum(nodes) {
-		return false, nil
-	}
-	return true, nil
 }
 
 // RestoreState is called by Mir when the validator goes out-of-sync, and it requires
@@ -278,16 +116,25 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	config := checkpoint.Snapshot.EpochData.EpochConfig
 	sm.currentEpoch = t.EpochNr(config.EpochNr)
-	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
 
-	for e, membership := range config.Memberships {
-		// skew membership to current epoch, we are starting from a checkpoint
-		sm.memberships[t.EpochNr(e)] = make(map[t.NodeID]t.NodeAddress)
-		sm.memberships[t.EpochNr(e)+sm.currentEpoch] = t.Membership(membership)
+	// Sanity check.
+	if len(config.Memberships) != ConfigOffset+1 {
+		return fmt.Errorf("checkpoint contains %d memberships, expected %d (ConfigOffset=%d)",
+			len(config.Memberships), ConfigOffset+1, ConfigOffset)
 	}
 
-	newMembership := maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
-	sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset+1)] = newMembership
+	// Set memberships for the current epoch and ConfigOffset following ones.
+	// Note that sm.memberships[i+sm.currentEpoch] will almost immediately be overwritten by the first call to NewEpoch.
+	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
+	for i, membership := range config.Memberships {
+		sm.memberships[t.EpochNr(i)+sm.currentEpoch] = t.Membership(membership)
+	}
+
+	// The next membership is the last known membership. It may be replaced by another one during this epoch.
+	sm.nextNewMembership = sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)]
+
+	// Remove all outdated reconfiguration vote data.
+	sm.reconfigurationVotes = make(map[t.EpochNr]map[string]int)
 
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
@@ -300,9 +147,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		}
 
 		log.Infof("Restoring state from checkpoint at height: %d", ch.Height)
-
-		// Restore the height.
-		sm.height = ch.Height
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -353,19 +197,171 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	return nil
 }
 
+// ApplyTXs applies transactions received from the availability layer to the app state
+// and creates a Lotus block from the delivered batch.
+func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
+	var mirMsgs []Message
+
+	// For each request in the batch
+	for _, req := range txs {
+		switch req.Type {
+		case TransportType:
+			mirMsgs = append(mirMsgs, req.Data)
+		case ReconfigurationType:
+			err := sm.applyConfigMsg(req)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	batch := &Batch{
+		Messages: mirMsgs,
+	}
+
+	base, err := sm.api.ChainHead(sm.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get chain head: %w", err)
+	}
+	log.Debugf("Trying to mine new block over base: %s", base.Key())
+
+	nextHeight := base.Height() + 1
+	log.Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
+
+	msgs := sm.MirManager.GetMessages(batch)
+	log.With("epoch", nextHeight).
+		Infof("try to create a block: msgs - %d", len(msgs))
+
+	// include checkpoint in VRF proof field?
+	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
+	eproofCheckpoint := &ltypes.ElectionProof{}
+	if ch := sm.pollCheckpoint(); ch != nil {
+		eproofCheckpoint, err = CertAsElectionProof(ch)
+		if err != nil {
+			return xerrors.Errorf("error setting eproof from checkpoint certificate: %w", err)
+		}
+		vrfCheckpoint, err = CheckpointAsVRFProof(ch)
+		if err != nil {
+			return xerrors.Errorf("error setting vrfproof from checkpoint: %w", err)
+		}
+		log.Infof("Including Mir checkpoint for in block %d", nextHeight)
+	}
+
+	bh, err := sm.api.MinerCreateBlock(sm.ctx, &lapi.BlockTemplate{
+		// mir blocks are created by all miners. We use system actor as miner of the block
+		Miner:            builtin.SystemActorAddr,
+		Parents:          base.Key(),
+		BeaconValues:     nil,
+		Ticket:           vrfCheckpoint,
+		Eproof:           eproofCheckpoint,
+		Epoch:            base.Height() + 1,
+		Timestamp:        uint64(base.Height() + 1),
+		WinningPoStProof: nil,
+		Messages:         msgs,
+	})
+	if err != nil {
+		return xerrors.Errorf("creating a block failed: %w", err)
+	}
+	if bh == nil {
+		log.With("epoch", nextHeight).Debug("created a nil block")
+		return nil
+	}
+
+	err = sm.api.SyncSubmitBlock(sm.ctx, &types.BlockMsg{
+		Header:        bh.Header,
+		BlsMessages:   bh.BlsMessages,
+		SecpkMessages: bh.SecpkMessages,
+	})
+	if err != nil {
+		return xerrors.Errorf("unable to sync a block: %w", err)
+	}
+
+	log.With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
+	return nil
+}
+
+func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
+	var newValSet validator.ValidatorSet
+	if err := newValSet.UnmarshalCBOR(bytes.NewReader(in.Data)); err != nil {
+		return err
+	}
+	voted, err := sm.UpdateAndCheckVotes(&newValSet)
+	if err != nil {
+		return err
+	}
+	if voted {
+		err = sm.UpdateNextMembership(&newValSet)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
+	log.Debugf("New epoch: updating %d to %d", sm.currentEpoch, nr)
+
+	// Sanity check. Generally, the new epoch is always the current epoch plus 1.
+	// At initialization and right after state transfer, sm.currentEpoch already has been initialized
+	// to the current epoch number.
+	if nr != sm.currentEpoch && nr != sm.currentEpoch+1 {
+		return nil, xerrors.Errorf("expected next epoch to be %d or %d, got %d",
+			sm.currentEpoch, sm.currentEpoch+1, nr)
+	}
+
+	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
+	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
+	sm.memberships[nr+ConfigOffset] = sm.nextNewMembership
+
+	// Update current epoch number.
+	sm.currentEpoch = nr
+
+	// Garbage-collect previous membership and old voting data.
+	// Note that at initialization and after state transfer, these entries do not exist.
+	delete(sm.memberships, sm.currentEpoch-1)
+	delete(sm.reconfigurationVotes, sm.currentEpoch-1)
+
+	return sm.nextNewMembership, nil
+}
+
+func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) error {
+	_, mbs, err := validator.Membership(valSet.GetValidators())
+	if err != nil {
+		return err
+	}
+	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
+	return nil
+}
+
+// UpdateAndCheckVotes votes for the valSet and returns true if it has enough votes for this valSet.
+func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (bool, error) {
+	h, err := valSet.Hash()
+	if err != nil {
+		return false, err
+	}
+	_, ok := sm.reconfigurationVotes[sm.currentEpoch]
+	if !ok {
+		sm.reconfigurationVotes[sm.currentEpoch] = make(map[string]int)
+	}
+	sm.reconfigurationVotes[sm.currentEpoch][string(h)]++
+	votes := sm.reconfigurationVotes[sm.currentEpoch][string(h)]
+	nodes := len(sm.memberships[sm.currentEpoch])
+
+	if votes < weakQuorum(nodes) {
+		return false, nil
+	}
+	return true, nil
+}
+
 // Snapshot is called by Mir every time a checkpoint period has
 // passed and is time to create a new checkpoint. This function waits
 // for the latest batch before the checkpoint to be synced is committed
 // in our local state, and it collects the cids for all the blocks verified
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
-	if sm.currentEpoch == 0 {
-		return nil, xerrors.Errorf("trying to make a snapshot in epech", sm.currentEpoch)
-	}
-
-	nextHeight := abi.ChainEpoch(sm.height) + 1
-	log.With("validator", sm.MirManager.ValidatorID).Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
-	log.With("validator", sm.MirManager.ValidatorID).Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
+	nextHeight := sm.prevCheckpoint.Height + sm.GetCheckpointPeriod()
+	log.Debugf("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
+	log.Debugf("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
 
 	// populating checkpoint template
 	ch := Checkpoint{
@@ -379,7 +375,9 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// wait the last block to sync for the snapshot before
 	// populating snapshot.
-	if err := sm.waitForBlock(i); err != nil {
+	log.Debugf("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
+	err := sm.waitForBlock(i)
+	if err != nil {
 		return nil, xerrors.Errorf("error waiting for next block %d: %w", i, err)
 	}
 
@@ -411,7 +409,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	if err := ch.FromBytes(checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error getting checkpoint data from mir checkpoint: %w", err)
 	}
-	log.With("validator", sm.MirManager.ValidatorID).Debugf("Mir generated new checkpoint for height: %d", ch.Height)
+	log.Debugf("Mir generated new checkpoint for height: %d", ch.Height)
 
 	if err := sm.deliverCheckpoint(checkpoint, ch); err != nil {
 		return err
@@ -474,7 +472,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	}
 
 	// Send the checkpoint to Lotus and handle it there
-	log.With("validator", sm.MirManager.ValidatorID).Debug("Sending checkpoint to mining process to include in block")
+	log.Debug("Sending checkpoint to mining process to include in block")
 	sm.NextCheckpoint <- checkpoint
 	return nil
 }
@@ -542,7 +540,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	if base.Height() < height {
 		timeout = timeout + time.Duration(height-base.Height())*time.Second
 	}
-	log.With("validator", sm.MirManager.ValidatorID).Debugf("waiting for block on height %d with timeout %v", height, timeout)
+	log.Debugf("waiting for block on height %d with timeout %v", height, timeout)
 	ctx, cancel := context.WithTimeout(sm.ctx, timeout)
 	defer cancel()
 
@@ -599,6 +597,32 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 		return nil, err
 	}
 	return ch, nil
+}
+
+// GetCheckpointPeriod returns the checkpoint period for the current epoch.
+//
+// The checkpoint period is computed as the number of validator times the
+// segment length.
+func (sm *StateManager) GetCheckpointPeriod() abi.ChainEpoch {
+	return abi.ChainEpoch(sm.MirManager.segmentLength * len(sm.memberships[sm.currentEpoch]))
+}
+
+// ReconfigureMirNode reconfigures the Mir node.
+func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.NodeAddress) error {
+	log.With("miner", m.MirID).Debug("Reconfiguring a Mir node")
+
+	if len(nodes) == 0 {
+		return fmt.Errorf("empty validator set")
+	}
+
+	go m.Net.Connect(nodes)
+	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
+	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
+	// (as there is where we have the config information). These functions should be called
+	// in the garbage collection process performed when the reconfiguration is effective.
+	// go m.Net.CloseOldConnections(nodes)
+
+	return nil
 }
 
 func parseTx(tx []byte) (interface{}, error) {

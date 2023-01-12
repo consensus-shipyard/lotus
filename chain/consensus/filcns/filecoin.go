@@ -18,7 +18,6 @@ import (
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/specs-actors/v7/actors/runtime/proof"
 
-	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -515,24 +514,6 @@ func (filec *FilecoinEC) isChainNearSynced() bool {
 func verifyBlockSignature(ctx context.Context, h *types.BlockHeader,
 	addr address.Address) error {
 	return sigs.CheckBlockSignature(ctx, h, addr)
-}
-
-func signBlock(ctx context.Context, w api.Wallet,
-	addr address.Address, next *types.BlockHeader) error {
-
-	nosigbytes, err := next.SigningBytes()
-	if err != nil {
-		return xerrors.Errorf("failed to get signing bytes for block: %w", err)
-	}
-
-	sig, err := w.WalletSign(ctx, addr, nosigbytes, api.MsgMeta{
-		Type: api.MTBlock,
-	})
-	if err != nil {
-		return xerrors.Errorf("failed to sign new block: %w", err)
-	}
-	next.BlockSig = sig
-	return nil
 }
 
 var _ consensus.Consensus = &FilecoinEC{}

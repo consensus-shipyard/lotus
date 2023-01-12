@@ -15,8 +15,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/policy"
 )
 
-const Consensus ConsensusType = Mir
-
 var NetworkBundle = "devnet"
 var BundleOverrides map[actorstypes.Version]string
 var ActorDebugging = false
@@ -31,7 +29,7 @@ var ActorDebugging = false
 const BootstrappersFile = "spacenet.pi"
 const GenesisFile = "spacenet.car"
 
-const GenesisNetworkVersion = network.Version16
+const GenesisNetworkVersion = network.Version18
 
 var UpgradeBreezeHeight = abi.ChainEpoch(-1)
 

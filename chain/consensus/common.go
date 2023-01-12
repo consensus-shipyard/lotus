@@ -28,6 +28,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/async"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	"github.com/filecoin-project/lotus/metrics"
@@ -427,7 +428,7 @@ func decodeAndCheckBlock(msg *pubsub.Message) (*types.BlockMsg, string, error) {
 	}
 
 	// make sure we have a signature
-	if build.Consensus != build.Mir {
+	if !global.IsConsensusAlgorithm(global.MirConsensus) {
 		if blk.Header.BlockSig == nil {
 			return nil, "missing_signature", fmt.Errorf("block without a signature")
 		}
@@ -480,5 +481,23 @@ func validateMsgMeta(ctx context.Context, msg *types.BlockMsg) error {
 		return fmt.Errorf("messages didn't match root cid in header")
 	}
 
+	return nil
+}
+
+func SignBlock(ctx context.Context, w api.Wallet,
+	addr address.Address, next *types.BlockHeader) error {
+
+	nosigbytes, err := next.SigningBytes()
+	if err != nil {
+		return xerrors.Errorf("failed to get signing bytes for block: %w", err)
+	}
+
+	sig, err := w.WalletSign(ctx, addr, nosigbytes, api.MsgMeta{
+		Type: api.MTBlock,
+	})
+	if err != nil {
+		return xerrors.Errorf("failed to sign new block: %w", err)
+	}
+	next.BlockSig = sig
 	return nil
 }

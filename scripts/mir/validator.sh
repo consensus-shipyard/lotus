@@ -18,10 +18,10 @@ export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 export GOLOG_LOG_LEVEL=$LOG_LEVEL
 
-./lotus wait-api
+./eudico wait-api
 
 # Copy mir config and import keys
-./lotus wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
+./eudico wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
 cp ./scripts/mir/mir-config/node$INDEX/* $LOTUS_PATH
 mkdir $LOTUS_PATH/mir.db
 
@@ -30,6 +30,5 @@ n=$(cat mir-event-logs/counter)
 export MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run-${n}"
 echo $((n + 1)) > mir-event-logs/counter
 
-# Compile and run validator
-# make mir-validator
-./mir-validator run --nosync 
+# Run validator
+./eudico mir validator run --nosync

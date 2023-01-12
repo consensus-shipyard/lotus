@@ -31,7 +31,7 @@ import (
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/simplewal"
-	"github.com/filecoin-project/mir/pkg/systems/smr"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	t "github.com/filecoin-project/mir/pkg/types"
 )
 
@@ -160,7 +160,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 		pool.DefaultModuleParams(),
 	)
 
-	params := smr.DefaultParams(initialMembership)
+	params := trantor.DefaultParams(initialMembership)
 	params.Iss.SegmentLength = m.segmentLength
 	params.Mempool.MaxTransactionsInBatch = 1024
 	params.Iss.AdjustSpeed(1 * time.Second)
@@ -175,9 +175,9 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 		}
 	}
 
-	smrSystem, err := smr.New(
+	smrSystem, err := trantor.New(
 		t.NodeID(mirID),
-		h,
+		netTransport,
 		initCh,
 		m.CryptoManager,
 		m.StateManager,
@@ -259,7 +259,7 @@ func (m *Manager) ID() string {
 	return m.ValidatorID.String()
 }
 
-func (m *Manager) initCheckpoint(params smr.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
+func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
 	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params)
 }
 
