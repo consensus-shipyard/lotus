@@ -109,7 +109,7 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 // - And we flag the mining process that we are synced, and it can start accepting new
 // batches from Mir and assembling new blocks.
 func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
-	log.Debugf("Calling RestoreState from Mir for epoch %d", sm.currentEpoch)
+	log.With("validator", sm.MirManager.MirID).Infof("Calling RestoreState from Mir for epoch %d", sm.currentEpoch)
 	// release any previous checkpoint delivered and pending
 	// to sync, as we are syncing again. This prevents a deadlock.
 	sm.releaseNextCheckpointChan()
@@ -146,7 +146,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("error getting checkpoint from snapshot bytes: %w", err)
 		}
 
-		log.Infof("Restoring state from checkpoint at height: %d", ch.Height)
+		log.With("validator", sm.MirManager.MirID).Infof("Restoring state from checkpoint at height: %d", ch.Height)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -163,9 +163,9 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
 		}
 
-		log.Debugf("Restoring from checkpoint at height %d ", ch.Height)
+		log.Infof("Restoring from checkpoint at height %d ", ch.Height)
 		for _, addr := range connPeers {
-			log.Debugf("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
+			log.Infof("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
 			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
 			if err != nil {
 				log.Errorf("error fetching latest tipset from peer %s: %v", addr.ID, err)
@@ -187,7 +187,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// once synced we deliver the checkpoint to our mining process, so it can be
 		// included in the next block (as the rest of Mir validators will do before
 		// accepting the next batch), and we persist it locally.
-		log.Debugf("Delivering checkpoint for height %d to mining process after sync", ch.Height)
+		log.Infof("Delivering checkpoint for height %d to mining process after sync", ch.Height)
 		err = sm.deliverCheckpoint(checkpoint, ch)
 		if err != nil {
 			return xerrors.Errorf("error delivering checkpoint to lotus from mir after restoreState: %w", err)
@@ -312,6 +312,7 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
 	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
 	sm.memberships[nr+ConfigOffset] = sm.nextNewMembership
+	log.With("validator", sm.MirManager.MirID).Infof("nextEpoch: >>> epoch %d membership size: %d", nr+ConfigOffset, len(sm.nextNewMembership))
 
 	// Update current epoch number.
 	sm.currentEpoch = nr
@@ -329,7 +330,8 @@ func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) err
 	if err != nil {
 		return err
 	}
-	sm.memberships[sm.currentEpoch+ConfigOffset+1] = mbs
+	sm.nextNewMembership = mbs
+	log.With("validator", sm.MirManager.MirID).Infof("updateNextMembership: >>> epoch %d, membership size: %d", sm.currentEpoch, len(mbs))
 	return nil
 }
 
@@ -360,8 +362,8 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (boo
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
 	nextHeight := sm.prevCheckpoint.Height + sm.GetCheckpointPeriod()
-	log.Debugf("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
-	log.Debugf("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
+	log.Infof("Mir requesting checkpoint snapshot for epoch %d and block height %d", sm.currentEpoch, nextHeight)
+	log.Infof("Previous checkpoint in snapshot: %v", sm.prevCheckpoint)
 
 	// populating checkpoint template
 	ch := Checkpoint{
@@ -375,7 +377,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// wait the last block to sync for the snapshot before
 	// populating snapshot.
-	log.Debugf("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
+	log.Infof("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
 	err := sm.waitForBlock(i)
 	if err != nil {
 		return nil, xerrors.Errorf("error waiting for next block %d: %w", i, err)
@@ -390,7 +392,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
 		i--
-		log.Debugf("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
+		log.Infof("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
 	return ch.Bytes()
