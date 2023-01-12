@@ -29,7 +29,7 @@ Alternatively, if by any chance you are not persisting these checkpoints in `$CH
 ./eudico mir validator checkpoint export --height <height>
 ```
 
-> NOTE: `./eudico mir validator checkpoint` can't be use when the validator is running. These commands insantiate the validator database to access the checkpoints, so they can only be used when the validator is stopped. They are provided to be used when a validator fails (or is shut down) and checkpoints from the validator need to be recovered. If in the future there is a lot of demand for these commands to be available while the validator is running we'll add this feature (so let us know :) ).
+> NOTE: `./eudico mir validator checkpoint` can't be used when the validator is running. These commands insantiate the validator database to access the checkpoints, so they can only be used when the validator is stopped. They are provided to be used when a validator fails (or is shut down) and checkpoints from the validator need to be recovered. If in the future there is a lot of demand for these commands to be available while the validator is running we'll add this feature (so let us know :) ).
 
 ## Restarting a validator
 Validators can be restarted seamlessly by running again `./eudico mir validator run --nosync`. The validator itself will request the latest checkpoint to other validators and sync its state until it catches up and is able to participate from the consensus again. Alternatively, we may restart a validator from a specific checkpoint by providing the `--init-height` and `--init-checkpoint` flags to initialize the validator from a checkpoint at a specific hegiht, or from a checkpoint file, respectively.
