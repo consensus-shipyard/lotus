@@ -12,17 +12,15 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
-	t "github.com/filecoin-project/mir/pkg/types"
-	"github.com/filecoin-project/mir/pkg/util/maputil"
-
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 var _ trantor.AppLogic = &StateManager{}
@@ -49,6 +47,8 @@ type StateManager struct {
 	memberships map[t.EpochNr]map[t.NodeID]t.NodeAddress
 
 	// Next membership to return from NewEpoch.
+	// Attention: No in-place modifications of this field are allowed.
+	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
 	nextNewMembership map[t.NodeID]t.NodeAddress
 
 	MirManager *Manager
@@ -129,9 +129,8 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		sm.memberships[t.EpochNr(i)+sm.currentEpoch] = t.Membership(membership)
 	}
 
-	// The next membership is initially just a copy of the last known membership.
-	// It may be replaced by another one during this epoch.
-	sm.nextNewMembership = maputil.Copy(sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)])
+	// The next membership is the last known membership. It may be replaced by another one during this epoch.
+	sm.nextNewMembership = sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)]
 
 	// Remove all outdated reconfiguration vote data.
 	sm.reconfigurationVotes = make(map[t.EpochNr]map[string]int)
@@ -312,7 +311,6 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
 	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
 	sm.memberships[nr+ConfigOffset] = sm.nextNewMembership
-	sm.nextNewMembership = maputil.Copy(sm.nextNewMembership)
 
 	// Update current epoch number.
 	sm.currentEpoch = nr
