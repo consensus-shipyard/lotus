@@ -1,0 +1,60 @@
+name: "Build"
+
+on: [push, pull_request]
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'
+
+      - name: Build
+        uses: goreleaser/goreleaser-action@v3
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          version: latest
+          args: build --skip-validate   # skip validate skips initial sanity checks in order to be able to fully run
+
+      # Link to CHANGELOG_PENDING.md as release notes.
+      - run: echo https://github.com/tendermint/tendermint/blob/${GITHUB_REF#refs/tags/}/CHANGELOG_PENDING.md > ../release_notes.md
+
+      - name: Release
+        uses: goreleaser/goreleaser-action@v3
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          version: latest
+          args: release --rm-dist --release-notes=../release_notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  prerelease-success:
+    needs: prerelease
+    if: ${{ success() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack upon pre-release
+        uses: slackapi/slack-github-action@v1.23.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          RELEASE_URL: "${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":sparkles: New Tendermint pre-release: <${{ env.RELEASE_URL }}|${{ github.ref_name }}>"
+                  }
+                }
+              ]
+            }

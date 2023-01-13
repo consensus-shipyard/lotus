@@ -1,9 +1,8 @@
-
-name: Lint
+name: golangci-lint
 on: [push, pull_request]
 jobs:
   golangci:
-    name: golangci-lint
+    name: lint
     runs-on: ubuntu-latest
     timeout-minutes: 9
     steps:
