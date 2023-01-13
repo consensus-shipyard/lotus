@@ -97,7 +97,7 @@ type TestMiner struct {
 	mirAddr          address.Address
 	mirMultiAddr     []multiaddr.Multiaddr
 	stopMir          context.CancelFunc
-	mirDB            *testDB
+	mirDB            *TestDB
 	mirMembership    string
 	checkpointPeriod int
 }

@@ -417,7 +417,7 @@ func (n *Ensemble) Start() *Ensemble {
 		})
 		require.NoError(n.t, err)
 
-		genesisProvider := fx.Options()
+		var genesisProvider fx.Option
 		if i == 0 && !n.bootstrapped {
 			genesisProvider = fx.Provide(testing2.MakeGenesisMem(&n.genesisBlock, *gtempl))
 		} else {
@@ -432,6 +432,7 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Consensus(global.MirConsensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
+			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),
 			genesisProvider,
 			fx.Replace(n.options.upgradeSchedule),
 			fx.Decorate(testing2.RandomBeacon),
@@ -1132,6 +1133,8 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				libp2p.DefaultTransports,
 				libp2p.ListenAddrs(m.mirMultiAddr...),
 			)
+			require.NoError(n.t, err)
+
 			if !withPersistentDB {
 				m.mirDB = NewTestDB()
 			}

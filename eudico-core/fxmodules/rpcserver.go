@@ -35,7 +35,7 @@ func RpcServer(cctx *cli.Context, r *repo.FsRepo, lr repo.LockedRepo, cfg *confi
 			startRPCServer,
 			newFullNodeHandler,
 			func(api impl.FullNodeAPI, lr repo.LockedRepo, e dtypes.APIEndpoint) lapi.FullNode {
-				lr.SetAPIEndpoint(e)
+				lr.SetAPIEndpoint(e) // nolint
 				return &api
 			},
 			func() (dtypes.APIEndpoint, error) {
@@ -44,10 +44,8 @@ func RpcServer(cctx *cli.Context, r *repo.FsRepo, lr repo.LockedRepo, cfg *confi
 			func() (*types.KeyInfo, error) {
 				if cctx.String("import-key") != "" {
 					return importKey(cctx.String("import-key"))
-				} else {
-					return nil, nil
 				}
-
+				return nil, nil
 			},
 		),
 		fx.Supply(

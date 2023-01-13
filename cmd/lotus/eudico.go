@@ -234,7 +234,7 @@ func eudicoDaemonAction(cctx *cli.Context) error {
 		// Debugging of the dependency graph
 		fx.Invoke(
 			func(dotGraph fx.DotGraph) {
-				os.WriteFile("fx.dot", []byte(dotGraph), 0660)
+				os.WriteFile("fx.dot", []byte(dotGraph), 0660) // nolint
 			}),
 	)
 

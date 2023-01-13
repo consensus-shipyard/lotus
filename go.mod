@@ -23,6 +23,7 @@ require (
 	github.com/drand/drand v1.3.0
 	github.com/drand/kyber v1.1.15
 	github.com/dustin/go-humanize v1.0.0
+	github.com/elastic/go-elasticsearch/v7 v7.14.0
 	github.com/elastic/go-sysinfo v1.7.0
 	github.com/elastic/gosigar v0.14.2
 	github.com/etclabscore/go-openrpc-reflect v0.0.36
@@ -42,12 +43,12 @@ require (
 	github.com/filecoin-project/go-legs v0.4.4
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.10.0-alpha-2
+	github.com/filecoin-project/go-state-types v0.10.0-alpha-5
 	github.com/filecoin-project/go-statemachine v1.0.2
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/go-storedcounter v0.1.0
 	github.com/filecoin-project/index-provider v0.9.1
-	github.com/filecoin-project/mir v0.1.4-0.20230106103901-fa51f5133c09
+	github.com/filecoin-project/mir v0.2.1-0.20230113171626-78e528a66144
 	github.com/filecoin-project/pubsub v1.0.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
@@ -137,7 +138,7 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/raulk/clock v1.1.0
 	github.com/raulk/go-watchdog v1.3.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/urfave/cli/v2 v2.16.3
 	github.com/whyrusleeping/bencher v0.0.0-20190829221104-bb6607aa8bba
@@ -157,7 +158,6 @@ require (
 	golang.org/x/net v0.0.0-20220920183852-bf014ff85ad5
 	golang.org/x/sync v0.0.0-20220907140024-f12130a52804
 	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8
-	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9
 	golang.org/x/tools v0.1.12
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
@@ -276,7 +276,7 @@ require (
 	github.com/lucas-clemente/quic-go v0.29.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.0.3 // indirect
 	github.com/magefile/mage v1.9.0 // indirect
-	github.com/mailru/easyjson v0.7.6 // indirect
+	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.0 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
@@ -342,6 +342,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220505152158-f39f71e6c8f3 // indirect
 	google.golang.org/grpc v1.50.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
