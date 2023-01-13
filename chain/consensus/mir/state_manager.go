@@ -431,7 +431,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	// persist the stable checkpoint to initialize mir from it if needed
 	b, err := checkpoint.Serialize()
 	if err != nil {
-		return xerrors.Errorf("error marshaling stable checkpoint", err)
+		return xerrors.Errorf("error marshaling stable checkpoint: %w", err)
 	}
 	// store latest checkpoint.
 	if err := sm.MirManager.ds.Put(sm.ctx, LatestCheckpointPbKey, b); err != nil {

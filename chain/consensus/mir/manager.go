@@ -180,7 +180,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	if initCh == nil {
 		initCh, err = m.initCheckpoint(params, 0, logger)
 		if err != nil {
-			return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
+			return nil, fmt.Errorf("error getting initial snapshot SMR system: %w", err)
 		}
 	}
 

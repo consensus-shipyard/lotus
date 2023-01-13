@@ -7,18 +7,18 @@ import (
 	ds "github.com/ipfs/go-datastore"
 )
 
-type testDB struct {
+type TestDB struct {
 	db   map[ds.Key][]byte
 	lock sync.Mutex
 }
 
-func NewTestDB() *testDB {
-	return &testDB{
+func NewTestDB() *TestDB {
+	return &TestDB{
 		db: make(map[ds.Key][]byte),
 	}
 }
 
-func (kv *testDB) Get(ctx context.Context, key ds.Key) (value []byte, err error) {
+func (kv *TestDB) Get(ctx context.Context, key ds.Key) (value []byte, err error) {
 	kv.lock.Lock()
 	defer kv.lock.Unlock()
 	v, ok := kv.db[key]
@@ -28,7 +28,7 @@ func (kv *testDB) Get(ctx context.Context, key ds.Key) (value []byte, err error)
 	return v, nil
 }
 
-func (kv *testDB) Put(ctx context.Context, key ds.Key, value []byte) error {
+func (kv *TestDB) Put(ctx context.Context, key ds.Key, value []byte) error {
 	kv.lock.Lock()
 	defer kv.lock.Unlock()
 	kv.db[key] = value

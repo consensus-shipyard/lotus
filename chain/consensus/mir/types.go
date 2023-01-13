@@ -239,7 +239,7 @@ func UnwrapCheckpointSnapshot(ch *checkpoint.StableCheckpoint) (*Checkpoint, err
 	return snap, err
 }
 
-// Get stable checkpoint by height from datastore.
+// GetCheckpointByHeight stable checkpoint by height from datastore.
 func GetCheckpointByHeight(ctx context.Context, ds db.DB,
 	height abi.ChainEpoch, params *trantor.Params, logger *managerLogger) (*checkpoint.StableCheckpoint, error) {
 
@@ -254,9 +254,8 @@ func GetCheckpointByHeight(ctx context.Context, ds db.DB,
 			if err == datastore.ErrNotFound {
 				if params != nil {
 					return trantor.GenesisCheckpoint([]byte{}, *params, logger)
-				} else {
-					return nil, xerrors.Errorf("no checkpoint for height %d or latest checkpoint found in db", height)
 				}
+				return nil, xerrors.Errorf("no checkpoint for height %d or latest checkpoint found in db", height)
 			}
 			return nil, xerrors.Errorf("error getting latest checkpoint: %w", err)
 		}
