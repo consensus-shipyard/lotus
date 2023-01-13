@@ -1,5 +1,12 @@
 package itests
 
+// These tests check that Mir operates normally.
+//
+// Notes:
+//   - It is assumed that the first F of N nodes can be byzantine
+//   - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
+//     and nodes[MirFaultyValidatorNumber:] are honest nodes.
+
 import (
 	"context"
 	"math/rand"
@@ -27,21 +34,6 @@ const (
 	MaxDelay                 = 30
 )
 
-// TestMirConsensus tests that Mir operates normally.
-//
-// Notes:
-//   - It is assumed that the first F of N nodes can be byzantine
-//   - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
-//     and nodes[MirFaultyValidatorNumber:] are honest nodes.
-func TestMirConsensus(t *testing.T) {
-	require.Greater(t, MirFaultyValidatorNumber, 0)
-	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
-
-	t.Run("mir", func(t *testing.T) {
-		runMirConsensusTests(t, kit.ThroughRPC(), kit.MirConsensus())
-	})
-}
-
 // TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
 func TestMirConsensusWithMangler(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
@@ -59,13 +51,6 @@ func TestMirConsensusWithMangler(t *testing.T) {
 	})
 }
 
-// runDraftTest is used for debugging.
-func runDraftTest(t *testing.T, opts ...interface{}) {
-	ts := itestsConsensusSuite{opts: opts}
-
-	t.Run("testMirOneNodeMining", ts.testMirAllNodesMining)
-}
-
 func runMirManglingTests(t *testing.T, opts ...interface{}) {
 	ts := itestsConsensusSuite{opts: opts}
 
@@ -74,26 +59,88 @@ func runMirManglingTests(t *testing.T, opts ...interface{}) {
 	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
 }
 
-func runMirConsensusTests(t *testing.T, opts ...interface{}) {
-	ts := itestsConsensusSuite{opts: opts}
-
+func TestMirOneNodeMining(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
+}
+
+func TestMirTwoNodesMining(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
+}
+
+func TestMirAllNodesMining(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
+}
+
+func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testGenesisBlocksOfValidatorsAndLearners", ts.testGenesisBlocksOfValidatorsAndLearners)
+}
+
+func TestMirWhenLearnersJoin(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
-	// Commenting for now, it is flaky and needs some love.
-	// t.Run("testMirMessageFromLearner", ts.testMirMessageFromLearner)
+}
+
+// func TestMirMessageFromLearner(t *testing.T) {
+// 	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
+// 	t.Run("testMirMessageFromLearner", ts.testMirMessageFromLearner)
+// }
+
+func TestMirNodesStartWithRandomDelay(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirNodesStartWithRandomDelay", ts.testMirNodesStartWithRandomDelay)
+}
+
+func TestMirFNodesNeverStart(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
+}
+
+func TestMirFNodesStartWithRandomDelay(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
-	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
+}
+
+func TestMirMiningWithMessaging(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
+	t.Run("testMirAllNodesMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
+}
+
+func TestMirWithFOmissionNodes(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
+}
+
+func TestMirWithFCrashedNodes(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
+}
+
+func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirWithFCrashedAndRecoveredNodes", ts.testMirWithFCrashedAndRecoveredNodes)
+}
+
+func TestMirStartStop(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirStartStop", ts.testMirStartStop)
+}
+
+func TestMirFNodesCrashLongTimeApart(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
+}
+
+func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
+}
+
+func TestMirFNodesSleepAndThenOperate(t *testing.T) {
+	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
 	t.Run("testMirFNodesSleepAndThenOperate", ts.testMirFNodesSleepAndThenOperate)
 }
 

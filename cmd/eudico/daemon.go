@@ -21,6 +21,7 @@ import (
 
 	"github.com/filecoin-project/go-paramfetch"
 
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/fxmodules"
@@ -62,6 +63,7 @@ var daemonStopCmd = &cli.Command{
 
 // DaemonCmd is the `eudico daemon` command
 func daemonCmd(consensusAlgorithm global.ConsensusAlgorithm) *cli.Command {
+	api.RunningNodeType = api.NodeFull
 	return &cli.Command{
 		Name:  "daemon",
 		Usage: "Start a eudico daemon process",
@@ -132,6 +134,14 @@ func daemonCmd(consensusAlgorithm global.ConsensusAlgorithm) *cli.Command {
 			&cli.PathFlag{
 				Name:  "restore-config",
 				Usage: "config file to use when restoring from backup",
+			},
+			&cli.BoolFlag{
+				Name:  "lite",
+				Usage: "start lotus in lite mode",
+			},
+			&cli.BoolFlag{
+				Name:  "mir-validator",
+				Usage: "start lotus in mir-validator mode",
 			},
 		},
 		Action: eudicoDaemonAction(consensusAlgorithm),

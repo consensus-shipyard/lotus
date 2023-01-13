@@ -76,7 +76,7 @@ debug: build-devnets
 2k: build-devnets
 
 spacenet: GOFLAGS+=-tags=spacenet
-spacenet: eudico lotus mir-validator lotus-seed lotus-keygen lotus-shed
+spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
 mir-test: GOFLAGS+=-tags=spacenet
 mir-test:
@@ -113,8 +113,9 @@ interopnet: GOFLAGS+=-tags=interopnet
 interopnet: build-devnets
 
 eudico: $(BUILD_DEPS)
-	rm -f eu
+	rm -f eudico
 	$(GOCC) build $(GOFLAGS) -o eudico ./cmd/eudico
+BINS+=eudico
 
 lotus: $(BUILD_DEPS)
 	rm -f lotus
