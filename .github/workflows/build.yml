@@ -1,4 +1,4 @@
-name: itests
+name: build
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  itests-go-stable:
+  build-go-stable:
     runs-on: ubuntu-latest
     defaults:
       run:
