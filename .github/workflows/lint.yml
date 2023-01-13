@@ -22,7 +22,7 @@ jobs:
           version: latest
 
           # Optional: working directory, useful for monorepos
-          # working-directory: somedir
+          working-directory: ./chain
 
           # Optional: golangci-lint command line arguments.
           args: --timeout 5m

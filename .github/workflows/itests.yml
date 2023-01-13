@@ -22,6 +22,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: InstallDependencies
+        run: sudo apt install mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget -y && sudo apt upgrade -y
+
       - name: Build
         run: make spacenet
 
