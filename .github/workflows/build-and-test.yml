@@ -1,4 +1,4 @@
-name: build
+name: Build and Test
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build-go-stable:
+  itests-go-stable:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,5 +39,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: RestoreFilecoinProofData
+        id: cache-filecoin-data-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: /var/tmp/filecoin-proof-parameters/
+          key: ${{ runner.os }}-filecoinparams
+
       - name: Build
         run: make spacenet
+
+      - name: Test
+        run: make spacenet-test
+
+      - name: SaveFilecoinProofData
+        id: cache-filecoin-data-save
+        uses: actions/cache/save@v3
+        with:
+          path: /var/tmp/filecoin-proof-parameters/
+          key: ${{ steps.cache-filecoin-data-restore.outputs.cache-primary-key }}
