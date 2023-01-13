@@ -417,7 +417,7 @@ func (n *Ensemble) Start() *Ensemble {
 		})
 		require.NoError(n.t, err)
 
-		genesisProvider := fx.Options()
+		var genesisProvider fx.Option
 		if i == 0 && !n.bootstrapped {
 			genesisProvider = fx.Provide(testing2.MakeGenesisMem(&n.genesisBlock, *gtempl))
 		} else {
@@ -1133,6 +1133,8 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				libp2p.DefaultTransports,
 				libp2p.ListenAddrs(m.mirMultiAddr...),
 			)
+			require.NoError(n.t, err)
+
 			if !withPersistentDB {
 				m.mirDB = NewTestDB()
 			}
