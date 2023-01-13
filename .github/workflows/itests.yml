@@ -1,5 +1,9 @@
 name: itests
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - spacenet
+  pull_request:
 
 jobs:
   itests-go-stable:
@@ -23,7 +27,7 @@ jobs:
           submodules: recursive
 
       - name: InstallDependencies
-        run: sudo apt install mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget -y && sudo apt upgrade -y
+        run: sudo apt-get update && sudo apt-get install mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget -y && sudo apt-get upgrade -y
 
       - name: Build
         run: make spacenet
