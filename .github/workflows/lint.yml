@@ -9,7 +9,7 @@ jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 10
     steps:
       - name: Set up Golang
         uses: actions/setup-go@v3
@@ -30,7 +30,7 @@ jobs:
           # working-directory:
 
           # Optional: golangci-lint command line arguments.
-          args: --timeout 5m -v ./chain
+          args: --timeout 5m -v ./chain/...
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # only-new-issues: true

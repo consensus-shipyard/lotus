@@ -55,4 +55,3 @@ jobs:
         with:
           path: /var/tmp/filecoin-proof-parameters/
           key: ${{ steps.cache-filecoin-data-restore.outputs.cache-primary-key }}
-
