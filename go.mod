@@ -150,7 +150,7 @@ require (
 	go.opentelemetry.io/otel/bridge/opencensus v0.33.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
 	go.opentelemetry.io/otel/sdk v1.11.1
-	go.uber.org/fx v1.19.1-0.20230109182455-f0d73c614abf
+	go.uber.org/fx v1.19.2-0.20230112190306-5e90c3828924
 	go.uber.org/multierr v1.8.0
 	go.uber.org/zap v1.23.0
 	golang.org/x/exp v0.0.0-20220916125017-b168a2c6b86b

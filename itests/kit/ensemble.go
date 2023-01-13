@@ -432,7 +432,6 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Consensus(global.MirConsensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
-			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),
 			genesisProvider,
 			fx.Replace(n.options.upgradeSchedule),
 			fx.Decorate(testing2.RandomBeacon),
