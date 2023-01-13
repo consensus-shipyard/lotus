@@ -312,7 +312,7 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
 	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
 	sm.memberships[nr+ConfigOffset] = sm.nextNewMembership
-	log.With("validator", sm.MirManager.MirID).Infof("nextEpoch: >>> epoch %d membership size: %d", nr+ConfigOffset, len(sm.nextNewMembership))
+	log.With("validator", sm.MirManager.MirID).Infof(">>> nextEpoch: current epoch %d, epoch %d membership size: %d", sm.currentEpoch, nr+ConfigOffset, len(sm.nextNewMembership))
 
 	// Update current epoch number.
 	sm.currentEpoch = nr
@@ -331,7 +331,7 @@ func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) err
 		return err
 	}
 	sm.nextNewMembership = mbs
-	log.With("validator", sm.MirManager.MirID).Infof("updateNextMembership: >>> epoch %d, membership size: %d", sm.currentEpoch, len(mbs))
+	log.With("validator", sm.MirManager.MirID).Infof("updateNextMembership: >>> current epoch %d, membership size: %d", sm.currentEpoch, len(mbs))
 	return nil
 }
 
