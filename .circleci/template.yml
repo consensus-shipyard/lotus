@@ -12,16 +12,6 @@ executors:
   ubuntu:
     docker:
       - image: ubuntu:20.04
-  packer:
-    description: |
-      The HashiCorp provided Packer container
-    parameters:
-      packer-version:
-        type: string
-        default: "1.8"
-    docker:
-      - image: hashicorp/packer:<< parameters.packer-version >>
-
 
 commands:
   prepare:
@@ -34,6 +24,10 @@ commands:
         default: false
         description: is a darwin build environment?
         type: boolean
+      darwin-architecture:
+        default: "amd64"
+        description: which darwin architecture is being used?
+        type: string
     steps:
       - checkout
       - git_fetch_all_tags
@@ -59,7 +53,7 @@ commands:
             - run:
                 name: Install Go
                 command: |
-                  curl https://dl.google.com/go/go`cat GO_VERSION_MIN`.darwin-amd64.pkg -o /tmp/go.pkg && \
+                  curl https://dl.google.com/go/go`cat GO_VERSION_MIN`.darwin-<<parameters.darwin-architecture>>.pkg -o /tmp/go.pkg && \
                   sudo installer -pkg /tmp/go.pkg -target /
             - run:
                 name: Export Go
@@ -105,25 +99,6 @@ commands:
           name: fetch all tags
           command: |
             git fetch --all
-  packer_build:
-    description: "Run a packer build"
-    parameters:
-      template:
-        description: |
-          The name of the packer template file
-        type: string
-        default: packer.json
-      args:
-        description: |
-          Arguments to pass to the packer build command
-        type: string
-        default: ""
-
-    steps:
-      - run:
-          name: "Run a packer build"
-          command: packer build << parameters.args >> << parameters.template >>
-          no_output_timeout: 30m
 
 jobs:
   mod-tidy-check:
@@ -136,12 +111,6 @@ jobs:
           command: |
             git --no-pager diff go.mod go.sum
             git --no-pager diff --quiet go.mod go.sum
-  build-debug:
-    executor: golang
-    steps:
-      - prepare
-      - run:
-          command: make debug
 
   test:
     description: |
@@ -272,47 +241,6 @@ jobs:
           path: /tmp/test-reports
       - store_artifacts:
           path: /tmp/test-artifacts/conformance-coverage.html
-  build-lotus-soup:
-    description: |
-      Compile `lotus-soup` Testground test plan
-    parameters:
-      <<: *test-params
-    executor: << parameters.executor >>
-    steps:
-      - prepare
-      - run: cd extern/filecoin-ffi && make
-      - run:
-          name: "go get lotus@master"
-          command: cd testplans/lotus-soup && go mod edit -replace=github.com/filecoin-project/lotus=../.. && go mod tidy
-      - run:
-          name: "build lotus-soup testplan"
-          command: pushd testplans/lotus-soup && go build -tags=testground .
-  trigger-testplans:
-    description: |
-      Trigger `lotus-soup` test cases on TaaS
-    parameters:
-      <<: *test-params
-    executor: << parameters.executor >>
-    steps:
-      - prepare
-      - run:
-          name: "download testground"
-          command: wget https://gist.github.com/nonsense/5fbf3167cac79945f658771aed32fc44/raw/2e17eb0debf7ec6bdf027c1bdafc2c92dd97273b/testground-d3e9603 -O ~/testground-cli && chmod +x ~/testground-cli
-      - run:
-          name: "prepare .env.toml"
-          command: pushd testplans/lotus-soup && mkdir -p $HOME/testground && cp env-ci.toml $HOME/testground/.env.toml && echo 'endpoint="https://ci.testground.ipfs.team"' >> $HOME/testground/.env.toml && echo 'user="circleci"' >> $HOME/testground/.env.toml
-      - run:
-          name: "prepare testground home dir and link test plans"
-          command: mkdir -p $HOME/testground/plans && ln -s $(pwd)/testplans/lotus-soup $HOME/testground/plans/lotus-soup
-      - run:
-          name: "go get lotus@master"
-          command: cd testplans/lotus-soup && go get github.com/filecoin-project/lotus@master
-      - run:
-          name: "trigger deals baseline testplan on taas"
-          command: ~/testground-cli run composition -f $HOME/testground/plans/lotus-soup/_compositions/baseline-k8s-3-1.toml --metadata-commit=$CIRCLE_SHA1 --metadata-repo=filecoin-project/lotus --metadata-branch=$CIRCLE_BRANCH
-      - run:
-          name: "trigger payment channel stress testplan on taas"
-          command: ~/testground-cli run composition -f $HOME/testground/plans/lotus-soup/_compositions/paych-stress-k8s.toml --metadata-commit=$CIRCLE_SHA1 --metadata-repo=filecoin-project/lotus --metadata-branch=$CIRCLE_BRANCH
 
   build-linux-amd64:
     executor: golang
@@ -339,7 +267,9 @@ jobs:
       - prepare:
           linux: false
           darwin: true
+          darwin-architecture: amd64
       - run: make lotus lotus-miner lotus-worker
+      - run: otool -hv lotus
       - run:
           name: check tag and version output match
           command: ./scripts/version-check.sh ./lotus
@@ -361,10 +291,12 @@ jobs:
       - prepare:
           linux: false
           darwin: true
+          darwin-architecture: arm64
       - run: |
           export CPATH=$(brew --prefix)/include
           export LIBRARY_PATH=$(brew --prefix)/lib
           make lotus lotus-miner lotus-worker
+      - run: otool -hv lotus
       - run:
           name: check tag and version output match
           command: ./scripts/version-check.sh ./lotus
@@ -476,11 +408,9 @@ jobs:
       - run: go install golang.org/x/tools/cmd/goimports
       - run: go install github.com/hannahhoward/cbor-gen-for
       - run: make gen
-      - run: git --no-pager diff
-      - run: git --no-pager diff --quiet
+      - run: git --no-pager diff && git --no-pager diff --quiet
       - run: make docsgen-cli
-      - run: git --no-pager diff
-      - run: git --no-pager diff --quiet
+      - run: git --no-pager diff && git --no-pager diff --quiet
 
   docs-check:
     executor: golang
@@ -495,11 +425,7 @@ jobs:
       - run: zcat build/openrpc/full.json.gz | jq > ../post-openrpc-full
       - run: zcat build/openrpc/miner.json.gz | jq > ../post-openrpc-miner
       - run: zcat build/openrpc/worker.json.gz | jq > ../post-openrpc-worker
-      - run: git --no-pager diff
-      - run: diff ../pre-openrpc-full ../post-openrpc-full
-      - run: diff ../pre-openrpc-miner ../post-openrpc-miner
-      - run: diff ../pre-openrpc-worker ../post-openrpc-worker
-      - run: git --no-pager diff --quiet
+      - run: diff ../pre-openrpc-full ../post-openrpc-full && diff ../pre-openrpc-miner ../post-openrpc-miner && diff ../pre-openrpc-worker ../post-openrpc-worker && git --no-pager diff && git --no-pager diff --quiet
 
   lint: &lint
     description: |
@@ -631,10 +557,14 @@ jobs:
                   - run:
                       name: Docker push
                       command: |
-                        echo docker push filecoin/<<parameters.image>>:<<parameters.channel>>
+                        docker push filecoin/<<parameters.image>>:<<parameters.channel>>
+                        if [["[[ ! -z $CIRCLE_SHA ]]"]]; then
+                          docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>> filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"
+                          docker push filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"
+                        fi
                         if [["[[ ! -z $CIRCLE_TAG ]]"]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>> filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
-                          echo docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
+                          docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
                         fi
             - unless:
                 condition: <<parameters.push>>
@@ -657,10 +587,14 @@ jobs:
                   - run:
                       name: Docker push
                       command: |
-                        echo docker push filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>>
+                        docker push filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>>
+                        if [["[[ ! -z $CIRCLE_SHA ]]"]]; then
+                          docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>> filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"-<<parameters.network>>
+                          docker push filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"-<<parameters.network>>
+                        fi
                         if [["[[ ! -z $CIRCLE_TAG ]]"]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>> filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
-                          echo docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
+                          docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
                         fi
             - unless:
                 condition: <<parameters.push>>
@@ -669,14 +603,6 @@ jobs:
                       image: filecoin/<<parameters.image>>
                       extra_build_args: --target <<parameters.image>> --build-arg GOFLAGS=-tags=<<parameters.network>>
 
-  publish-packer-snap:
-    description: build packer image with snap. mainnet only.
-    executor:
-      name: packer
-    steps:
-      - checkout
-      - packer_build:
-          template: tools/packer/lotus-snap.pkr.hcl
 workflows:
   version: 2.1
   ci:
@@ -718,13 +644,6 @@ workflows:
           suite: conformance-bleeding-edge
           target: "./conformance"
           vectors-branch: specs-actors-v7
-      - trigger-testplans:
-          filters:
-            branches:
-              only:
-                - master
-      - build-debug
-      - build-lotus-soup
 
   release:
     jobs:
@@ -852,6 +771,16 @@ workflows:
               only:
                 - /^v\d+\.\d+\.\d+-rc\d+$/
       - build-docker:
+          name: "Docker push (lotus-all-in-one / edge / [[.]])"
+          image: lotus-all-in-one
+          channel: master
+          network: [[.]]
+          push: true
+          filters:
+            branches:
+              only:
+                - master
+      - build-docker:
           name: "Docker build (lotus-all-in-one / [[.]])"
           image: lotus-all-in-one
           network: [[.]]
@@ -861,6 +790,51 @@ workflows:
               only:
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
       [[- end]]
+      - build-docker:
+          name: "Docker push (lotus / stable / mainnet)"
+          image: lotus
+          channel: stable
+          network: mainnet
+          push: true
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+$/
+      - build-docker:
+          name: "Docker push (lotus / candidate / mainnet)"
+          image: lotus
+          channel: candidate
+          network: mainnet
+          push: true
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+-rc\d+$/
+      - build-docker:
+          name: "Docker push (lotus / master / mainnet)"
+          image: lotus
+          channel: master
+          network: mainnet
+          push: true
+          filters:
+            branches:
+              only:
+                - master
+      - build-docker:
+          name: "Docker build (lotus / mainnet)"
+          image: lotus
+          network: mainnet
+          push: false
+          filters:
+            branches:
+              only:
+                - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
 
   nightly:
     triggers:
@@ -885,13 +859,3 @@ workflows:
           network: [[.]]
           push: true
       [[- end]]
-  biweekly:
-    triggers:
-      - schedule:
-          cron: "0 0 1 * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - publish-packer-snap

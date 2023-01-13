@@ -1211,7 +1211,9 @@ COMMANDS:
      check-notary-datacap           check a notary's remaining bytes
      sign-remove-data-cap-proposal  allows a notary to sign a Remove Data Cap Proposal
      list-allocations               List allocations made by client
+     list-claims                    List claims made by provider
      remove-expired-allocations     remove expired allocations (if no allocations are specified all eligible allocations are removed)
+     remove-expired-claims          remove expired claims (if no claims are specified all eligible claims are removed)
      help, h                        Shows a list of commands or help for one command
 
 OPTIONS:
@@ -1310,6 +1312,19 @@ OPTIONS:
    
 ```
 
+### lotus filplus list-claims
+```
+NAME:
+   lotus filplus list-claims - List claims made by provider
+
+USAGE:
+   lotus filplus list-claims [command options] providerAddress
+
+OPTIONS:
+   --expired  list only expired claims (default: false)
+   
+```
+
 ### lotus filplus remove-expired-allocations
 ```
 NAME:
@@ -1317,6 +1332,19 @@ NAME:
 
 USAGE:
    lotus filplus remove-expired-allocations [command options] clientAddress Optional[...allocationId]
+
+OPTIONS:
+   --from value  optionally specify the account to send the message from
+   
+```
+
+### lotus filplus remove-expired-claims
+```
+NAME:
+   lotus filplus remove-expired-claims - remove expired claims (if no claims are specified all eligible claims are removed)
+
+USAGE:
+   lotus filplus remove-expired-claims [command options] providerAddress Optional[...claimId]
 
 OPTIONS:
    --from value  optionally specify the account to send the message from
@@ -2424,7 +2452,6 @@ USAGE:
    lotus chain prune [command options] [arguments...]
 
 OPTIONS:
-   --move-to value    specify new path for coldstore during moving gc
    --moving-gc        use moving gc for garbage collecting the coldstore (default: false)
    --online-gc        use online gc for garbage collecting the coldstore (default: false)
    --retention value  specify state retention policy (default: -1)
