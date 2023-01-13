@@ -178,7 +178,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config
 	if initCh == nil {
-		initCh, err = m.initCheckpoint(params, 0)
+		initCh, err = m.initCheckpoint(params, 0, logger)
 		if err != nil {
 			return nil, fmt.Errorf("error getting inital snapshot SMR system: %w", err)
 		}
@@ -284,8 +284,8 @@ func (m *Manager) ID() string {
 	return m.Addr.String()
 }
 
-func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
-	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params)
+func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch, logger *managerLogger) (*checkpoint.StableCheckpoint, error) {
+	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params, logger)
 }
 
 // GetMessages extracts Filecoin messages from a Mir batch.
