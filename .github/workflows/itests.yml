@@ -1,4 +1,4 @@
-name: e2e
+name: itests
 on: [push, pull_request]
 
 jobs:
@@ -15,12 +15,15 @@ jobs:
       - name: Set up Golang
         uses: actions/setup-go@v3
         with:
-          go-version: '1.18'
-          with:
-            go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go }}
 
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Build
+        run: make spacenet
 
       - name: Test
         run: make spacenet-test
