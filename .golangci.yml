@@ -9,6 +9,8 @@ linters:
     - unconvert
     - staticcheck
     - exportloopref
+    - govet
+    - typecheck
 
 # We don't want to skip builtin/
 skip-dirs-use-default: false
@@ -16,7 +18,6 @@ skip-dirs:
   - vendor$
   - testdata$
   - examples$
-  - extern$
 
 run:
   skip-files:
