@@ -28,7 +28,7 @@ rm -rf $LOTUS_PATH
 # then
 #   # Remove the previous genesis so we don´t get a race if we try to start a daemon before generating the genesis from daemon 0.
 #    rm ./scripts/mir/devgen.car
-#    ./eudico mir daemon --lotus-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
+#    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
 ./eudico mir daemon --genesis=./scripts/mir/devgen.car --bootstrap=false --api=123$INDEX
 # fi

@@ -8,6 +8,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 type EnsembleOpt func(opts *ensembleOpts) error
@@ -24,6 +25,8 @@ type ensembleOpts struct {
 	mockProofs   bool
 
 	upgradeSchedule stmgr.UpgradeSchedule
+
+	consensus global.ConsensusAlgorithm
 }
 
 var DefaultEnsembleOpts = ensembleOpts{
@@ -32,6 +35,14 @@ var DefaultEnsembleOpts = ensembleOpts{
 		Height:  -1,
 		Network: build.TestNetworkVersion,
 	}},
+}
+
+// MirConsensus sets consensus protocol to Mir.
+func MirConsensus() EnsembleOpt {
+	return func(opts *ensembleOpts) error {
+		opts.consensus = global.MirConsensus
+		return nil
+	}
 }
 
 // MockProofs activates mock proofs for the entire ensemble.
