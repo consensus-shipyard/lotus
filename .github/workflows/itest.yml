@@ -1,4 +1,4 @@
-name: test
+name: itest
 on:
   push:
     branches:
@@ -47,7 +47,7 @@ jobs:
           key: ${{ runner.os }}-filecoinparams
 
       - name: Test
-          run: make spacenet-test
+        run: make spacenet-test
 
       - name: SaveFilecoinProofData
         id: cache-filecoin-data-save
