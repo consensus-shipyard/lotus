@@ -98,13 +98,13 @@ spacenet-mangling-test:
 
 spacenet-smoke-test: GOFLAGS+=-tags=spacenet
 spacenet-smoke-test:
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=20m -run TestMirConsensusSmoke ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=5m -run TestMirConsensusSmoke ./itests/mir_test.go
 .PHONY: spacenet-smoke-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet
 spacenet-test-race:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -race -shuffle=on -v -timeout=60 -count=1 ./itests/mir_test.go
+	go test $(GOFLAGS) -race -shuffle=on -v -timeout=60m -count=1 ./itests/mir_test.go
 .PHONY: spacenet-test-race
 
 calibnet: GOFLAGS+=-tags=calibnet
