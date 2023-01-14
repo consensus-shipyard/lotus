@@ -27,7 +27,7 @@ jobs:
           submodules: recursive
 
       - name: InstallDependencies
-        run: sudo apt-get update && sudo apt-get install mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget -y && sudo apt-get upgrade -y
+        run: sudo apt-get update && sudo apt-get install -y mesa-opencl-icd ocl-icd-opencl-dev gcc git bzr jq pkg-config curl clang build-essential hwloc libhwloc-dev wget
 
       - name: CashGoModules
         uses: actions/cache@v3
@@ -49,8 +49,8 @@ jobs:
       - name: Deps
         run: make deps
 
-      - name: Tests with mangler
-        run: make spacenet-test-mangler
+      - name: Tests
+        run: make spacenet-test
 
       - name: SaveFilecoinProofData
         id: cache-filecoin-data-save

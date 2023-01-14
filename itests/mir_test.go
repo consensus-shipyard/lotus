@@ -46,17 +46,36 @@ func TestMirConsensusWithMangler(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	t.Run("mirWithMangler", func(t *testing.T) {
-		runMirManglingTests(t, kit.ThroughRPC(), kit.MirConsensus())
-	})
+	TestMirAllNodesMining(t)
+	TestMirWhenLearnersJoin(t)
+	TestMirMiningWithMessaging(t)
 }
 
-func runMirManglingTests(t *testing.T, opts ...interface{}) {
-	ts := itestsConsensusSuite{opts: opts}
+func TestMirConsensusSmoke(t *testing.T) {
+	TestMirOneNodeMining(t)
+	TestMirTwoNodesMining(t)
+	TestMirStartStop(t)
+	TestGenesisBlocksOfValidatorsAndLearners(t)
+	TestMirWhenLearnersJoin(t)
+}
 
-	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
-	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
-	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
+func TestMirConsensus(t *testing.T) {
+	TestMirOneNodeMining(t)
+	TestMirTwoNodesMining(t)
+	TestMirAllNodesMining(t)
+	TestGenesisBlocksOfValidatorsAndLearners(t)
+	TestMirWhenLearnersJoin(t)
+	TestMirNodesStartWithRandomDelay(t)
+	TestMirFNodesNeverStart(t)
+	TestMirFNodesStartWithRandomDelay(t)
+	TestMirMiningWithMessaging(t)
+	TestMirWithFOmissionNodes(t)
+	TestMirWithFCrashedNodes(t)
+	TestMirWithFCrashedAndRecoveredNodes(t)
+	TestMirStartStop(t)
+	TestMirFNodesCrashLongTimeApart(t)
+	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
+	TestMirFNodesSleepAndThenOperate(t)
 }
 
 func TestMirOneNodeMining(t *testing.T) {

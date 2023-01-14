@@ -81,20 +81,25 @@ spacenet: eudico lotus-seed lotus-keygen lotus-shed
 # Run spacenet unit tests
 spacenet-unit-test: GOFLAGS+=-tags=spacenet
 spacenet-unit-test:
-	go test $(GOFLAGS) -count=1 -timeout=0 -v  ./chain/...
+	go test $(GOFLAGS) -count=1 -timeout=0 -v  ./chain/consensus/...
 .PHONY: spacenet-unit-test
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -run TestMirTwoNodesMining ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -run TestMirConsensus ./itests/mir_test.go
 .PHONY: spacenet-test
 
-spacenet-test-mangler: GOFLAGS+=-tags=spacenet
-spacenet-test-mangler:
+spacenet-mangling-test: GOFLAGS+=-tags=spacenet
+spacenet-mangling-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
 	go test $(GOFLAGS) -shuffle=on -v -count=1 -run TestMirConsensusWithMangler ./itests/mir_test.go
-.PHONY: spacenet-test-mangler
+.PHONY: spacenet-mangling-test
+
+spacenet-smoke-test: GOFLAGS+=-tags=spacenet
+spacenet-smoke-test:
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -run TestMirConsensusSmoke ./itests/mir_test.go
+.PHONY: spacenet-smoke-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet
 spacenet-test-race:

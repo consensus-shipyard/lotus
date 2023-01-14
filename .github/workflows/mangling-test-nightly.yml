@@ -1,10 +1,9 @@
-name: Tests
-# Tests workflow builds the system and runs unit and integration tests.
+name: NighltyTest
+# This workflow runs long nightly integration tests with Mir's mangler.
 on:
-  push:
-    branches:
-      - spacenet
-  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * *'
 
 jobs:
   tests:
@@ -47,17 +46,11 @@ jobs:
           path: /var/tmp/filecoin-proof-parameters/
           key: ${{ runner.os }}-filecoinparams
 
-      - name: BuildDeps
+      - name: Deps
         run: make deps
 
-      - name: Build
-        run: make spacenet
-
-      - name: UnitTests
-        run: make spacenet-unit-test
-
-      - name: SmokeTests
-        run: make spacenet-smoke-test
+      - name: Tests with mangler
+        run: make spacenet-mangling-test
 
       - name: SaveFilecoinProofData
         id: cache-filecoin-data-save
