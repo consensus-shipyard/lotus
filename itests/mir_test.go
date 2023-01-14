@@ -47,7 +47,7 @@ func TestMirConsensusWithMangler(t *testing.T) {
 	}()
 
 	t.Run("mirWithMangler", func(t *testing.T) {
-		runMirManglingTests(t, kit.ThroughRPC())
+		runMirManglingTests(t, kit.ThroughRPC(), kit.MirConsensus())
 	})
 }
 

@@ -79,21 +79,27 @@ spacenet: GOFLAGS+=-tags=spacenet
 spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
 # Run spacenet unit tests
-spacenet-uint-test: GOFLAGS+=-tags=spacenet
+spacenet-unit-test: GOFLAGS+=-tags=spacenet
 spacenet-unit-test:
 	go test $(GOFLAGS) -count=1 -timeout=0 -v  ./chain/...
-.PHONY: spacenet-uint-test
+.PHONY: spacenet-unit-test
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirTwoNodesMining ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -run TestMirTwoNodesMining ./itests/mir_test.go
 .PHONY: spacenet-test
+
+spacenet-test-mangler: GOFLAGS+=-tags=spacenet
+spacenet-test-mangler:
+	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -run TestMirConsensusWithMangler ./itests/mir_test.go
+.PHONY: spacenet-test-mangler
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet
 spacenet-test-race:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
+	go test $(GOFLAGS) -race -shuffle=on -v -count=1 ./itests/mir_test.go
 .PHONY: spacenet-test-race
 
 calibnet: GOFLAGS+=-tags=calibnet
