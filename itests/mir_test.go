@@ -581,6 +581,7 @@ func (ts *itestsConsensusSuite) testMirStartStop(t *testing.T) {
 	}()
 
 	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
 		wg.Wait()
 		close(wait)
 	}()
