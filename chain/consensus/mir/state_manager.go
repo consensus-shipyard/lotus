@@ -534,7 +534,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	}
 
 	// one minute baseline timeout
-	timeout := 60 * time.Second
+	timeout := 120 * time.Second
 	// add extra if the gap is big.
 	if base.Height() < height {
 		timeout = timeout + time.Duration(height-base.Height())*time.Second
@@ -567,7 +567,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	case <-out:
 		return nil
 	case <-ctx.Done():
-		panic(100)
+		log.Errorf("waiting for block: ErrMirCtxCanceledWhileWaitingSnapshot on height %d with timeout %v", height, timeout)
 		return ErrMirCtxCanceledWhileWaitingSnapshot
 	}
 }
