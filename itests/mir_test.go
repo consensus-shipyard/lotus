@@ -53,10 +53,10 @@ func TestMirConsensusWithMangler(t *testing.T) {
 
 func TestMirConsensusSmoke(t *testing.T) {
 	TestMirOneNodeMining(t)
-	TestMirTwoNodesMining(t)
+	TestMirAllNodesMining(t)
 	TestMirStartStop(t)
 	TestGenesisBlocksOfValidatorsAndLearners(t)
-	TestMirWhenLearnersJoin(t)
+	TestMirFNodesNeverStart(t)
 }
 
 func TestMirConsensus(t *testing.T) {
