@@ -564,25 +564,25 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirStartStop tests that n − f nodes operate normally and can recover
-// if f nodes crash at the same time.
+// testMirStartStop tests that Mir nodes can be stopped.
 func (ts *itestsConsensusSuite) testMirStartStop(t *testing.T) {
 	var wg sync.WaitGroup
+	wait := make(chan struct{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wait := make(chan struct{})
-		go func() {
-			wg.Wait()
-			wait <- struct{}{}
-		}()
 		select {
 		case <-time.After(10 * time.Second):
 			t.Fatalf("fail to stop Mir nodes")
 		case <-wait:
 		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(wait)
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)

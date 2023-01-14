@@ -1079,7 +1079,7 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miner
 	n.Bootstrapped()
 }
 
-// Bootstrap explicitly sets the ensemble as bootstrapped.
+// Bootstrapped explicitly sets the ensemble as bootstrapped.
 func (n *Ensemble) Bootstrapped() {
 	n.bootstrapped = true
 }

@@ -567,6 +567,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	case <-out:
 		return nil
 	case <-ctx.Done():
+		panic(100)
 		return ErrMirCtxCanceledWhileWaitingSnapshot
 	}
 }
