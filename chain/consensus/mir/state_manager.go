@@ -534,7 +534,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	}
 
 	// one minute baseline timeout
-	timeout := 120 * time.Second
+	timeout := 60 * time.Second
 	// add extra if the gap is big.
 	if base.Height() < height {
 		timeout = timeout + time.Duration(height-base.Height())*time.Second
