@@ -1,4 +1,5 @@
-name: Build and Test
+name: Tests
+# Tests workflow builds the system and runs unit and integration tests.
 on:
   push:
     branches:
@@ -6,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  itests-go-stable:
+  tests:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,7 +50,10 @@ jobs:
       - name: Build
         run: make spacenet
 
-      - name: Test
+      - name: UnitTests
+        run: make spacenet-unit-test
+
+      - name: IntegrationTest
         run: make spacenet-test
 
       - name: SaveFilecoinProofData

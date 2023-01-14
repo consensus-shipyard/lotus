@@ -1,4 +1,4 @@
-name: golangci-lint
+name: Lint
 on:
   push:
     branches:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   golangci:
-    name: lint
+    name: golangci-lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -78,6 +78,12 @@ debug: build-devnets
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
+# Run spacenet unit tests
+spacenet-uint-test: GOFLAGS+=-tags=spacenet
+spacenet-unit-test:
+	go test $(GOFLAGS) -count=1 -timeout=0 -v  ./chain/...
+.PHONY: spacenet-uint-test
+
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
