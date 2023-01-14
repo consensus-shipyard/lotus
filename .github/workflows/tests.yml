@@ -48,7 +48,7 @@ jobs:
           key: ${{ runner.os }}-filecoinparams
 
       - name: Build
-        run: make spacenet
+        run: make deps
 
       - name: UnitTests
         run: make spacenet-unit-test

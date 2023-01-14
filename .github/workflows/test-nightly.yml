@@ -1,9 +1,9 @@
 name: NighltyTest
 # This workflow runs long nightly integration tests with Mir's mangler.
 on:
-  workflow_dispatch: # allow running workflow manually, in theory
+  workflow_dispatch:
   schedule:
-   - cron: '1 * * * *'
+   - cron: '0 12 * * *'
 
 jobs:
   tests:
@@ -50,7 +50,7 @@ jobs:
         run: make deps
 
       - name: Tests with mangler
-        run: make spacenet-test
+        run: make spacenet-test-mangler
 
       - name: SaveFilecoinProofData
         id: cache-filecoin-data-save
