@@ -424,6 +424,8 @@ func (n *Ensemble) Start() *Ensemble {
 			genesisProvider = fx.Provide(modules.LoadGenesis(n.genesisBlock.Bytes()))
 		}
 
+		shutdownChan := dtypes.ShutdownChan(make(chan struct{}))
+
 		fxProviders := fx.Options(
 			fxmodules.Fullnode(false, full.options.lite),
 			fxmodules.Libp2p(&cfg.Common),
@@ -432,7 +434,7 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Consensus(global.MirConsensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
-			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),
+			fx.Supply(shutdownChan),
 			genesisProvider,
 			fx.Replace(n.options.upgradeSchedule),
 			fx.Decorate(testing2.RandomBeacon),
@@ -469,6 +471,8 @@ func (n *Ensemble) Start() *Ensemble {
 			})
 			return stopErr
 		}
+
+		node.MonitorShutdown(shutdownChan, node.ShutdownHandler{Component: "node", StopFunc: stopFunc})
 
 		// Are we hitting this node through its RPC?
 		if full.options.rpc {
