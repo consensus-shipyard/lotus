@@ -143,8 +143,8 @@ func TestMirTwoNodesMining(t *testing.T) {
 
 // TestMirAllNodesMining tests that n nodes can mine blocks normally.
 func TestMirAllNodesMining(t *testing.T) {
-	t.Logf(t.Name(), " started")
-	defer t.Logf(t.Name(), " finished")
+	t.Log(t.Name(), " TestMirAllNodesMining started")
+	defer t.Log(t.Name(), "TestMirAllNodesMining finished")
 
 	var wg sync.WaitGroup
 
@@ -506,8 +506,8 @@ func TestMirWithFCrashedNodes(t *testing.T) {
 
 // TestMirStartStop tests that Mir nodes can be stopped.
 func TestMirStartStop(t *testing.T) {
-	t.Logf(t.Name(), " started")
-	defer t.Logf(t.Name(), " finished")
+	t.Log(t.Name(), " TestMirStartStop started")
+	defer t.Log(t.Name(), "TestMirStartStop finished")
 
 	var wg sync.WaitGroup
 	wait := make(chan struct{})
@@ -520,6 +520,16 @@ func TestMirStartStop(t *testing.T) {
 		case <-time.After(10 * time.Second):
 			t.Fatalf("fail to stop Mir nodes")
 		case <-wait:
+		}
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		select {
+		case <-time.After(120 * time.Second):
+			t.Fatalf("test time exceeded")
+		case <-ctx.Done():
+			return
 		}
 	}()
 
