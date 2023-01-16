@@ -143,6 +143,9 @@ func TestMirTwoNodesMining(t *testing.T) {
 
 // TestMirAllNodesMining tests that n nodes can mine blocks normally.
 func TestMirAllNodesMining(t *testing.T) {
+	t.Logf(t.Name(), " started")
+	defer t.Logf(t.Name(), " finished")
+
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -503,6 +506,9 @@ func TestMirWithFCrashedNodes(t *testing.T) {
 
 // TestMirStartStop tests that Mir nodes can be stopped.
 func TestMirStartStop(t *testing.T) {
+	t.Logf(t.Name(), " started")
+	defer t.Logf(t.Name(), " finished")
+
 	var wg sync.WaitGroup
 	wait := make(chan struct{})
 
