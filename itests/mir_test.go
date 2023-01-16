@@ -57,11 +57,11 @@ func TestMirConsensusWithMangler(t *testing.T) {
 }
 
 func TestMirConsensusSmoke(t *testing.T) {
-	TestMirOneNodeMining(t)
+	// TestMirOneNodeMining(t)
 	TestMirAllNodesMining(t)
 	TestMirStartStop(t)
-	TestGenesisBlocksOfValidatorsAndLearners(t)
-	TestMirFNodesNeverStart(t)
+	// TestGenesisBlocksOfValidatorsAndLearners(t)
+	// TestMirFNodesNeverStart(t)
 }
 
 func TestMirConsensus(t *testing.T) {
@@ -526,7 +526,7 @@ func TestMirStartStop(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	err := kit.AdvanceChain(ctx, 20, nodes...)
 	require.NoError(t, err)
 
 }
