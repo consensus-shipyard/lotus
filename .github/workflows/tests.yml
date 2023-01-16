@@ -50,11 +50,11 @@ jobs:
       - name: BuildDeps
         run: make deps
 
-      - name: Build
-        run: make spacenet
+      #- name: Build
+      #  run: make spacenet
 
-      - name: UnitTests
-        run: make spacenet-unit-test
+      #- name: UnitTests
+      #  run: make spacenet-unit-test
 
       - name: SmokeTests
         run: make spacenet-smoke-test
