@@ -34,54 +34,19 @@ const (
 	MaxDelay                 = 30
 )
 
-// TestMirConsensus tests that Mir operates normally when messaged are dropped or delayed.
-func TestMirConsensusWithMangler(t *testing.T) {
+var mirTestOpts = []interface{}{kit.ThroughRPC(), kit.MirConsensus()}
+
+func setupMangler(t *testing.T) {
 	require.Greater(t, MirFaultyValidatorNumber, 0)
 	require.Equal(t, MirTotalValidatorNumber, MirHonestValidatorNumber+MirFaultyValidatorNumber)
 
 	err := mir.SetEnvManglerParams(200*time.Millisecond, 2*time.Second, 0)
 	require.NoError(t, err)
-	defer func() {
+
+	t.Cleanup(func() {
 		err := os.Unsetenv(mir.ManglerEnv)
 		require.NoError(t, err)
-	}()
-
-	t.Run("mirWithMangler", func(t *testing.T) {
-		runMirManglingTests(t, kit.ThroughRPC())
 	})
-}
-
-func runMirManglingTests(t *testing.T, opts ...interface{}) {
-	ts := itestsConsensusSuite{opts: opts}
-
-	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
-	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
-	t.Run("testMirMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
-}
-
-func TestMirOneNodeMining(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirOneNodeMining", ts.testMirOneNodeMining)
-}
-
-func TestMirTwoNodesMining(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirTwoNodesMining", ts.testMirTwoNodesMining)
-}
-
-func TestMirAllNodesMining(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirAllNodesMining", ts.testMirAllNodesMining)
-}
-
-func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testGenesisBlocksOfValidatorsAndLearners", ts.testGenesisBlocksOfValidatorsAndLearners)
-}
-
-func TestMirWhenLearnersJoin(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirWhenLearnersJoin", ts.testMirWhenLearnersJoin)
 }
 
 // func TestMirMessageFromLearner(t *testing.T) {
@@ -89,67 +54,8 @@ func TestMirWhenLearnersJoin(t *testing.T) {
 // 	t.Run("testMirMessageFromLearner", ts.testMirMessageFromLearner)
 // }
 
-func TestMirNodesStartWithRandomDelay(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirNodesStartWithRandomDelay", ts.testMirNodesStartWithRandomDelay)
-}
-
-func TestMirFNodesNeverStart(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirFNodesNeverStart", ts.testMirFNodesNeverStart)
-}
-
-func TestMirFNodesStartWithRandomDelay(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirFNodesStartWithRandomDelay", ts.testMirFNodesStartWithRandomDelay)
-}
-
-func TestMirMiningWithMessaging(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirAllNodesMiningWithMessaging", ts.testMirAllNodesMiningWithMessaging)
-}
-
-func TestMirWithFOmissionNodes(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirWithFOmissionNodes", ts.testMirWithFOmissionNodes)
-}
-
-func TestMirWithFCrashedNodes(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirWithFCrashedNodes", ts.testMirWithFCrashedNodes)
-}
-
-func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirWithFCrashedAndRecoveredNodes", ts.testMirWithFCrashedAndRecoveredNodes)
-}
-
-func TestMirStartStop(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirStartStop", ts.testMirStartStop)
-}
-
-func TestMirFNodesCrashLongTimeApart(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirFNodesCrashLongTimeApart", ts.testMirFNodesCrashLongTimeApart)
-}
-
-func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash", ts.testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash)
-}
-
-func TestMirFNodesSleepAndThenOperate(t *testing.T) {
-	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-	t.Run("testMirFNodesSleepAndThenOperate", ts.testMirFNodesSleepAndThenOperate)
-}
-
-type itestsConsensusSuite struct {
-	opts []interface{}
-}
-
 // testMirOneNodeMining tests that a Mir node can mine blocks.
-func (ts *itestsConsensusSuite) testMirOneNodeMining(t *testing.T) {
+func TestMirOneNodeMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -159,7 +65,7 @@ func (ts *itestsConsensusSuite) testMirOneNodeMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	full, miner, ens := kit.EnsembleMinimalMir(t, ts.opts...)
+	full, miner, ens := kit.EnsembleMinimalMir(t, mirTestOpts...)
 	ens.BeginMirMining(ctx, &wg, miner)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, full)
@@ -169,7 +75,7 @@ func (ts *itestsConsensusSuite) testMirOneNodeMining(t *testing.T) {
 // testMirTwoNodesMining tests that two Mir nodes can mine blocks.
 //
 // NOTE: Its peculiarity is that it uses other mechanisms to instantiate testing comparing to the main tests here.
-func (ts *itestsConsensusSuite) testMirTwoNodesMining(t *testing.T) {
+func TestMirTwoNodesMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -179,7 +85,7 @@ func (ts *itestsConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	n1, n2, m1, m2, ens := kit.EnsembleTwoMirNodes(t, ts.opts...)
+	n1, n2, m1, m2, ens := kit.EnsembleTwoMirNodes(t, mirTestOpts...)
 
 	// Fail if genesis blocks are different
 	gen1, err := n1.ChainGetGenesis(ctx)
@@ -206,7 +112,7 @@ func (ts *itestsConsensusSuite) testMirTwoNodesMining(t *testing.T) {
 }
 
 // testMirAllNodesMining tests that n nodes can mine blocks normally.
-func (ts *itestsConsensusSuite) testMirAllNodesMining(t *testing.T) {
+func TestMirAllNodesMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,7 +122,7 @@ func (ts *itestsConsensusSuite) testMirAllNodesMining(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -225,8 +131,13 @@ func (ts *itestsConsensusSuite) testMirAllNodesMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestMirAllNodesMiningWithMangling(t *testing.T) {
+	setupMangler(t)
+	TestMirAllNodesMining(t)
+}
+
 // testMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
-func (ts *itestsConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
+func TestMirFNodesNeverStart(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -236,7 +147,7 @@ func (ts *itestsConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirHonestValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirHonestValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -247,7 +158,7 @@ func (ts *itestsConsensusSuite) testMirFNodesNeverStart(t *testing.T) {
 
 // testMirWhenLearnersJoin tests that all nodes operate normally
 // if new learner joins when the network is already started and syncs the whole network.
-func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
+func TestMirWhenLearnersJoin(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -257,7 +168,7 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -281,14 +192,19 @@ func (ts *itestsConsensusSuite) testMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (ts *itestsConsensusSuite) testGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
+func TestMirWhenLearnersJoinWithMangler(t *testing.T) {
+	setupMangler(t)
+	TestMirWhenLearnersJoin(t)
+}
+
+func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
 	}()
 
-	nodes, _, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, _, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.Bootstrapped()
 
 	genesis, err := nodes[0].ChainGetGenesis(ctx)
@@ -318,7 +234,8 @@ func (ts *itestsConsensusSuite) testGenesisBlocksOfValidatorsAndLearners(t *test
 
 // testMirMessageFromLearner tests that messages can be sent from learners and validators,
 // and successfully proposed by validators
-func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
+func TestMirMessageFromLearner(t *testing.T) {
+	t.Skip()
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -328,7 +245,7 @@ func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	// immediately start learners
@@ -398,7 +315,7 @@ func (ts *itestsConsensusSuite) testMirMessageFromLearner(t *testing.T) {
 
 // testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if all nodes start with large, random delays (1-2 minutes).
-func (ts *itestsConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
+func TestMirNodesStartWithRandomDelay(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -408,7 +325,7 @@ func (ts *itestsConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMiningWithDelay(ctx, &wg, MaxDelay, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -419,7 +336,7 @@ func (ts *itestsConsensusSuite) testMirNodesStartWithRandomDelay(t *testing.T) {
 
 // testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if f nodes start with large, random delays (1-2 minutes).
-func (ts *itestsConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) {
+func TestMirFNodesStartWithRandomDelay(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -429,7 +346,7 @@ func (ts *itestsConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMiningWithDelayForFaultyNodes(ctx, &wg, MaxDelay, miners[MirFaultyValidatorNumber:], miners[:MirFaultyValidatorNumber]...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -439,7 +356,7 @@ func (ts *itestsConsensusSuite) testMirFNodesStartWithRandomDelay(t *testing.T) 
 }
 
 // testMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
-func (ts *itestsConsensusSuite) testMirAllNodesMiningWithMessaging(t *testing.T) {
+func TestMirAllNodesMiningWithMessaging(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -449,7 +366,7 @@ func (ts *itestsConsensusSuite) testMirAllNodesMiningWithMessaging(t *testing.T)
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	for range nodes {
@@ -475,9 +392,14 @@ func (ts *itestsConsensusSuite) testMirAllNodesMiningWithMessaging(t *testing.T)
 	}
 }
 
+func TestMirAllNodesMiningWithMessagingWithMangler(t *testing.T) {
+	setupMangler(t)
+	TestMirAllNodesMiningWithMessaging(t)
+}
+
 // testMirWithFOmissionNodes tests that n − f nodes operate normally and can recover
 // if f nodes do not have access to network at the same time.
-func (ts *itestsConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
+func TestMirWithFOmissionNodes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -487,7 +409,7 @@ func (ts *itestsConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -512,7 +434,7 @@ func (ts *itestsConsensusSuite) testMirWithFOmissionNodes(t *testing.T) {
 
 // testMirWithFCrashedNodes tests that n − f nodes operate normally and can recover
 // if f nodes crash at the same time.
-func (ts *itestsConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
+func TestMirWithFCrashedNodes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -522,7 +444,7 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -547,7 +469,7 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedNodes(t *testing.T) {
 
 // testMirStartStop tests that n − f nodes operate normally and can recover
 // if f nodes crash at the same time.
-func (ts *itestsConsensusSuite) testMirStartStop(t *testing.T) {
+func TestMirStartStop(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -566,7 +488,7 @@ func (ts *itestsConsensusSuite) testMirStartStop(t *testing.T) {
 		}
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -576,7 +498,7 @@ func (ts *itestsConsensusSuite) testMirStartStop(t *testing.T) {
 // testMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
 // and recovered nodes eventually operate normally
 // if f nodes crash and then recover (with only initial state) after a long delay (few minutes).
-func (ts *itestsConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.T) {
+func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -586,7 +508,7 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -611,7 +533,7 @@ func (ts *itestsConsensusSuite) testMirWithFCrashedAndRecoveredNodes(t *testing.
 
 // testMirFNodesCrashLongTimeApart tests that n − f nodes operate normally
 // if f nodes crash, long time apart (few minutes).
-func (ts *itestsConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
+func TestMirFNodesCrashLongTimeApart(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -621,7 +543,7 @@ func (ts *itestsConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -646,7 +568,7 @@ func (ts *itestsConsensusSuite) testMirFNodesCrashLongTimeApart(t *testing.T) {
 // testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
 // and partitioned nodes eventually catch up
 // if f nodes have a long period of no network access, but do not crash.
-func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
+func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -656,7 +578,7 @@ func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, ts.opts...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
@@ -685,6 +607,7 @@ func (ts *itestsConsensusSuite) testMirFNodesHaveLongPeriodNoNetworkAccessButDoN
 // testMirFNodesSleepAndThenOperate tests that n − f nodes operate normally without significant interruption
 // and woken up nodes eventually operate normally
 // if f  nodes sleep for a significant amount of time and then continue operating but keep network connection.
-func (ts *itestsConsensusSuite) testMirFNodesSleepAndThenOperate(t *testing.T) {
+func TestMirFNodesSleepAndThenOperate(t *testing.T) {
 	// TBD
+	t.Skip()
 }
