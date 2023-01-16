@@ -98,7 +98,7 @@ spacenet-mangling-test:
 
 spacenet-smoke-test: GOFLAGS+=-tags=spacenet
 spacenet-smoke-test:
-	export GOLOG_LOG_LEVEL="INFO,mir-manager=info,mir-consensus=debug"; \
+	export GOLOG_LOG_LEVEL="INFO,mir-manager=debug,mir-consensus=debug"; \
 	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m -run TestMirConsensusSmoke ./itests/mir_test.go
 .PHONY: spacenet-smoke-test
 
