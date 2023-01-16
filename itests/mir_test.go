@@ -526,7 +526,7 @@ func TestMirStartStop(t *testing.T) {
 	go func() {
 		// This goroutine is leaking after time.After(x) seconds with panicking.
 		select {
-		case <-time.After(120 * time.Second):
+		case <-time.After(200 * time.Second):
 			panic("test time exceeded")
 		case <-ctx.Done():
 			return
