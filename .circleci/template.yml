@@ -1,0 +1,241 @@
+steps:
+  - run:
+      name: Confirm that environment variables are set
+      command: |
+        if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+          echo "No AWS_ACCESS_KEY_ID is set. Skipping build-and-push job ..."
+          circleci-agent step halt
+        fi
+  - aws-cli/setup:
+      profile-name: <<parameters.profile-name>>
+      aws-access-key-id: <<parameters.aws-access-key-id>>
+      aws-secret-access-key: <<parameters.aws-secret-access-key>>
+      aws-region: <<parameters.region>>
+
+  - run:
+      name: Log into Amazon ECR
+      command: |
+        aws ecr-public get-login-password --region $<<parameters.region>> --profile <<parameters.profile-name>> | docker login --username AWS --password-stdin $<<parameters.account-url>>
+  - checkout
+
+  - setup_remote_docker:
+      version: 19.03.13
+      docker_layer_caching: false
+
+  - run:
+      name: Build docker image
+      command: |
+        registry_id=$(echo $<<parameters.account-url>> | sed "s;\..*;;g")
+        docker_tag_args=""
+        IFS="," read -ra DOCKER_TAGS \<<< "<< parameters.tag >>"
+        for tag in "${DOCKER_TAGS[@]}"; do
+          docker_tag_args="$docker_tag_args -t $<<parameters.account-url>>/<<parameters.repo>>:$tag"
+        done
+        docker build \
+          <<#parameters.extra-build-args>><<parameters.extra-build-args>><</parameters.extra-build-args>> \
+          --target <<parameters.target>> \
+          -f <<parameters.path>>/<<parameters.dockerfile>> \
+          $docker_tag_args \
+          <<parameters.path>>
+  - run:
+      name: Push image to Amazon ECR
+      command: |
+        IFS="," read -ra DOCKER_TAGS \<<< "<< parameters.tag >>"
+        for tag in "${DOCKER_TAGS[@]}"; do
+          docker push $<<parameters.account-url>>/<<parameters.repo>>:${tag}
+        done
+publish-packer-snap:
+  description: build packer image with snap. mainnet only.
+  executor:
+    name: packer
+  steps:
+    - checkout
+    - attach_workspace:
+        at: "."
+    - packer_build:
+        template: tools/packer/lotus-snap.pkr.hcl
+publish-dockerhub:
+  description: publish to dockerhub
+  machine:
+    image: ubuntu-2004:202010-01
+  parameters:
+    tag:
+      type: string
+      default: latest
+  steps:
+    - checkout
+    - run:
+        name: dockerhub login
+        command: echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+    - run:
+        name: docker build
+        command: |
+          docker build --target lotus -t filecoin/lotus:<< parameters.tag >> -f Dockerfile.lotus .
+          docker build --target lotus-all-in-one -t filecoin/lotus-all-in-one:<< parameters.tag >> -f Dockerfile.lotus .
+          if [["[[ ! -z $CIRCLE_SHA1 ]]"]]; then
+            docker build --target lotus -t filecoin/lotus:$CIRCLE_SHA1 -f Dockerfile.lotus .
+            docker build --target lotus-all-in-one -t filecoin/lotus-all-in-one:$CIRCLE_SHA1 -f Dockerfile.lotus .
+          fi
+          if [["[[ ! -z $CIRCLE_TAG ]]"]]; then
+            docker build --target lotus -t filecoin/lotus:$CIRCLE_TAG -f Dockerfile.lotus .
+            docker build --target lotus-all-in-one -t filecoin/lotus-all-in-one:$CIRCLE_TAG -f Dockerfile.lotus .
+          fi
+    - run:
+        name: docker push
+        command: |
+          docker push filecoin/lotus:<< parameters.tag >>
+          docker push filecoin/lotus-all-in-one:<< parameters.tag >>
+          if [["[[ ! -z $CIRCLE_SHA1 ]]"]]; then
+            docker push filecoin/lotus:$CIRCLE_SHA1
+            docker push filecoin/lotus-all-in-one:$CIRCLE_SHA1
+          fi
+          if [["[[ ! -z $CIRCLE_TAG ]]"]]; then
+            docker push filecoin/lotus:$CIRCLE_TAG
+            docker push filecoin/lotus-all-in-one:$CIRCLE_TAG
+          fi
+workflows:
+  version: 2.1
+  ci:
+    jobs:
+      - lint-all:
+          concurrency: "16"   # expend all docker 2xlarge CPUs.
+      - mod-tidy-check
+      - gofmt
+      - gen-check
+      - docs-check
+
+      [[- range $file := .ItestFiles -]]
+      [[ with $name := $file | stripSuffix ]]
+      - test:
+          name: test-itest-[[ $name ]]
+          suite: itest-[[ $name ]]
+          target: "./itests/[[ $file ]]"
+      [[ end ]]
+      [[- end -]]
+
+      [[range $suite, $pkgs := .UnitSuites]]
+      - test:
+          name: test-[[ $suite ]]
+          suite: utest-[[ $suite ]]
+          target: "[[ $pkgs ]]"
+      [[- end]]
+      - test:
+          go-test-flags: "-run=TestMulticoreSDR"
+          suite: multicore-sdr-check
+          target: "./extern/sector-storage/ffiwrapper"
+          proofs-log-test: "1"
+      - test-conformance:
+          suite: conformance
+          codecov-upload: false
+          target: "./conformance"
+      - test-conformance:
+          name: test-conformance-bleeding-edge
+          codecov-upload: false
+          suite: conformance-bleeding-edge
+          target: "./conformance"
+          vectors-branch: specs-actors-v7
+      - trigger-testplans:
+          filters:
+            branches:
+              only:
+                - master
+      - build-debug
+      - build-all:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-ntwk-calibration:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-ntwk-butterfly:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-lotus-soup
+      - build-macos:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-appimage:
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - publish:
+          requires:
+            - build-all
+            - build-macos
+            - build-appimage
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-and-push-image:
+          dockerfile: Dockerfile.lotus
+          path: .
+          repo: lotus-dev
+          tag: '${CIRCLE_SHA1:0:8}'
+          target: lotus-all-in-one
+      - build-and-push-image:
+          dockerfile: Dockerfile.lotus
+          path: .
+          repo: lotus-test
+          tag: '${CIRCLE_SHA1:0:8}'
+          target: lotus-test
+      - publish-snapcraft:
+          name: publish-snapcraft-stable
+          channel: stable
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - publish-dockerhub:
+          name: publish-dockerhub
+          tag: stable
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - publish-snapcraft:
+          name: publish-snapcraft-nightly
+          channel: edge
+      - publish-dockerhub:
+          name: publish-dockerhub-nightly
+          tag: nightly
+  monthly:
+    triggers:
+      - schedule:
+          cron: "0 0 1 * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - publish-packer-snap
