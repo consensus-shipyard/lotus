@@ -147,13 +147,13 @@ jobs:
       - prepare
       - run:
           command: make debug
-  build-eudico:
+  build-spacenet:
     executor: golang
     steps:
       - install-deps
       - prepare
       - run:
-          command: make eudico
+          command: make spacenet
 
   test: &basic_test
     description: |
@@ -796,7 +796,7 @@ workflows:
           target: "./itests/mir_test.go"
           requires:
             - lint-all
-      # FIXME: Uncomment when Eudico is stable and ready for production.
+      # FIXME: Uncomment when Eudico/Spacenet is stable and ready for production.
       # - docs-check
 
       # NOTE: From here on these are Lotus-specific test which we may not need.
@@ -1002,7 +1002,7 @@ workflows:
       #         only:
       #           - master
       # - build-debug
-      - build-eudico
+      - build-spacenet
       - build-all:
           filters:
             tags:
