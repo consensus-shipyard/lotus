@@ -171,7 +171,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	if initCh == nil {
 		initCh, err = m.initCheckpoint(params, 0)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get inital SMR system snapshot: %w", err)
+			return nil, fmt.Errorf("error getting initial snapshot SMR system: %w", err)
 		}
 	}
 

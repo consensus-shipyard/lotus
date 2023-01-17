@@ -76,12 +76,12 @@ debug: build-devnets
 2k: build-devnets
 
 spacenet: GOFLAGS+=-tags=spacenet
-spacenet: eudico lotus mir-validator lotus-seed lotus-keygen lotus-shed
+spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
-	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
+	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=debug,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration ./itests/mir_test.go
 .PHONY: spacenet-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet

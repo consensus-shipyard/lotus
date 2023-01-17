@@ -40,6 +40,7 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 	}
 
 	for h := from; h <= baseHead.Height(); h++ {
+		h := h
 		baseTipSet, err := baseNode.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
 		if err != nil {
 			return err
@@ -142,6 +143,9 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
 	base, err := api.ChainHead(ctx)
+	if err != nil {
+		return err
+	}
 	err = WaitForBlock(ctx, base.Height()+abi.ChainEpoch(n), api)
 	if err != nil {
 		return err

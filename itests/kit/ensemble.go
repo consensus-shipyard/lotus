@@ -418,12 +418,14 @@ func (n *Ensemble) Start() *Ensemble {
 		})
 		require.NoError(n.t, err)
 
-		genesisProvider := fx.Options()
+		var genesisProvider fx.Option
 		if i == 0 && !n.bootstrapped {
 			genesisProvider = fx.Provide(testing2.MakeGenesisMem(&n.genesisBlock, *gtempl))
 		} else {
 			genesisProvider = fx.Provide(modules.LoadGenesis(n.genesisBlock.Bytes()))
 		}
+
+		shutdownChan := dtypes.ShutdownChan(make(chan struct{}))
 
 		fxProviders := fx.Options(
 			fxmodules.Fullnode(false, full.options.lite),
@@ -433,7 +435,7 @@ func (n *Ensemble) Start() *Ensemble {
 			fxmodules.Consensus(global.MirConsensus),
 			// misc providers
 			fx.Supply(dtypes.Bootstrapper(true)),
-			fx.Supply(dtypes.ShutdownChan(make(chan struct{}))),
+			fx.Supply(shutdownChan),
 			genesisProvider,
 			fx.Replace(n.options.upgradeSchedule),
 			fx.Decorate(testing2.RandomBeacon),
@@ -470,6 +472,8 @@ func (n *Ensemble) Start() *Ensemble {
 			})
 			return stopErr
 		}
+
+		node.MonitorShutdown(shutdownChan, node.ShutdownHandler{Component: "node", StopFunc: stopFunc})
 
 		// Are we hitting this node through its RPC?
 		if full.options.rpc {
@@ -1187,6 +1191,8 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 				libp2p.DefaultTransports,
 				libp2p.ListenAddrs(m.mirMultiAddr...),
 			)
+			require.NoError(n.t, err)
+
 			if !withPersistentDB {
 				m.mirDB = NewTestDB()
 			}

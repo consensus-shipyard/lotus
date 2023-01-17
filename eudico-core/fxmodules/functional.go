@@ -8,18 +8,16 @@ import "go.uber.org/fx"
 func fxOptional(predicate bool, option fx.Option) fx.Option {
 	if predicate {
 		return option
-	} else {
-		return fx.Options()
 	}
+	return fx.Options()
 }
 
 // Returns optionOnTrue if the predicate is true. Otherwise, it returns optionOnFalse.
 func fxEitherOr(predicate bool, optionOnTrue fx.Option, optionOnFalse fx.Option) fx.Option {
 	if predicate {
 		return optionOnTrue
-	} else {
-		return optionOnFalse
 	}
+	return optionOnFalse
 }
 
 // Returns the value in map m whose key is expr, if such a key exists. Otherwise,

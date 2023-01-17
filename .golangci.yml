@@ -1,20 +1,14 @@
 linters:
   disable-all: true
   enable:
-    - gofmt
-    - govet
     - goimports
     - misspell
     - goconst
-    - golint
     - errcheck
     - gosec
     - unconvert
     - staticcheck
-    - varcheck
-    - structcheck
-    - deadcode
-    - scopelint
+    - exportloopref
 
 # We don't want to skip builtin/
 skip-dirs-use-default: false

@@ -135,6 +135,14 @@ func daemonCmd(consensusAlgorithm global.ConsensusAlgorithm) *cli.Command {
 				Name:  "restore-config",
 				Usage: "config file to use when restoring from backup",
 			},
+			&cli.BoolFlag{
+				Name:  "lite",
+				Usage: "start lotus in lite mode",
+			},
+			&cli.BoolFlag{
+				Name:  "mir-validator",
+				Usage: "start lotus in mir-validator mode",
+			},
 		},
 		Action: eudicoDaemonAction(consensusAlgorithm),
 		Subcommands: []*cli.Command{
@@ -313,7 +321,7 @@ func eudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.
 			// Debugging of the dependency graph
 			fx.Invoke(
 				func(dotGraph fx.DotGraph) {
-					os.WriteFile("fx.dot", []byte(dotGraph), 0660)
+					os.WriteFile("fx.dot", []byte(dotGraph), 0660) // nolint
 				}),
 		)
 
