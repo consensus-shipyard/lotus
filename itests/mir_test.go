@@ -536,7 +536,7 @@ func TestMirStartStop(t *testing.T) {
 			close(wait)
 		}()
 
-		nodes, miners, ens := kit.EnsembleMirNodes(t, 1, mirTestOpts...)
+		nodes, miners, ens := kit.EnsembleMirNodes(t, 2, mirTestOpts...)
 		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
 		err := kit.AdvanceChain(ctx, 20, nodes...)
