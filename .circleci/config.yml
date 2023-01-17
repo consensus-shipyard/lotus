@@ -790,12 +790,19 @@ workflows:
       - mod-tidy-check
       - gofmt
       - gen-check
-      - test-consensus:
-          name: hc-test-consensus
-          suite: hc
+      - test-consensus-unit:
+            name: unit-tests
+            suite: consensus
+            target: "./chain/consensus/..."
+            requires:
+              - lint-all
+      - test-consensus-smoke:
+          name: smoke-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 10m -run TestMirConsensusSmoke"
           target: "./itests/mir_test.go"
           requires:
-            - lint-all
+            - unit-tests
       # FIXME: Uncomment when Eudico/Spacenet is stable and ready for production.
       # - docs-check
 
