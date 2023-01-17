@@ -21,9 +21,13 @@ const (
 	ReconfigurationInterval = 2000 * time.Millisecond
 )
 
-var (
-	ErrMirCtxCanceledWhileWaitingSnapshot = fmt.Errorf("context canceled while wating for a snapshot")
-)
+type ErrMirCtxCanceledWhileWaitingSnapshot struct {
+	Addr address.Address
+}
+
+func (e ErrMirCtxCanceledWhileWaitingSnapshot) Error() string {
+	return fmt.Sprintf("validator %s context canceled while wating for a snapshot", e.Addr)
+}
 
 // Mine implements "block mining" using the Mir framework.
 //
@@ -43,7 +47,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 	m, err := NewManager(ctx, addr, h, api, db, membership, cfg)
 	if err != nil {
-		return fmt.Errorf("unable to create a manager: %w", err)
+		return fmt.Errorf("validator %v failed to create a manager: %w", addr, err)
 	}
 
 	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
@@ -111,13 +115,13 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 		case toMir := <-m.ToMir:
 			base, err := m.StateManager.api.ChainHead(ctx)
 			if err != nil {
-				return xerrors.Errorf("failed to get chain head: %w", err)
+				return xerrors.Errorf("validator %v failed to get chain head: %w", addr, err)
 			}
 			log.With("validator", addr).Debugf("selecting messages from mempool from base: %v", base.Key())
 			msgs, err := api.MpoolSelect(ctx, base.Key(), 1)
 			if err != nil {
-				log.With("epoch", base.Height()).
-					Errorw("unable to select messages from mempool", "error", err)
+				log.With("validator", addr).With("epoch", base.Height()).
+					Errorw("failed to select messages from mempool", "error", err)
 			}
 
 			requests := m.TransportRequests(msgs)

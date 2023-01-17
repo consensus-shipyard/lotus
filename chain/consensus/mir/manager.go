@@ -83,21 +83,21 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 
 	initialValidatorSet, err := membership.GetValidators()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get validator set: %w", err)
+		return nil, fmt.Errorf("validator %v failed to get validator set: %w", validatorID, err)
 	}
 	if initialValidatorSet.Size() == 0 {
-		return nil, fmt.Errorf("empty validator set")
+		return nil, fmt.Errorf("validator %v: empty validator set", validatorID)
 	}
 
 	_, initialMembership, err := validator.Membership(initialValidatorSet.Validators)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build node membership: %w", err)
+		return nil, fmt.Errorf("validator %v failed to build node membership: %w", validatorID, err)
 	}
 
 	mirID := validatorID.String()
 	_, ok := initialMembership[t.NodeID(mirID)]
 	if !ok {
-		return nil, fmt.Errorf("self identity is not included in the validator set")
+		return nil, fmt.Errorf("validator %v failed to find its identity in membership", validatorID)
 	}
 
 	logger := newManagerLogger(mirID)
@@ -105,12 +105,12 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	// Create Mir modules.
 	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create network transport: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create network transport: %w", validatorID, err)
 	}
 
 	cryptoManager, err := NewCryptoManager(validatorID, api)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create crypto manager: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", validatorID, err)
 	}
 
 	var interceptor *eventlog.Recorder
@@ -124,12 +124,12 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 			logging.Decorate(logger, "Interceptor: "),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create interceptor: %w", err)
+			return nil, fmt.Errorf("validator %v failed to create interceptor: %w", validatorID, err)
 		}
 	}
 
 	if cfg.SegmentLength < 0 {
-		return nil, fmt.Errorf("segment length must not be negative")
+		return nil, fmt.Errorf("validator %v segment length must not be negative", validatorID)
 	}
 
 	m := Manager{
@@ -150,7 +150,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 
 	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
 	if err != nil {
-		return nil, fmt.Errorf("error starting mir state manager: %w", err)
+		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", validatorID, err)
 	}
 
 	// Create SMR modules.
@@ -171,7 +171,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	if initCh == nil {
 		initCh, err = m.initCheckpoint(params, 0)
 		if err != nil {
-			return nil, fmt.Errorf("error getting initial snapshot SMR system: %w", err)
+			return nil, fmt.Errorf("validator %v failed to get initial snapshot SMR system: %w", validatorID, err)
 		}
 	}
 
@@ -185,7 +185,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 		logger,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create SMR system: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create SMR system: %w", validatorID, err)
 	}
 
 	smrSystem = smrSystem.
@@ -196,7 +196,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	if mirManglerParams != "" {
 		p, err := GetEnvManglerParams()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("validator %v failed to get mangler params: %w", validatorID, err)
 		}
 		err = smrSystem.PerturbMessages(&eventmangler.ModuleParams{
 			MinDelay: p.MinDelay,
@@ -204,18 +204,18 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 			DropRate: p.DropRate,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to configure SMR mangler: %w", err)
+			return nil, fmt.Errorf("validator %v failed to configure SMR mangler: %w", validatorID, err)
 		}
 	}
 
 	if err := smrSystem.Start(); err != nil {
-		return nil, fmt.Errorf("could not start SMR system: %w", err)
+		return nil, fmt.Errorf("validator %v failed to start SMR system: %w", validatorID, err)
 	}
 
 	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
 	m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Mir node: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create Mir node: %w", validatorID, err)
 	}
 
 	return &m, nil
@@ -223,7 +223,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 
 // Start starts the manager.
 func (m *Manager) Start(ctx context.Context) chan error {
-	log.Infof("Mir manager %s starting", m.MirID)
+	log.With("validator", m.MirID).Infof("Mir manager %s starting", m.MirID)
 
 	errChan := make(chan error, 1)
 
@@ -238,7 +238,7 @@ func (m *Manager) Start(ctx context.Context) chan error {
 // Stop stops the manager and all its components.
 func (m *Manager) Stop() {
 	log.With("validator", m.MirID).Infof("Mir manager shutting down")
-	defer log.With("validator", m.MirID).Info("Mir manager stopped")
+	defer log.With("validator", m.MirID).Info("Mir manager shut down")
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
@@ -265,12 +265,12 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 
 // GetMessages extracts Filecoin messages from a Mir batch.
 func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
-	log.Infof("received a block with %d messages", len(msgs))
+	log.With("validator", m.MirID).Infof("received a block with %d messages", len(msgs))
 	for _, tx := range batch.Messages {
 
 		input, err := parseTx(tx)
 		if err != nil {
-			log.Error("unable to decode a message in Mir block:", err)
+			log.With("validator", m.MirID).Error("unable to decode a message in Mir block:", err)
 			continue
 		}
 
@@ -279,16 +279,17 @@ func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
 			// batch being processed, remove from mpool
 			found := m.Pool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
 			if !found {
-				log.Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
+				log.With("validator", m.MirID).
+					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
 				// TODO: If we try to remove something from the pool, we should remember that
 				// we already tried to remove that to avoid adding as it may lead to a dead-lock.
 				// FIFO should be updated because we don't have the support for in-flight supports.
 				// continue
 			}
 			msgs = append(msgs, msg)
-			log.Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
+			log.With("validator", m.MirID).Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
 		default:
-			log.Error("got unknown message type in a block")
+			log.With("validator", m.MirID).Error("unknown message type in a block")
 		}
 	}
 	return
@@ -304,7 +305,7 @@ func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 func (m *Manager) ReconfigurationRequest(valset *validator.ValidatorSet) *mirproto.Request {
 	var payload bytes.Buffer
 	if err := valset.MarshalCBOR(&payload); err != nil {
-		log.Error("unable to marshall config valset:", err)
+		log.With("validator", m.MirID).Error("unable to marshall config valset:", err)
 		return nil
 	}
 	r := mirproto.Request{
@@ -315,6 +316,24 @@ func (m *Manager) ReconfigurationRequest(valset *validator.ValidatorSet) *mirpro
 	}
 	m.reconfigurationNonce++
 	return &r
+}
+
+// ReconfigureMirNode reconfigures the Mir node.
+func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.NodeAddress) error {
+	log.With("validator", m.MirID).Debug("Reconfiguring a Mir node")
+
+	if len(nodes) == 0 {
+		return fmt.Errorf("validator %s got empty validator set", m.ValidatorID)
+	}
+
+	go m.Net.Connect(nodes)
+	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
+	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
+	// (as there is where we have the config information). These functions should be called
+	// in the garbage collection process performed when the reconfiguration is effective.
+	// go m.Net.CloseOldConnections(nodes)
+
+	return nil
 }
 
 // batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
@@ -331,7 +350,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 
 		data, err := MessageBytes(msg)
 		if err != nil {
-			log.Errorf("error in message bytes in batchSignedMessage: %s", err)
+			log.With("validator", m.MirID).Errorf("error in message bytes in batchSignedMessage: %s", err)
 			continue
 		}
 
