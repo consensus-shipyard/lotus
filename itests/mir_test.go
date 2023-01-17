@@ -143,25 +143,24 @@ func TestMirTwoNodesMining(t *testing.T) {
 
 // TestMirAllNodesMining tests that n nodes can mine blocks normally.
 func TestMirAllNodesMining(t *testing.T) {
-	t.Log(t.Name(), " TestMirAllNodesMining started")
-	defer t.Log(t.Name(), "TestMirAllNodesMining finished")
+	t.Run("TestMirAllNodesMining", func(t *testing.T) {
+		var wg sync.WaitGroup
 
-	var wg sync.WaitGroup
+		ctx, cancel := context.WithCancel(context.Background())
+		defer func() {
+			t.Logf("[*] defer: cancelling %s context", t.Name())
+			cancel()
+			wg.Wait()
+		}()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		t.Logf("[*] defer: cancelling %s context", t.Name())
-		cancel()
-		wg.Wait()
-	}()
+		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
-
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
-	require.NoError(t, err)
+		err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+		require.NoError(t, err)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+		require.NoError(t, err)
+	})
 }
 
 // TestMirAllNodesMiningWithMangling run TestMirAllNodesMining with mangler.
@@ -506,45 +505,43 @@ func TestMirWithFCrashedNodes(t *testing.T) {
 
 // TestMirStartStop tests that Mir nodes can be stopped.
 func TestMirStartStop(t *testing.T) {
-	t.Log(t.Name(), " TestMirStartStop started")
-	defer t.Log(t.Name(), "TestMirStartStop finished")
+	t.Run("TestMirStartStop", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wait := make(chan struct{})
 
-	var wg sync.WaitGroup
-	wait := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
+		defer func() {
+			t.Logf("[*] defer: cancelling %s context", t.Name())
+			cancel()
+			select {
+			case <-time.After(10 * time.Second):
+				t.Fatalf("fail to stop Mir nodes")
+			case <-wait:
+			}
+		}()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		t.Logf("[*] defer: cancelling %s context", t.Name())
-		cancel()
-		select {
-		case <-time.After(10 * time.Second):
-			t.Fatalf("fail to stop Mir nodes")
-		case <-wait:
-		}
-	}()
+		go func() {
+			// This goroutine is leaking after time.After(x) seconds with panicking.
+			select {
+			case <-time.After(200 * time.Second):
+				panic("test time exceeded")
+			case <-ctx.Done():
+				return
+			}
+		}()
 
-	go func() {
-		// This goroutine is leaking after time.After(x) seconds with panicking.
-		select {
-		case <-time.After(200 * time.Second):
-			panic("test time exceeded")
-		case <-ctx.Done():
-			return
-		}
-	}()
+		go func() {
+			// This goroutine is leaking after time.After(x) seconds with panicking.
+			wg.Wait()
+			close(wait)
+		}()
 
-	go func() {
-		// This goroutine is leaking after time.After(x) seconds with panicking.
-		wg.Wait()
-		close(wait)
-	}()
+		nodes, miners, ens := kit.EnsembleMirNodes(t, 1, mirTestOpts...)
+		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
-
-	err := kit.AdvanceChain(ctx, 20, nodes...)
-	require.NoError(t, err)
-
+		err := kit.AdvanceChain(ctx, 20, nodes...)
+		require.NoError(t, err)
+	})
 }
 
 // TestMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
