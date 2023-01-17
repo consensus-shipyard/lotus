@@ -105,7 +105,7 @@ var exportCheckCmd = &cli.Command{
 		}
 
 		height := abi.ChainEpoch(cctx.Int("height"))
-		ch, err := mir.GetCheckpointByHeight(ctx, ds, height, nil, nil)
+		ch, err := mir.GetCheckpointByHeight(ctx, ds, height, nil)
 		if err != nil {
 			return fmt.Errorf("error getting checkpoint by height: %s", err)
 		}
