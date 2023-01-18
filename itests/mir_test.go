@@ -90,34 +90,28 @@ func TestMirWithReconfiguration(t *testing.T) {
 	// Start new miners.
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
 
-	err = kit.AdvanceChain(ctx, 8*TestedBlockNumber, nodes...)
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-
-	t.Log(">>> final sync checks")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 
-	t.Log(">>> after sync checks")
+	t.Log(">>> remove the last added validator from membership")
+	ens.OverwriteMirValidatorsInMembershipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 
-	/*
-		t.Log(">>> remove the last added validator from membership")
-		ens.OverwriteMirValidatorsInMembershipFile(membershipFileName, miners[:MirTotalValidatorNumber]...)
-		membership, err = validator.NewValidatorSetFromFile(membershipFileName)
-		require.NoError(t, err)
-		require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
 
-		err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
-		require.NoError(t, err)
-		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
-		require.NoError(t, err)
-
-	*/
 }
 
-// testMirWithReconfigurationIfNewNodeFailsToJoin tests that the reconfiguration mechanism operates normally
+// TestMirWithReconfigurationIfNewNodeFailsToJoin tests that the reconfiguration mechanism operates normally
 // if a new validator cannot join the network.
 // In this test we don't stop the faulty validator explicitly, instead, we don't spawn it.
-func T1estMirWithReconfigurationIfNewNodeFailsToJoin(t *testing.T) {
+func TestMirWithReconfigurationIfNewNodeFailsToJoin(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -145,37 +139,10 @@ func T1estMirWithReconfigurationIfNewNodeFailsToJoin(t *testing.T) {
 	t.Log(">>> new validators have been added to the membership")
 	ens.AppendMirValidatorsToMembershipFile(membershipFileName, miners...)
 
-	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
-
-	nodes, _, ens = kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.Bootstrapped()
-
-	genesis, err := nodes[0].ChainGetGenesis(ctx)
-	require.NoError(t, err)
-	for i := range nodes[1:] {
-		gen, err := nodes[i].ChainGetGenesis(ctx)
-		require.NoError(t, err)
-		require.Equal(t, genesis.String(), gen.String())
-	}
-
-	var learners []*kit.TestFullNode
-	for i := 0; i < MirLearnersNumber; i++ {
-		var learner kit.TestFullNode
-		ens.FullNode(&learner, kit.LearnerNode()).Start()
-		require.Equal(t, true, learner.IsLearner())
-		learners = append(learners, &learner)
-	}
-
-	ens.Start()
-
-	for i := range learners {
-		gen, err := learners[i].ChainGetGenesis(ctx)
-		require.NoError(t, err)
-		require.Equal(t, genesis.String(), gen.String())
-	}
 }
 
 // testMirOneNodeMining tests that a Mir node can mine blocks.
