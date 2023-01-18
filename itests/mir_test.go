@@ -89,7 +89,8 @@ func TestMirWithReconfiguration(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	// Start new miners.
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
-	err = kit.AdvanceChain(ctx, TestedBlockNumber+20, nodes...)
+
+	err = kit.AdvanceChain(ctx, 8*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Log(">>> final sync checks")

@@ -26,7 +26,7 @@ type ErrMirCtxCanceledWhileWaitingSnapshot struct {
 }
 
 func (e ErrMirCtxCanceledWhileWaitingSnapshot) Error() string {
-	return fmt.Sprintf("validator %s context canceled while wating for a snapshot", e.Addr)
+	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
 }
 
 // Mine implements "block mining" using the Mir framework.
