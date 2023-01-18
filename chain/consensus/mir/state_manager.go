@@ -350,7 +350,7 @@ func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) err
 		return err
 	}
 	sm.nextNewMembership = mbs
-	log.With("validator", sm.ValidatorID).Infof("updateNextMembership: >>> current epoch %d, membership size: %d", sm.currentEpoch, len(mbs))
+	log.With("validator", sm.ValidatorID).Infof("updateNextMembership: >>> current epoch %d, next membership size: %d", sm.currentEpoch, len(mbs))
 	return nil
 }
 
