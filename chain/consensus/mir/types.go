@@ -238,7 +238,7 @@ func GetCheckpointByHeight(ctx context.Context, ds db.DB,
 		if err != nil {
 			if err == datastore.ErrNotFound {
 				if params != nil {
-					return trantor.GenesisCheckpoint([]byte{}, *params), nil
+					return trantor.GenesisCheckpoint([]byte{}, *params)
 				}
 				return nil, xerrors.Errorf("no checkpoint for height %d or latest checkpoint found in db", height)
 			}

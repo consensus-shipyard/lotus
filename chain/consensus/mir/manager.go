@@ -64,6 +64,7 @@ type Manager struct {
 	ToMir         chan chan []*mirproto.Request
 	ds            db.DB
 	stopCh        chan struct{}
+	stopped       bool
 
 	// Reconfiguration types.
 	InitialValidatorSet  *validator.ValidatorSet
@@ -239,6 +240,13 @@ func (m *Manager) Start(ctx context.Context) chan error {
 func (m *Manager) Stop() {
 	log.With("validator", m.MirID).Infof("Mir manager shutting down")
 	defer log.With("validator", m.MirID).Info("Mir manager shut down")
+
+	if m.stopped {
+		log.With("validator", m.MirID).Warnf("Mir manager has already stopped")
+		return
+	}
+
+	m.stopped = true
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {

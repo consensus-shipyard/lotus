@@ -302,16 +302,20 @@ func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
 	if err := newValSet.UnmarshalCBOR(bytes.NewReader(in.Data)); err != nil {
 		return err
 	}
+
 	voted, err := sm.UpdateAndCheckVotes(&newValSet)
 	if err != nil {
 		return xerrors.Errorf("validator %v failed to update and check votes: %w", sm.ValidatorID, err)
 	}
-	if voted {
-		err = sm.UpdateNextMembership(&newValSet)
-		if err != nil {
-			return xerrors.Errorf("validator %v failed to update membership: %w", sm.ValidatorID, err)
-		}
+	if !voted {
+		return nil
 	}
+
+	err = sm.UpdateNextMembership(&newValSet)
+	if err != nil {
+		return xerrors.Errorf("validator %v failed to update membership: %w", sm.ValidatorID, err)
+	}
+
 	return nil
 }
 
@@ -568,35 +572,29 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 		timeout = timeout + time.Duration(height-base.Height())*time.Second
 	}
 	log.With("validator", sm.ValidatorID).Debugf("waiting for block on height %d with timeout %v", height, timeout)
-	ctx, cancel := context.WithTimeout(sm.ctx, timeout)
-	defer cancel()
-
-	// FIXME DENIS: remove G and add a for-select loop.
-	out := make(chan bool, 1)
-	go func() {
-		head := abi.ChainEpoch(0)
-		// poll until we get the desired height.
-		// TODO: We may be able to add a slight sleep here if needed.
-		for head != height {
+	head := abi.ChainEpoch(0)
+	// poll until we get the desired height.
+	// TODO: We may be able to add a slight sleep here if needed.
+	for {
+		select {
+		case <-sm.ctx.Done():
+		case <-time.After(timeout):
+			return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.ValidatorID}
+		default:
+			if head == height {
+				return nil
+			}
 			base, err := sm.api.ChainHead(sm.ctx)
 			if err != nil {
 				log.With("validator", sm.ValidatorID).Errorf("failed to get chain head: %v", err)
-				return
+				return nil
 			}
 			head = base.Height()
 			if head > height {
 				log.With("validator", sm.ValidatorID).Warnf("already have a larger head: waiting %d, head %d", height, head)
-				break
+				return nil
 			}
 		}
-		out <- true
-	}()
-
-	select {
-	case <-out:
-		return nil
-	case <-ctx.Done():
-		return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.ValidatorID}
 	}
 }
 

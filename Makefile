@@ -80,8 +80,8 @@ spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
-	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=debug,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration_AddThreeNodes ./itests/mir_test.go
+	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=info,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration_AddAndRemoveOneNode ./itests/mir_test.go
 .PHONY: spacenet-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet

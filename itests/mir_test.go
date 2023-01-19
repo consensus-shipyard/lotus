@@ -50,23 +50,22 @@ func setupMangler(t *testing.T) {
 	})
 }
 
-// TestMirWithReconfiguration_AddRemoveOneNode tests that the reconfiguration mechanism operates normally
+// TestMirWithReconfiguration_AddAndRemoveOneNode tests that the reconfiguration mechanism operates normally
 // if a new validator joins the network and then leaves it.
-func TestMirWithReconfiguration_AddRemoveOneNode(t *testing.T) {
+func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
 	var wg sync.WaitGroup
+
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
 		wg.Wait()
-	}()
-
-	membershipFileName := kit.TempFileName("membership")
-	defer func() {
-		t.Cleanup(func() {
-			os.Remove(membershipFileName) // nolint
-		})
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
@@ -78,7 +77,7 @@ func TestMirWithReconfiguration_AddRemoveOneNode(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -115,18 +114,16 @@ func TestMirWithReconfiguration_AddThreeNodes(t *testing.T) {
 	mirAddedValidatorNumber := 3
 	var wg sync.WaitGroup
 
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
 		wg.Wait()
-	}()
-
-	membershipFileName := kit.TempFileName("membership")
-	defer func() {
-		t.Cleanup(func() {
-			os.Remove(membershipFileName) // nolint
-		})
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, mirTotalValidatorNumber+mirAddedValidatorNumber, mirTestOpts...)
@@ -163,18 +160,16 @@ func TestMirWithReconfiguration_AddThreeNodesOneByOne(t *testing.T) {
 	mirAddedValidatorNumber := 3
 	var wg sync.WaitGroup
 
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
 		wg.Wait()
-	}()
-
-	membershipFileName := kit.TempFileName("membership")
-	defer func() {
-		t.Cleanup(func() {
-			os.Remove(membershipFileName) // nolint
-		})
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+mirAddedValidatorNumber, mirTestOpts...)
@@ -217,18 +212,13 @@ func TestMirWithReconfiguration_AddThreeNodesOneByOne(t *testing.T) {
 func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	var wg sync.WaitGroup
 
+	membershipFileName := kit.TempFileName("membership")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
 		wg.Wait()
-	}()
-
-	membershipFileName := kit.TempFileName("membership")
-	defer func() {
-		t.Cleanup(func() {
-			os.Remove(membershipFileName) // nolint
-		})
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, mirTestOpts...)
