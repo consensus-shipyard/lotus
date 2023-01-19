@@ -318,24 +318,6 @@ func (m *Manager) ReconfigurationRequest(valset *validator.ValidatorSet) *mirpro
 	return &r
 }
 
-// ReconfigureMirNode reconfigures the Mir node.
-func (m *Manager) ReconfigureMirNode(ctx context.Context, nodes map[t.NodeID]t.NodeAddress) error {
-	log.With("validator", m.MirID).Debug("Reconfiguring a Mir node")
-
-	if len(nodes) == 0 {
-		return fmt.Errorf("validator %s got empty validator set", m.ValidatorID)
-	}
-
-	go m.Net.Connect(nodes)
-	// Per comment https://github.com/consensus-shipyard/lotus/pull/14#discussion_r993162569,
-	// CloseOldConnections should only be used after a stable checkpoint when a reconfiguration is applied
-	// (as there is where we have the config information). These functions should be called
-	// in the garbage collection process performed when the reconfiguration is effective.
-	// go m.Net.CloseOldConnections(nodes)
-
-	return nil
-}
-
 // batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
 func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 	requests []*mirproto.Request,

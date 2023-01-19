@@ -92,14 +92,13 @@ type TestMiner struct {
 	options nodeOpts
 
 	// Mir types
-	mirPrivKey       crypto.PrivKey
-	mirHost          host.Host
-	mirAddr          address.Address
-	mirMultiAddr     []multiaddr.Multiaddr
-	stopMir          context.CancelFunc
-	mirDB            *TestDB
-	mirMembership    string
-	checkpointPeriod int
+	mirPrivKey    crypto.PrivKey
+	mirHost       host.Host
+	mirAddr       address.Address
+	mirMultiAddr  []multiaddr.Multiaddr
+	stopMir       context.CancelFunc
+	mirDB         *TestDB
+	mirMembership string
 }
 
 func (tm *TestMiner) PledgeSectors(ctx context.Context, n, existing int, blockNotif <-chan struct{}) {

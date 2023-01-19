@@ -21,11 +21,11 @@ const (
 	ReconfigurationInterval = 2000 * time.Millisecond
 )
 
-type ErrMirCtxCanceledWhileWaitingSnapshot struct {
+type ErrMirCtxCanceledWhileWaitingBlock struct {
 	Addr address.Address
 }
 
-func (e ErrMirCtxCanceledWhileWaitingSnapshot) Error() string {
+func (e ErrMirCtxCanceledWhileWaitingBlock) Error() string {
 	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
 }
 

@@ -2,6 +2,7 @@ package kit
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"time"
@@ -21,6 +22,13 @@ import (
 const (
 	testTimeout = 1200
 )
+
+// TempFileName generates a temporary filename for use in testing or whatever
+func TempFileName(suffix string) string {
+	randBytes := make([]byte, 8)
+	rand.Read(randBytes)
+	return suffix + "_" + hex.EncodeToString(randBytes) + ".tmp"
+}
 
 // CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current
 // height, if for some reason any of the nodes haven't seen a block
@@ -73,12 +81,21 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
 func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
-	timeout := time.After(10 * time.Second)
+	// one minute baseline timeout
+	timeout := 10 * time.Second
+	base, err := node.ChainHead(ctx)
+	if err != nil {
+		return err
+	}
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
+	after := time.After(timeout)
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-timeout:
+		case <-after:
 			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
 			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)

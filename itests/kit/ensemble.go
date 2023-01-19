@@ -1084,6 +1084,17 @@ func (n *Ensemble) AppendMirValidatorsToMembershipFile(membershipFile string, mi
 	}
 }
 
+func (n *Ensemble) AppendMirValidatorsToMembershipFileNew(membershipFile string, miners ...*TestMiner) {
+	for _, m := range miners {
+		id, err := NodeLibp2pAddr(m.mirHost)
+		require.NoError(n.t, err)
+		val, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", m.mirAddr, id))
+		require.NoError(n.t, err)
+		err = ioutil.WriteFile(membershipFile, []byte(val.String()), 0666)
+		require.NoError(n.t, err)
+	}
+}
+
 func (n *Ensemble) OverwriteMirValidatorsInMembershipFile(membershipFile string, miners ...*TestMiner) {
 	f, err := os.OpenFile(membershipFile,
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
@@ -1112,7 +1123,7 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miner
 	n.Bootstrapped()
 }
 
-// Bootstrap explicitly sets the ensemble as bootstrapped.
+// Bootstrapped explicitly sets the ensemble as bootstrapped.
 func (n *Ensemble) Bootstrapped() {
 	n.bootstrapped = true
 }
@@ -1130,7 +1141,6 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 			defer wg.Done()
 			m.mirMembership = membershipString
 			m.mirDB = NewTestDB()
-			m.checkpointPeriod = len(miners) + len(faultyMiners)
 			cfg := mir.Config{
 				SegmentLength: 1,
 			}
@@ -1157,7 +1167,6 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, con
 		go func(ctx context.Context, i int, m *TestMiner) {
 			defer wg.Done()
 			m.mirDB = NewTestDB()
-			m.checkpointPeriod = checkpoint
 			cfg := mir.Config{
 				SegmentLength: 1,
 			}
@@ -1179,9 +1188,6 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 		}
 		if m.mirMembership == "" {
 			n.t.Fatalf("empty miner membership: %v", m.mirAddr)
-		}
-		if m.checkpointPeriod <= 0 {
-			n.t.Fatalf("invalid checkpoint period: %v", m.checkpointPeriod)
 		}
 		go func(m *TestMiner) {
 			var err error

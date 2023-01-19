@@ -384,7 +384,6 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		return nil, xerrors.Errorf("trying to make a snapshot in epoch", sm.currentEpoch)
 	}
 
-	// nextHeight := abi.ChainEpoch(sm.height)+1
 	nextHeight := abi.ChainEpoch(sm.height) + 1
 	log.With("validator", sm.ValidatorID).Infof("Snapshot started: epoch - %d, height - %d", sm.currentEpoch, sm.height)
 
@@ -597,7 +596,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	case <-out:
 		return nil
 	case <-ctx.Done():
-		return ErrMirCtxCanceledWhileWaitingSnapshot{sm.MirManager.ValidatorID}
+		return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.ValidatorID}
 	}
 }
 
