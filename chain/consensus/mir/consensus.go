@@ -254,7 +254,7 @@ func (bft *Mir) verifyCheckpointInHeader(h *types.BlockHeader) (*Checkpoint, err
 	// check that the membership expected for the checkpoint is correct as part of the verification.
 	// Here we are just getting the most recent membership according to the cert without additional
 	// checks. We should probably check if the membership included in the cert is the correct one.
-	if err := ch.VerifyCert(crypto.SHA256, CheckpointVerifier{}, ch.Memberships()[0]); err != nil {
+	if err := ch.VerifyCert(crypto.SHA256, CheckpointVerifier{}, ch.PreviousMembership()); err != nil {
 		return nil, xerrors.Errorf("error verifying checkpoint signature: %w", err)
 	}
 	c, err := prev.Cid()
