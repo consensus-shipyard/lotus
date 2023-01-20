@@ -372,6 +372,10 @@ func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (boo
 	votes := sm.reconfigurationVotes[sm.currentEpoch][string(h)]
 	nodes := len(sm.memberships[sm.currentEpoch])
 
+	log.With("validator", sm.ValidatorID).Infof("UpdateAndCheckVotes %s in %d epoch: votes %d, nodes %d",
+		string(h), sm.currentEpoch, votes, nodes)
+
+	// We must have f+1 votes at least.
 	if votes < weakQuorum(nodes) {
 		return false, nil
 	}
