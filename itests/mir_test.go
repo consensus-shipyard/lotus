@@ -213,6 +213,9 @@ func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {

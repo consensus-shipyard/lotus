@@ -78,10 +78,16 @@ debug: build-devnets
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: eudico lotus-seed lotus-keygen lotus-shed
 
+spacenet-test-reconfiguration: GOFLAGS+=-tags=spacenet
+spacenet-test-reconfiguration:
+	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=info,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration ./itests/mir_test.go
+.PHONY: spacenet-test-reconfiguration
+
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
 	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=info,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration_AddAndRemoveOneNode ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
 .PHONY: spacenet-test
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet
