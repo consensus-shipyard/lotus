@@ -242,10 +242,9 @@ func (m *Manager) Stop() {
 	defer log.With("validator", m.MirID).Info("Mir manager shut down")
 
 	if m.stopped {
-		log.With("validator", m.MirID).Warnf("Mir manager has already stopped")
+		log.With("validator", m.MirID).Warnf("Mir manager has already been stopped")
 		return
 	}
-
 	m.stopped = true
 
 	if m.interceptor != nil {

@@ -293,7 +293,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("validator %v unable to sync a block: %w", sm.ValidatorID, err)
 	}
 
-	log.With("validator", sm.MirManager.ValidatorID).With("epoch", nextHeight).Infof("mined a block at %d", bh.Header.Height)
+	log.With("validator", sm.MirManager.ValidatorID).With("epoch", sm.currentEpoch).Infof("mined a block at height %d", bh.Header.Height)
 	return nil
 }
 
