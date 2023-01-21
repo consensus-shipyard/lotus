@@ -56,3 +56,5 @@ lotus-wal*
 mir-event-logs
 
 devgen.car
+*.log
+fx.dot
