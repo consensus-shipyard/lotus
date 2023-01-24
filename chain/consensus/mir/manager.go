@@ -14,13 +14,6 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api/v1api"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
-	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -33,6 +26,14 @@ import (
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	t "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
@@ -67,7 +68,7 @@ type Manager struct {
 	stopped       bool
 
 	// Reconfiguration types.
-	InitialValidatorSet  *validator.ValidatorSet
+	InitialValidatorSet  *validator.Set
 	reconfigurationNonce uint64
 
 	// Checkpoints
@@ -76,7 +77,7 @@ type Manager struct {
 }
 
 func NewManager(ctx context.Context, validatorID address.Address, h host.Host, api v1api.FullNode, ds db.DB,
-	membership validator.MembershipReader, cfg *Config) (*Manager, error) {
+	membership validator.Reader, cfg *Config) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
@@ -309,7 +310,7 @@ func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 	return
 }
 
-func (m *Manager) ReconfigurationRequest(valset *validator.ValidatorSet) *mirproto.Request {
+func (m *Manager) ReconfigurationRequest(valset *validator.Set) *mirproto.Request {
 	var b bytes.Buffer
 	if err := valset.MarshalCBOR(&b); err != nil {
 		log.With("validator", m.MirID).Error("unable to marshall validator set:", err)

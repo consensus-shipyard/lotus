@@ -325,7 +325,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 }
 
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
-	var valSet validator.ValidatorSet
+	var valSet validator.Set
 	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
 		return err
 	}
@@ -349,7 +349,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	return nil
 }
 
-func (sm *StateManager) updateNextMembership(valSet *validator.ValidatorSet) error {
+func (sm *StateManager) updateNextMembership(valSet *validator.Set) error {
 	_, mbs, err := validator.Membership(valSet.GetValidators())
 	if err != nil {
 		return err
@@ -361,7 +361,7 @@ func (sm *StateManager) updateNextMembership(valSet *validator.ValidatorSet) err
 }
 
 // countVotes count votes for the validator set and returns true if we have got enough votes for this valSet.
-func (sm *StateManager) countVote(from string, valSet *validator.ValidatorSet) (bool, error) {
+func (sm *StateManager) countVote(from string, valSet *validator.Set) (bool, error) {
 	if valSet.ConfigurationNumber != sm.nextConfigurationNumber {
 		return false, xerrors.Errorf("validator %s sent outdated vote: received - %d, expected - %d",
 			from, valSet.ConfigurationNumber, sm.nextConfigurationNumber)

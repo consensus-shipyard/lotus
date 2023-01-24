@@ -41,7 +41,7 @@ func (e ErrMirCtxCanceledWhileWaitingBlock) Error() string {
 //     they already have it.
 //  6. Sync and restore from state whenever needed.
 func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, db db.DB,
-	membership validator.MembershipReader, cfg *Config) error {
+	membership validator.Reader, cfg *Config) error {
 	log.With("validator", addr).Infof("Mir validator started")
 	defer log.With("validator", addr).Infof("Mir validator completed")
 

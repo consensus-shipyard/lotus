@@ -1,7 +1,7 @@
 package validator
 
-type MembershipReader interface {
-	GetValidatorSet() (*ValidatorSet, error)
+type Reader interface {
+	GetValidatorSet() (*Set, error)
 }
 
 // ------
@@ -17,7 +17,7 @@ func NewFileMembership(fileName string) FileMembership {
 }
 
 // GetValidatorSet gets the membership config from a file.
-func (f FileMembership) GetValidatorSet() (*ValidatorSet, error) {
+func (f FileMembership) GetValidatorSet() (*Set, error) {
 	return NewValidatorSetFromFile(f.FileName)
 }
 
@@ -26,7 +26,7 @@ func (f FileMembership) GetValidatorSet() (*ValidatorSet, error) {
 type StringMembership string
 
 // GetValidatorSet gets the membership config from the input string.
-func (s StringMembership) GetValidatorSet() (*ValidatorSet, error) {
+func (s StringMembership) GetValidatorSet() (*Set, error) {
 	return NewValidatorSetFromString(string(s))
 }
 
@@ -35,6 +35,6 @@ func (s StringMembership) GetValidatorSet() (*ValidatorSet, error) {
 type EnvMembership string
 
 // GetValidatorSet gets the membership config from the input environment variable.
-func (e EnvMembership) GetValidatorSet() (*ValidatorSet, error) {
+func (e EnvMembership) GetValidatorSet() (*Set, error) {
 	return NewValidatorsFromEnv(string(e))
 }

@@ -9,7 +9,7 @@ import (
 func main() {
 	if err := gen.WriteTupleEncodersToFile("./cbor_gen.go", "validator",
 		validator.Validator{},
-		validator.ValidatorSet{},
+		validator.Set{},
 	); err != nil {
 		panic(err)
 	}
