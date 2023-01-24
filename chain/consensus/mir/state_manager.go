@@ -51,11 +51,12 @@ type StateManager struct {
 	// Next membership to return from NewEpoch.
 	// Attention: No in-place modifications of this field are allowed.
 	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
-	nextNewMembership map[t.NodeID]t.NodeAddress
+	nextNewMembership       map[t.NodeID]t.NodeAddress
+	nextConfigurationNumber uint64
 
 	MirManager *Manager
 
-	reconfigurationVotes map[t.EpochNr]map[string]int
+	reconfigurationVotes map[uint64]map[string]uint64
 
 	prevCheckpoint ParentMeta
 
@@ -70,13 +71,14 @@ type StateManager struct {
 
 func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
 	sm := StateManager{
-		ctx:                  ctx,
-		NextCheckpoint:       make(chan *checkpoint.StableCheckpoint, 1),
-		MirManager:           m,
-		currentEpoch:         0,
-		reconfigurationVotes: make(map[t.EpochNr]map[string]int),
-		api:                  api,
-		ValidatorID:          m.ValidatorID,
+		ctx:                     ctx,
+		NextCheckpoint:          make(chan *checkpoint.StableCheckpoint, 1),
+		MirManager:              m,
+		currentEpoch:            0,
+		reconfigurationVotes:    make(map[uint64]map[string]uint64),
+		api:                     api,
+		ValidatorID:             m.ValidatorID,
+		nextConfigurationNumber: 1,
 	}
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
@@ -143,7 +145,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	log.With("validator", sm.ValidatorID).Infof("RestoreState: next membership size is %d at epoch %d", len(sm.nextNewMembership), sm.currentEpoch)
 
 	// Remove all outdated reconfiguration vote data.
-	sm.reconfigurationVotes = make(map[t.EpochNr]map[string]int)
+	sm.reconfigurationVotes = make(map[uint64]map[string]uint64)
 
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
@@ -157,8 +159,10 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 		log.With("validator", sm.ValidatorID).Infof("Restoring state from checkpoint at height: %d", ch.Height)
 
-		// Restore the height.
+		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
+		sm.nextConfigurationNumber = ch.NextConfigNumber
+		sm.restoreReconfigurationVotes(ch.Votes)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -211,6 +215,29 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	}
 
 	return nil
+}
+
+func (sm *StateManager) restoreReconfigurationVotes(votes []VoteMessage) {
+	m := make(map[uint64]map[string]uint64)
+	for _, v := range votes {
+		m[v.Nonce] = make(map[string]uint64)
+		m[v.Nonce][v.ValSetHash] = v.Votes
+	}
+	sm.reconfigurationVotes = m
+}
+
+func (sm *StateManager) storeReconfigurationVotes() (voteMessages []VoteMessage) {
+	for n, votes := range sm.reconfigurationVotes {
+		for h, v := range votes {
+			e := VoteMessage{
+				Nonce:      n,
+				ValSetHash: h,
+				Votes:      v,
+			}
+			voteMessages = append(voteMessages, e)
+		}
+	}
+	return
 }
 
 // ApplyTXs applies transactions received from the availability layer to the app state
@@ -297,26 +324,75 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	return nil
 }
 
-func (sm *StateManager) applyConfigMsg(in *requestpb.Request) error {
-	var newValSet validator.ValidatorSet
-	if err := newValSet.UnmarshalCBOR(bytes.NewReader(in.Data)); err != nil {
+func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
+	var valSet validator.ValidatorSet
+	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
 		return err
 	}
 
-	voted, err := sm.UpdateAndCheckVotes(&newValSet)
+	enoughVotes, err := sm.countVote(msg.ClientId, &valSet)
 	if err != nil {
-		return xerrors.Errorf("validator %v failed to update and check votes: %w", sm.ValidatorID, err)
+		log.With("validator", sm.ValidatorID).Errorf("failed to apply config message: %v", err)
+		return nil
 	}
-	if !voted {
+	if !enoughVotes {
 		return nil
 	}
 
-	err = sm.UpdateNextMembership(&newValSet)
+	err = sm.updateNextMembership(&valSet)
 	if err != nil {
 		return xerrors.Errorf("validator %v failed to update membership: %w", sm.ValidatorID, err)
 	}
+	delete(sm.reconfigurationVotes, sm.nextConfigurationNumber)
+	sm.nextConfigurationNumber = valSet.ConfigurationNumber
 
 	return nil
+}
+
+func (sm *StateManager) updateNextMembership(valSet *validator.ValidatorSet) error {
+	_, mbs, err := validator.Membership(valSet.GetValidators())
+	if err != nil {
+		return err
+	}
+	sm.nextNewMembership = mbs
+	log.With("validator", sm.ValidatorID).Infof("updateNextMembership: current epoch %d, config number %d, next membership size: %d",
+		sm.currentEpoch, sm.nextConfigurationNumber, len(mbs))
+	return nil
+}
+
+// countVotes count votes for the validator set and returns true if we have got enough votes for this valSet.
+func (sm *StateManager) countVote(from string, valSet *validator.ValidatorSet) (bool, error) {
+	if valSet.ConfigurationNumber != sm.nextConfigurationNumber {
+		return false, xerrors.Errorf("validator %s sent outdated vote: received - %d, expected - %d",
+			from, valSet.ConfigurationNumber, sm.nextConfigurationNumber)
+	}
+	if !valSet.HasValidatorWithID(from) {
+		return false, xerrors.Errorf("validator %s is not in the membership", from)
+	}
+	// FIXME DENIS
+	// if it returns error the Mine function will panic?
+	// we should not panic on input data controlled by other nodes
+	h, err := valSet.Hash()
+	if err != nil {
+		return false, err
+	}
+
+	_, ok := sm.reconfigurationVotes[valSet.ConfigurationNumber]
+	if !ok {
+		sm.reconfigurationVotes[valSet.ConfigurationNumber] = make(map[string]uint64)
+	}
+	sm.reconfigurationVotes[valSet.ConfigurationNumber][string(h)]++
+
+	votes := sm.reconfigurationVotes[valSet.ConfigurationNumber][string(h)]
+	nodes := len(sm.memberships[sm.currentEpoch])
+	log.With("validator", sm.ValidatorID).Infof("UpdateAndCheckVotes: valset number %d, epoch %d: votes %d, nodes %d",
+		valSet.ConfigurationNumber, sm.currentEpoch, votes, nodes)
+
+	// We must have f+1 votes at least.
+	if votes < weakQuorum(uint64(nodes)) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
@@ -343,43 +419,8 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	// Garbage-collect previous membership and old voting data.
 	// Note that at initialization and after state transfer, these entries do not exist.
 	delete(sm.memberships, sm.currentEpoch-1)
-	delete(sm.reconfigurationVotes, sm.currentEpoch-1)
 
 	return sm.nextNewMembership, nil
-}
-
-func (sm *StateManager) UpdateNextMembership(valSet *validator.ValidatorSet) error {
-	_, mbs, err := validator.Membership(valSet.GetValidators())
-	if err != nil {
-		return err
-	}
-	sm.nextNewMembership = mbs
-	log.With("validator", sm.ValidatorID).Infof("updateNextMembership: >>> current epoch %d, next membership size: %d", sm.currentEpoch, len(mbs))
-	return nil
-}
-
-// UpdateAndCheckVotes votes for the valSet and returns true if it has enough votes for this valSet.
-func (sm *StateManager) UpdateAndCheckVotes(valSet *validator.ValidatorSet) (bool, error) {
-	h, err := valSet.Hash()
-	if err != nil {
-		return false, err
-	}
-	_, ok := sm.reconfigurationVotes[sm.currentEpoch]
-	if !ok {
-		sm.reconfigurationVotes[sm.currentEpoch] = make(map[string]int)
-	}
-	sm.reconfigurationVotes[sm.currentEpoch][string(h)]++
-	votes := sm.reconfigurationVotes[sm.currentEpoch][string(h)]
-	nodes := len(sm.memberships[sm.currentEpoch])
-
-	log.With("validator", sm.ValidatorID).Infof("UpdateAndCheckVotes %s in %d epoch: votes %d, nodes %d",
-		string(h), sm.currentEpoch, votes, nodes)
-
-	// We must have f+1 votes at least.
-	if votes < weakQuorum(nodes) {
-		return false, nil
-	}
-	return true, nil
 }
 
 // Snapshot is called by Mir every time a checkpoint period has
@@ -397,9 +438,11 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// populating checkpoint template
 	ch := Checkpoint{
-		Height:    nextHeight,
-		Parent:    sm.prevCheckpoint,
-		BlockCids: make([]cid.Cid, 0),
+		Height:           nextHeight,
+		Parent:           sm.prevCheckpoint,
+		BlockCids:        make([]cid.Cid, 0),
+		NextConfigNumber: sm.nextConfigurationNumber,
+		Votes:            sm.storeReconfigurationVotes(),
 	}
 
 	// put blocks in descending order.
@@ -518,13 +561,13 @@ func CidCheckIndexKey(c cid.Cid) datastore.Key {
 	return datastore.NewKey(CheckpointDBKeyPrefix + c.String())
 }
 
-func maxFaulty(n int) int {
+func maxFaulty(n uint64) uint64 {
 	// assuming n > 3f:
 	//   return max f
 	return (n - 1) / 3
 }
 
-func weakQuorum(n int) int {
+func weakQuorum(n uint64) uint64 {
 	// assuming n > 3f:
 	//   return min q: q > f
 	return maxFaulty(n) + 1

@@ -82,7 +82,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 		return nil, err
 	}
 
-	initialValidatorSet, err := membership.GetValidators()
+	initialValidatorSet, err := membership.GetValidatorSet()
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to get validator set: %w", validatorID, err)
 	}
@@ -310,17 +310,19 @@ func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 }
 
 func (m *Manager) ReconfigurationRequest(valset *validator.ValidatorSet) *mirproto.Request {
-	var payload bytes.Buffer
-	if err := valset.MarshalCBOR(&payload); err != nil {
-		log.With("validator", m.MirID).Error("unable to marshall config valset:", err)
+	var b bytes.Buffer
+	if err := valset.MarshalCBOR(&b); err != nil {
+		log.With("validator", m.MirID).Error("unable to marshall validator set:", err)
 		return nil
 	}
 	r := mirproto.Request{
 		ClientId: m.MirID,
 		ReqNo:    m.reconfigurationNonce,
 		Type:     ReconfigurationType,
-		Data:     payload.Bytes(),
+		Data:     b.Bytes(),
 	}
+	// FIXME DENIS
+	// If the implementation works then increase nonce only we have sent the message to Mir
 	m.reconfigurationNonce++
 	return &r
 }

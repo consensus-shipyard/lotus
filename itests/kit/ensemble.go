@@ -1073,15 +1073,20 @@ func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
-func (n *Ensemble) AppendMirValidatorsToMembershipFile(membershipFile string, miners ...*TestMiner) {
+func (n *Ensemble) SaveMirValidatorsToFile(configNumber uint64, membershipFile string, miners ...*TestMiner) {
+	var vs []validator.Validator
+
 	for _, m := range miners {
 		id, err := NodeLibp2pAddr(m.mirHost)
 		require.NoError(n.t, err)
-		val, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", m.mirAddr, id))
+		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", m.mirAddr, id))
 		require.NoError(n.t, err)
-		err = val.AppendToFile(membershipFile)
-		require.NoError(n.t, err)
+		vs = append(vs, v)
 	}
+
+	valSet := validator.NewValidatorSetFromValidators(configNumber, vs...)
+	err := valSet.Save(membershipFile)
+	require.NoError(n.t, err)
 }
 
 func (n *Ensemble) AppendMirValidatorsToMembershipFileNew(membershipFile string, miners ...*TestMiner) {

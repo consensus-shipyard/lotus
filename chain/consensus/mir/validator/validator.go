@@ -13,9 +13,9 @@ import (
 )
 
 type Validator struct {
-	Addr addr.Address
+	Addr addr.Address `json:"addr"`
 	// FIXME: Consider using a multiaddr
-	NetAddr string
+	NetAddr string `json:"net_addr,omitempty"`
 }
 
 // NewValidatorFromString parses a validator address from the string.

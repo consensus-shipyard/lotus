@@ -132,6 +132,12 @@ type ParentMeta struct {
 	Cid    cid.Cid
 }
 
+type VoteMessage struct {
+	Nonce      uint64
+	ValSetHash string
+	Votes      uint64
+}
+
 type Checkpoint struct {
 	// Height of the checkpoint
 	Height abi.ChainEpoch
@@ -140,6 +146,10 @@ type Checkpoint struct {
 	BlockCids []cid.Cid
 	// Parent checkpoint, i.e. metadata of previous checkpoint committed.
 	Parent ParentMeta
+	// Reconfiguration votes.
+	Votes []VoteMessage
+	// The configuration number that can be accepted.
+	NextConfigNumber uint64
 }
 
 func (ch *Checkpoint) isEmpty() bool {

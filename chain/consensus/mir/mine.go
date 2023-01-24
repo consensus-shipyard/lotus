@@ -93,7 +93,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := membership.GetValidators()
+			newValidatorSet, err := membership.GetValidatorSet()
 			if err != nil {
 				log.With("validator", addr).Warnf("failed to get subnet validators: %w", err)
 				continue

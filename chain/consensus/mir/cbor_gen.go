@@ -8,11 +8,10 @@ import (
 	"math"
 	"sort"
 
-	"github.com/ipfs/go-cid"
+	abi "github.com/filecoin-project/go-state-types/abi"
+	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
-
-	"github.com/filecoin-project/go-state-types/abi"
+	xerrors "golang.org/x/xerrors"
 )
 
 var _ = xerrors.Errorf
@@ -20,7 +19,7 @@ var _ = cid.Undef
 var _ = math.E
 var _ = sort.Sort
 
-var lengthBufCheckpoint = []byte{131}
+var lengthBufCheckpoint = []byte{132}
 
 func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 	if t == nil {
@@ -63,6 +62,20 @@ func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 	if err := t.Parent.MarshalCBOR(cw); err != nil {
 		return err
 	}
+
+	// t.Votes ([]mir.VoteMessage) (slice)
+	if len(t.Votes) > cbg.MaxLength {
+		return xerrors.Errorf("Slice value in field t.Votes was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajArray, uint64(len(t.Votes))); err != nil {
+		return err
+	}
+	for _, v := range t.Votes {
+		if err := v.MarshalCBOR(cw); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -85,7 +98,7 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("cbor input should be of type array")
 	}
 
-	if extra != 3 {
+	if extra != 4 {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
@@ -151,6 +164,35 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		}
 
 	}
+	// t.Votes ([]mir.VoteMessage) (slice)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("t.Votes: array too large (%d)", extra)
+	}
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("expected cbor array")
+	}
+
+	if extra > 0 {
+		t.Votes = make([]VoteMessage, extra)
+	}
+
+	for i := 0; i < int(extra); i++ {
+
+		var v VoteMessage
+		if err := v.UnmarshalCBOR(cr); err != nil {
+			return err
+		}
+
+		t.Votes[i] = v
+	}
+
 	return nil
 }
 
@@ -246,6 +288,111 @@ func (t *ParentMeta) UnmarshalCBOR(r io.Reader) (err error) {
 		}
 
 		t.Cid = c
+
+	}
+	return nil
+}
+
+var lengthBufVoteMessage = []byte{131}
+
+func (t *VoteMessage) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufVoteMessage); err != nil {
+		return err
+	}
+
+	// t.Nonce (uint64) (uint64)
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Nonce)); err != nil {
+		return err
+	}
+
+	// t.ValSetHash (string) (string)
+	if len(t.ValSetHash) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.ValSetHash was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.ValSetHash))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.ValSetHash)); err != nil {
+		return err
+	}
+
+	// t.Votes (uint64) (uint64)
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Votes)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *VoteMessage) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = VoteMessage{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 3 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.Nonce (uint64) (uint64)
+
+	{
+
+		maj, extra, err = cr.ReadHeader()
+		if err != nil {
+			return err
+		}
+		if maj != cbg.MajUnsignedInt {
+			return fmt.Errorf("wrong type for uint64 field")
+		}
+		t.Nonce = uint64(extra)
+
+	}
+	// t.ValSetHash (string) (string)
+
+	{
+		sval, err := cbg.ReadString(cr)
+		if err != nil {
+			return err
+		}
+
+		t.ValSetHash = string(sval)
+	}
+	// t.Votes (uint64) (uint64)
+
+	{
+
+		maj, extra, err = cr.ReadHeader()
+		if err != nil {
+			return err
+		}
+		if maj != cbg.MajUnsignedInt {
+			return fmt.Errorf("wrong type for uint64 field")
+		}
+		t.Votes = uint64(extra)
 
 	}
 	return nil

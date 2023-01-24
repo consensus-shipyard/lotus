@@ -59,7 +59,7 @@ var initCmd = &cli.Command{
 				return fmt.Errorf("error importing membership config specified: %s", err)
 			}
 			// persist validator config in the right path.
-			if err := validators.StoreToFile(membershipFile); err != nil {
+			if err := validators.Save(membershipFile); err != nil {
 				return fmt.Errorf("error exporting membership config: %s", err)
 			}
 		} else {

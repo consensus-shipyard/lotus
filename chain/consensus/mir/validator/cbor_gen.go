@@ -96,7 +96,7 @@ func (t *Validator) UnmarshalCBOR(r io.Reader) (err error) {
 	return nil
 }
 
-var lengthBufValidatorSet = []byte{129}
+var lengthBufValidatorSet = []byte{130}
 
 func (t *ValidatorSet) MarshalCBOR(w io.Writer) error {
 	if t == nil {
@@ -107,6 +107,12 @@ func (t *ValidatorSet) MarshalCBOR(w io.Writer) error {
 	cw := cbg.NewCborWriter(w)
 
 	if _, err := cw.Write(lengthBufValidatorSet); err != nil {
+		return err
+	}
+
+	// t.ConfigurationNumber (uint64) (uint64)
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.ConfigurationNumber)); err != nil {
 		return err
 	}
 
@@ -145,10 +151,24 @@ func (t *ValidatorSet) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("cbor input should be of type array")
 	}
 
-	if extra != 1 {
+	if extra != 2 {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
+	// t.ConfigurationNumber (uint64) (uint64)
+
+	{
+
+		maj, extra, err = cr.ReadHeader()
+		if err != nil {
+			return err
+		}
+		if maj != cbg.MajUnsignedInt {
+			return fmt.Errorf("wrong type for uint64 field")
+		}
+		t.ConfigurationNumber = uint64(extra)
+
+	}
 	// t.Validators ([]validator.Validator) (slice)
 
 	maj, extra, err = cr.ReadHeader()
@@ -180,4 +200,3 @@ func (t *ValidatorSet) UnmarshalCBOR(r io.Reader) (err error) {
 
 	return nil
 }
-
