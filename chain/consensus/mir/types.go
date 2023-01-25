@@ -16,12 +16,12 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
-
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	mir "github.com/filecoin-project/mir/pkg/types"
 )
 
 const (
@@ -41,6 +41,8 @@ type Config struct {
 	CheckpointRepo string
 	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
 	SegmentLength int
+
+	ConfigurationNonce uint64
 }
 
 func NewConfig(
@@ -48,12 +50,14 @@ func NewConfig(
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 	segmentLength int,
+	configurationNonce uint64,
 ) *Config {
 	return &Config{
-		DatastorePath:     dbPath,
-		InitialCheckpoint: initCheck,
-		CheckpointRepo:    checkpointRepo,
-		SegmentLength:     segmentLength,
+		DatastorePath:      dbPath,
+		InitialCheckpoint:  initCheck,
+		CheckpointRepo:     checkpointRepo,
+		SegmentLength:      segmentLength,
+		ConfigurationNonce: configurationNonce,
 	}
 }
 
@@ -132,10 +136,27 @@ type ParentMeta struct {
 	Cid    cid.Cid
 }
 
-type VoteMessage struct {
-	Nonce      uint64
-	ValSetHash string
-	Votes      uint64
+type VotedValidator struct {
+	ID string
+}
+
+func (v VotedValidator) NodeID() mir.NodeID {
+	return mir.NodeID(v.ID)
+}
+
+func NewVotedValidators(vs ...mir.NodeID) []VotedValidator {
+	var validators []VotedValidator
+	for _, v := range vs {
+		validators = append(validators, VotedValidator{v.Pb()})
+	}
+	return validators
+}
+
+// VoteRecord states that VotedValidators voted for the validator set with ValSetHash having number ConfigurationNumber.
+type VoteRecord struct {
+	ConfigurationNumber uint64
+	ValSetHash          string
+	VotedValidators     []VotedValidator
 }
 
 type Checkpoint struct {
@@ -147,7 +168,7 @@ type Checkpoint struct {
 	// Parent checkpoint, i.e. metadata of previous checkpoint committed.
 	Parent ParentMeta
 	// Reconfiguration votes.
-	Votes []VoteMessage
+	Votes []VoteRecord
 	// The configuration number that can be accepted.
 	NextConfigNumber uint64
 }

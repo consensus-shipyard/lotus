@@ -13,16 +13,17 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	t "github.com/filecoin-project/mir/pkg/types"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
-	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 var _ trantor.AppLogic = &StateManager{}
@@ -51,21 +52,26 @@ type StateManager struct {
 	// Next membership to return from NewEpoch.
 	// Attention: No in-place modifications of this field are allowed.
 	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
-	nextNewMembership       map[t.NodeID]t.NodeAddress
-	nextConfigurationNumber uint64
+	nextNewMembership map[t.NodeID]t.NodeAddress
 
 	MirManager *Manager
 
-	reconfigurationVotes map[uint64]map[string]uint64
+	// reconfigurationVotes implements ConfigurationNumber->ValSetHash->[]NodeID mapping.
+	reconfigurationVotes map[uint64]map[string][]t.NodeID
+
+	// nextConfigurationNumber is the acceptable configuration number.
+	// The initial nextConfigurationNumber is 1.
+	nextConfigurationNumber uint64
 
 	prevCheckpoint ParentMeta
 
-	// Channel to send checkpoints to assemble them in blocks
+	// Channel to send checkpoints to assemble them in blocks.
 	NextCheckpoint chan *checkpoint.StableCheckpoint
 
-	// Validator ID
+	// Validator ID.
 	ValidatorID address.Address
 
+	// Mir chain height.
 	height abi.ChainEpoch
 }
 
@@ -75,7 +81,7 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 		NextCheckpoint:          make(chan *checkpoint.StableCheckpoint, 1),
 		MirManager:              m,
 		currentEpoch:            0,
-		reconfigurationVotes:    make(map[uint64]map[string]uint64),
+		reconfigurationVotes:    make(map[uint64]map[string][]t.NodeID),
 		api:                     api,
 		ValidatorID:             m.ValidatorID,
 		nextConfigurationNumber: 1,
@@ -144,9 +150,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	sm.nextNewMembership = sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)]
 	log.With("validator", sm.ValidatorID).Infof("RestoreState: next membership size is %d at epoch %d", len(sm.nextNewMembership), sm.currentEpoch)
 
-	// Remove all outdated reconfiguration vote data.
-	sm.reconfigurationVotes = make(map[uint64]map[string]uint64)
-
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
 	ch := &Checkpoint{}
@@ -162,7 +165,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
 		sm.nextConfigurationNumber = ch.NextConfigNumber
-		sm.restoreReconfigurationVotes(ch.Votes)
+		sm.restoreConfigurationVotes(ch.Votes)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -217,27 +220,39 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	return nil
 }
 
-func (sm *StateManager) restoreReconfigurationVotes(votes []VoteMessage) {
-	m := make(map[uint64]map[string]uint64)
-	for _, v := range votes {
-		m[v.Nonce] = make(map[string]uint64)
-		m[v.Nonce][v.ValSetHash] = v.Votes
+func restoreConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.NodeID {
+	m := make(map[uint64]map[string][]t.NodeID)
+	for _, v := range voteRecords {
+		if _, exist := m[v.ConfigurationNumber]; !exist {
+			m[v.ConfigurationNumber] = make(map[string][]t.NodeID)
+		}
+		for _, id := range v.VotedValidators {
+			m[v.ConfigurationNumber][v.ValSetHash] = append(m[v.ConfigurationNumber][v.ValSetHash], id.NodeID())
+		}
 	}
-	sm.reconfigurationVotes = m
+	return m
 }
 
-func (sm *StateManager) storeReconfigurationVotes() (voteMessages []VoteMessage) {
-	for n, votes := range sm.reconfigurationVotes {
-		for h, v := range votes {
-			e := VoteMessage{
-				Nonce:      n,
-				ValSetHash: h,
-				Votes:      v,
+func storeConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) (votesRecords []VoteRecord) {
+	for n, hashToValidatorsVotes := range reconfigurationVotes {
+		for h, nodeIDs := range hashToValidatorsVotes {
+			e := VoteRecord{
+				ConfigurationNumber: n,
+				ValSetHash:          h,
+				VotedValidators:     NewVotedValidators(nodeIDs...),
 			}
-			voteMessages = append(voteMessages, e)
+			votesRecords = append(votesRecords, e)
 		}
 	}
 	return
+}
+
+func (sm *StateManager) restoreConfigurationVotes(voteRecords []VoteRecord) {
+	sm.reconfigurationVotes = restoreConfigurationVotes(voteRecords)
+}
+
+func (sm *StateManager) storeConfigurationVotes() []VoteRecord {
+	return storeConfigurationVotes(sm.reconfigurationVotes)
 }
 
 // ApplyTXs applies transactions received from the availability layer to the app state
@@ -330,7 +345,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 		return err
 	}
 
-	enoughVotes, err := sm.countVote(msg.ClientId, &valSet)
+	enoughVotes, err := sm.countVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
 		log.With("validator", sm.ValidatorID).Errorf("failed to apply config message: %v", err)
 		return nil
@@ -343,8 +358,13 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	if err != nil {
 		return xerrors.Errorf("validator %v failed to update membership: %w", sm.ValidatorID, err)
 	}
-	delete(sm.reconfigurationVotes, sm.nextConfigurationNumber)
+
 	sm.nextConfigurationNumber = valSet.ConfigurationNumber
+	for n := range sm.reconfigurationVotes {
+		if n < sm.nextConfigurationNumber {
+			delete(sm.reconfigurationVotes, n)
+		}
+	}
 
 	return nil
 }
@@ -361,35 +381,41 @@ func (sm *StateManager) updateNextMembership(valSet *validator.Set) error {
 }
 
 // countVotes count votes for the validator set and returns true if we have got enough votes for this valSet.
-func (sm *StateManager) countVote(from string, valSet *validator.Set) (bool, error) {
-	if valSet.ConfigurationNumber != sm.nextConfigurationNumber {
+func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) (bool, error) {
+	if set.ConfigurationNumber < sm.nextConfigurationNumber {
 		return false, xerrors.Errorf("validator %s sent outdated vote: received - %d, expected - %d",
-			from, valSet.ConfigurationNumber, sm.nextConfigurationNumber)
+			votingValidator, set.ConfigurationNumber, sm.nextConfigurationNumber)
 	}
-	if !valSet.HasValidatorWithID(from) {
-		return false, xerrors.Errorf("validator %s is not in the membership", from)
+
+	if _, found := sm.memberships[sm.currentEpoch][votingValidator]; !found {
+		return false, xerrors.Errorf("validator %s is not in the membership", votingValidator)
 	}
-	// FIXME DENIS
-	// if it returns error the Mine function will panic?
-	// we should not panic on input data controlled by other nodes
-	h, err := valSet.Hash()
+
+	h, err := set.Hash()
 	if err != nil {
 		return false, err
 	}
 
-	_, ok := sm.reconfigurationVotes[valSet.ConfigurationNumber]
-	if !ok {
-		sm.reconfigurationVotes[valSet.ConfigurationNumber] = make(map[string]uint64)
+	if _, exist := sm.reconfigurationVotes[set.ConfigurationNumber]; !exist {
+		sm.reconfigurationVotes[set.ConfigurationNumber] = make(map[string][]t.NodeID)
 	}
-	sm.reconfigurationVotes[valSet.ConfigurationNumber][string(h)]++
 
-	votes := sm.reconfigurationVotes[valSet.ConfigurationNumber][string(h)]
+	// Prevent double voting.
+	for _, voted := range sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] {
+		if voted == votingValidator {
+			return false, xerrors.Errorf("validator %s has been voted for configuration %d", votingValidator, set.ConfigurationNumber)
+		}
+	}
+
+	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = append(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)], votingValidator)
+
+	votes := len(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)])
 	nodes := len(sm.memberships[sm.currentEpoch])
 	log.With("validator", sm.ValidatorID).Infof("UpdateAndCheckVotes: valset number %d, epoch %d: votes %d, nodes %d",
-		valSet.ConfigurationNumber, sm.currentEpoch, votes, nodes)
+		set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
 
 	// We must have f+1 votes at least.
-	if votes < weakQuorum(uint64(nodes)) {
+	if votes < weakQuorum(nodes) {
 		return false, nil
 	}
 	return true, nil
@@ -442,7 +468,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		Parent:           sm.prevCheckpoint,
 		BlockCids:        make([]cid.Cid, 0),
 		NextConfigNumber: sm.nextConfigurationNumber,
-		Votes:            sm.storeReconfigurationVotes(),
+		Votes:            sm.storeConfigurationVotes(),
 	}
 
 	// put blocks in descending order.
@@ -467,9 +493,12 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		log.With("validator", sm.ValidatorID).Infof("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
 	}
 
+	b, err := ch.Bytes()
+	if err != nil {
+		return nil, xerrors.Errorf("snapshot: validator %v failed to serialize checkpoint: %w", sm.ValidatorID, err)
+	}
 	log.With("validator", sm.ValidatorID).Infof("Snapshot finished: epoch - %d, height - %d", sm.currentEpoch, sm.height)
-
-	return ch.Bytes()
+	return b, nil
 }
 
 // Checkpoint is triggered by Mir when the committee agrees on the next checkpoint.
@@ -561,13 +590,13 @@ func CidCheckIndexKey(c cid.Cid) datastore.Key {
 	return datastore.NewKey(CheckpointDBKeyPrefix + c.String())
 }
 
-func maxFaulty(n uint64) uint64 {
+func maxFaulty(n int) int {
 	// assuming n > 3f:
 	//   return max f
 	return (n - 1) / 3
 }
 
-func weakQuorum(n uint64) uint64 {
+func weakQuorum(n int) int {
 	// assuming n > 3f:
 	//   return min q: q > f
 	return maxFaulty(n) + 1

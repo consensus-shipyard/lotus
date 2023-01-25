@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"time"
@@ -43,8 +44,9 @@ const (
 )
 
 var (
-	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
-	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
+	LatestCheckpointKey    = datastore.NewKey("mir/latest-check")
+	LatestCheckpointPbKey  = datastore.NewKey("mir/latest-check-pb")
+	LastConfigurationNonce = datastore.NewKey("mir/configuration-nonce")
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
@@ -135,19 +137,20 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	}
 
 	m := Manager{
-		stopCh:              make(chan struct{}),
-		ValidatorID:         validatorID,
-		NetName:             netName,
-		Pool:                fifo.New(),
-		MirID:               mirID,
-		interceptor:         interceptor,
-		CryptoManager:       cryptoManager,
-		Net:                 netTransport,
-		ds:                  ds,
-		InitialValidatorSet: initialValidatorSet,
-		ToMir:               make(chan chan []*mirproto.Request),
-		checkpointRepo:      cfg.CheckpointRepo,
-		segmentLength:       cfg.SegmentLength,
+		stopCh:               make(chan struct{}),
+		ValidatorID:          validatorID,
+		NetName:              netName,
+		Pool:                 fifo.New(),
+		MirID:                mirID,
+		interceptor:          interceptor,
+		CryptoManager:        cryptoManager,
+		Net:                  netTransport,
+		ds:                   ds,
+		InitialValidatorSet:  initialValidatorSet,
+		ToMir:                make(chan chan []*mirproto.Request),
+		checkpointRepo:       cfg.CheckpointRepo,
+		segmentLength:        cfg.SegmentLength,
+		reconfigurationNonce: cfg.ConfigurationNonce,
 	}
 
 	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
@@ -313,18 +316,24 @@ func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
 func (m *Manager) ReconfigurationRequest(valset *validator.Set) *mirproto.Request {
 	var b bytes.Buffer
 	if err := valset.MarshalCBOR(&b); err != nil {
-		log.With("validator", m.MirID).Error("unable to marshall validator set:", err)
+		log.With("validator", m.MirID).Errorf("unable to marshall validator set: %v", err)
 		return nil
 	}
+
 	r := mirproto.Request{
 		ClientId: m.MirID,
 		ReqNo:    m.reconfigurationNonce,
 		Type:     ReconfigurationType,
 		Data:     b.Bytes(),
 	}
-	// FIXME DENIS
-	// If the implementation works then increase nonce only we have sent the message to Mir
+
 	m.reconfigurationNonce++
+
+	rb := make([]byte, 8)
+	binary.LittleEndian.PutUint64(rb, m.reconfigurationNonce)
+	if err := m.ds.Put(context.Background(), LastConfigurationNonce, rb); err != nil {
+		log.With("validator", m.MirID).Warnf("failed to persist configuration number: %v", err)
+	}
 	return &r
 }
 

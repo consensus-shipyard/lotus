@@ -122,7 +122,7 @@ func TestValidatorSetFromJson(t *testing.T) {
 	js := vs2.JSONString()
 	fmt.Println(vs2.JSONString())
 
-	var vs1 ValidatorSet
+	var vs1 Set
 	err = json.Unmarshal([]byte(js), &vs1)
 	require.NoError(t, err)
 

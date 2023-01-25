@@ -16,6 +16,10 @@ import (
 	"github.com/filecoin-project/go-address"
 )
 
+type Reader interface {
+	GetValidatorSet() (*Set, error)
+}
+
 type Set struct {
 	ConfigurationNumber uint64      `json:"configuration_number"`
 	Validators          []Validator `json:"validators"`
@@ -69,7 +73,7 @@ func (s *Set) Hash() ([]byte, error) {
 	var hs [][]byte
 
 	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, s.ConfigurationNumber)
+	binary.LittleEndian.PutUint64(b, s.GetConfigurationNumber())
 	hs = append(hs, b)
 
 	for _, v := range s.Validators {

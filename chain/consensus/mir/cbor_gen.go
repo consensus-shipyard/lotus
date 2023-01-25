@@ -19,7 +19,7 @@ var _ = cid.Undef
 var _ = math.E
 var _ = sort.Sort
 
-var lengthBufCheckpoint = []byte{132}
+var lengthBufCheckpoint = []byte{133}
 
 func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 	if t == nil {
@@ -63,7 +63,7 @@ func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	// t.Votes ([]mir.VoteMessage) (slice)
+	// t.Votes ([]mir.VoteRecord) (slice)
 	if len(t.Votes) > cbg.MaxLength {
 		return xerrors.Errorf("Slice value in field t.Votes was too long")
 	}
@@ -76,6 +76,13 @@ func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 			return err
 		}
 	}
+
+	// t.NextConfigNumber (uint64) (uint64)
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.NextConfigNumber)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -98,7 +105,7 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("cbor input should be of type array")
 	}
 
-	if extra != 4 {
+	if extra != 5 {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
@@ -164,7 +171,7 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		}
 
 	}
-	// t.Votes ([]mir.VoteMessage) (slice)
+	// t.Votes ([]mir.VoteRecord) (slice)
 
 	maj, extra, err = cr.ReadHeader()
 	if err != nil {
@@ -180,12 +187,12 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 	}
 
 	if extra > 0 {
-		t.Votes = make([]VoteMessage, extra)
+		t.Votes = make([]VoteRecord, extra)
 	}
 
 	for i := 0; i < int(extra); i++ {
 
-		var v VoteMessage
+		var v VoteRecord
 		if err := v.UnmarshalCBOR(cr); err != nil {
 			return err
 		}
@@ -193,6 +200,20 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		t.Votes[i] = v
 	}
 
+	// t.NextConfigNumber (uint64) (uint64)
+
+	{
+
+		maj, extra, err = cr.ReadHeader()
+		if err != nil {
+			return err
+		}
+		if maj != cbg.MajUnsignedInt {
+			return fmt.Errorf("wrong type for uint64 field")
+		}
+		t.NextConfigNumber = uint64(extra)
+
+	}
 	return nil
 }
 
@@ -293,9 +314,9 @@ func (t *ParentMeta) UnmarshalCBOR(r io.Reader) (err error) {
 	return nil
 }
 
-var lengthBufVoteMessage = []byte{131}
+var lengthBufVoteRecord = []byte{131}
 
-func (t *VoteMessage) MarshalCBOR(w io.Writer) error {
+func (t *VoteRecord) MarshalCBOR(w io.Writer) error {
 	if t == nil {
 		_, err := w.Write(cbg.CborNull)
 		return err
@@ -303,13 +324,13 @@ func (t *VoteMessage) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write(lengthBufVoteMessage); err != nil {
+	if _, err := cw.Write(lengthBufVoteRecord); err != nil {
 		return err
 	}
 
-	// t.Nonce (uint64) (uint64)
+	// t.ConfigurationNumber (uint64) (uint64)
 
-	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Nonce)); err != nil {
+	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.ConfigurationNumber)); err != nil {
 		return err
 	}
 
@@ -325,17 +346,24 @@ func (t *VoteMessage) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
-	// t.Votes (uint64) (uint64)
-
-	if err := cw.WriteMajorTypeHeader(cbg.MajUnsignedInt, uint64(t.Votes)); err != nil {
-		return err
+	// t.VotedValidators ([]mir.VotedValidator) (slice)
+	if len(t.VotedValidators) > cbg.MaxLength {
+		return xerrors.Errorf("Slice value in field t.VotedValidators was too long")
 	}
 
+	if err := cw.WriteMajorTypeHeader(cbg.MajArray, uint64(len(t.VotedValidators))); err != nil {
+		return err
+	}
+	for _, v := range t.VotedValidators {
+		if err := v.MarshalCBOR(cw); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func (t *VoteMessage) UnmarshalCBOR(r io.Reader) (err error) {
-	*t = VoteMessage{}
+func (t *VoteRecord) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = VoteRecord{}
 
 	cr := cbg.NewCborReader(r)
 
@@ -357,7 +385,7 @@ func (t *VoteMessage) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
-	// t.Nonce (uint64) (uint64)
+	// t.ConfigurationNumber (uint64) (uint64)
 
 	{
 
@@ -368,7 +396,7 @@ func (t *VoteMessage) UnmarshalCBOR(r io.Reader) (err error) {
 		if maj != cbg.MajUnsignedInt {
 			return fmt.Errorf("wrong type for uint64 field")
 		}
-		t.Nonce = uint64(extra)
+		t.ConfigurationNumber = uint64(extra)
 
 	}
 	// t.ValSetHash (string) (string)
@@ -381,19 +409,98 @@ func (t *VoteMessage) UnmarshalCBOR(r io.Reader) (err error) {
 
 		t.ValSetHash = string(sval)
 	}
-	// t.Votes (uint64) (uint64)
+	// t.VotedValidators ([]mir.VotedValidator) (slice)
+
+	maj, extra, err = cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+
+	if extra > cbg.MaxLength {
+		return fmt.Errorf("t.VotedValidators: array too large (%d)", extra)
+	}
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("expected cbor array")
+	}
+
+	if extra > 0 {
+		t.VotedValidators = make([]VotedValidator, extra)
+	}
+
+	for i := 0; i < int(extra); i++ {
+
+		var v VotedValidator
+		if err := v.UnmarshalCBOR(cr); err != nil {
+			return err
+		}
+
+		t.VotedValidators[i] = v
+	}
+
+	return nil
+}
+
+var lengthBufVotedValidator = []byte{129}
+
+func (t *VotedValidator) MarshalCBOR(w io.Writer) error {
+	if t == nil {
+		_, err := w.Write(cbg.CborNull)
+		return err
+	}
+
+	cw := cbg.NewCborWriter(w)
+
+	if _, err := cw.Write(lengthBufVotedValidator); err != nil {
+		return err
+	}
+
+	// t.ID (string) (string)
+	if len(t.ID) > cbg.MaxLength {
+		return xerrors.Errorf("Value in field t.ID was too long")
+	}
+
+	if err := cw.WriteMajorTypeHeader(cbg.MajTextString, uint64(len(t.ID))); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, string(t.ID)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *VotedValidator) UnmarshalCBOR(r io.Reader) (err error) {
+	*t = VotedValidator{}
+
+	cr := cbg.NewCborReader(r)
+
+	maj, extra, err := cr.ReadHeader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
+	if maj != cbg.MajArray {
+		return fmt.Errorf("cbor input should be of type array")
+	}
+
+	if extra != 1 {
+		return fmt.Errorf("cbor input had wrong number of fields")
+	}
+
+	// t.ID (string) (string)
 
 	{
-
-		maj, extra, err = cr.ReadHeader()
+		sval, err := cbg.ReadString(cr)
 		if err != nil {
 			return err
 		}
-		if maj != cbg.MajUnsignedInt {
-			return fmt.Errorf("wrong type for uint64 field")
-		}
-		t.Votes = uint64(extra)
 
+		t.ID = string(sval)
 	}
 	return nil
 }

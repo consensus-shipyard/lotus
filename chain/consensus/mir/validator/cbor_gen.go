@@ -96,7 +96,7 @@ func (t *Validator) UnmarshalCBOR(r io.Reader) (err error) {
 	return nil
 }
 
-var lengthBufValidatorSet = []byte{130}
+var lengthBufSet = []byte{130}
 
 func (t *Set) MarshalCBOR(w io.Writer) error {
 	if t == nil {
@@ -106,7 +106,7 @@ func (t *Set) MarshalCBOR(w io.Writer) error {
 
 	cw := cbg.NewCborWriter(w)
 
-	if _, err := cw.Write(lengthBufValidatorSet); err != nil {
+	if _, err := cw.Write(lengthBufSet); err != nil {
 		return err
 	}
 

@@ -65,7 +65,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 	lastValidatorSet := m.InitialValidatorSet
 
-	var configRequests []*mirproto.Request
+	var configRequest *mirproto.Request
 
 	for {
 		// Here we use `ctx.Err()` in the beginning of the `for` loop instead of using it in the `select` statement,
@@ -93,24 +93,23 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newValidatorSet, err := membership.GetValidatorSet()
+			newSet, err := membership.GetValidatorSet()
 			if err != nil {
 				log.With("validator", addr).Warnf("failed to get subnet validators: %w", err)
 				continue
 			}
 
-			if lastValidatorSet.Equal(newValidatorSet) {
+			if lastValidatorSet.Equal(newSet) {
 				continue
 			}
 
 			log.With("validator", addr).
-				Infof("new validator set: size: %d, members: %v", newValidatorSet.Size(), newValidatorSet.GetValidatorIDs())
+				Infof("new validator set: number: %d, size: %d, members: %v",
+					newSet.ConfigurationNumber, newSet.Size(), newSet.GetValidatorIDs())
 
-			lastValidatorSet = newValidatorSet
+			lastValidatorSet = newSet
 
-			if req := m.ReconfigurationRequest(newValidatorSet); req != nil {
-				configRequests = append(configRequests, req)
-			}
+			configRequest = m.ReconfigurationRequest(newSet)
 
 		case toMir := <-m.ToMir:
 			base, err := m.StateManager.api.ChainHead(ctx)
@@ -126,9 +125,9 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 			requests := m.TransportRequests(msgs)
 
-			if len(configRequests) > 0 {
-				requests = append(requests, configRequests...)
-				configRequests = nil
+			if configRequest != nil {
+				requests = append(requests, configRequest)
+				configRequest = nil
 			}
 
 			// We send requests via the channel instead of calling m.SubmitRequests(ctx, requests) explicitly.

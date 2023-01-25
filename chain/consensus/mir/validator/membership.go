@@ -1,11 +1,5 @@
 package validator
 
-type Reader interface {
-	GetValidatorSet() (*Set, error)
-}
-
-// ------
-
 type FileMembership struct {
 	FileName string
 }
