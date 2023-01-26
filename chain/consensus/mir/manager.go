@@ -274,10 +274,10 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params)
 }
 
-// GetMessages extracts Filecoin messages from a Mir batch.
-func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
+// GetSignedMessages extracts Filecoin signed messages from a Mir batch.
+func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMessage) {
 	log.With("validator", m.MirID).Infof("received a block with %d messages", len(msgs))
-	for _, tx := range batch.Messages {
+	for _, tx := range mirMsgs {
 
 		input, err := parseTx(tx)
 		if err != nil {
@@ -306,27 +306,7 @@ func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
 	return
 }
 
-func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
-	requests []*mirproto.Request,
-) {
-	requests = append(requests, m.batchSignedMessages(msgs)...)
-	return
-}
-
-func (m *Manager) ReconfigurationRequest(valset *validator.Set) *mirproto.Request {
-	var b bytes.Buffer
-	if err := valset.MarshalCBOR(&b); err != nil {
-		log.With("validator", m.MirID).Errorf("unable to marshall validator set: %v", err)
-		return nil
-	}
-
-	r := mirproto.Request{
-		ClientId: m.MirID,
-		ReqNo:    m.reconfigurationNonce,
-		Type:     ReconfigurationType,
-		Data:     b.Bytes(),
-	}
-
+func (m *Manager) IncreaseAndPersistConfigurationNonce() {
 	m.reconfigurationNonce++
 
 	rb := make([]byte, 8)
@@ -334,13 +314,33 @@ func (m *Manager) ReconfigurationRequest(valset *validator.Set) *mirproto.Reques
 	if err := m.ds.Put(context.Background(), LastConfigurationNonce, rb); err != nil {
 		log.With("validator", m.MirID).Warnf("failed to persist configuration number: %v", err)
 	}
+}
+
+func (m *Manager) CreateTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
+	var requests []*mirproto.Request
+	requests = append(requests, m.batchSignedMessages(msgs)...)
+	return requests
+}
+
+func (m *Manager) CreateReconfigurationRequest(set *validator.Set) *mirproto.Request {
+	var b bytes.Buffer
+	if err := set.MarshalCBOR(&b); err != nil {
+		log.With("validator", m.MirID).Errorf("unable to marshall validator set: %v", err)
+		return nil
+	}
+
+	r := mirproto.Request{
+		ClientId: m.MirID,
+		ReqNo:    m.reconfigurationNonce,
+		Type:     ConfigurationRequest,
+		Data:     b.Bytes(),
+	}
+
 	return &r
 }
 
 // batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
-func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
-	requests []*mirproto.Request,
-) {
+func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*mirproto.Request) {
 	for _, msg := range msgs {
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
@@ -358,7 +358,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 		r := &mirproto.Request{
 			ClientId: clientID,
 			ReqNo:    nonce,
-			Type:     TransportType,
+			Type:     TransportRequest,
 			Data:     data,
 		}
 

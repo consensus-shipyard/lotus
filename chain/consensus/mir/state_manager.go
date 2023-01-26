@@ -265,18 +265,14 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	// For each request in the batch
 	for _, req := range txs {
 		switch req.Type {
-		case TransportType:
+		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
-		case ReconfigurationType:
+		case ConfigurationRequest:
 			err := sm.applyConfigMsg(req)
 			if err != nil {
 				return err
 			}
 		}
-	}
-
-	batch := &Batch{
-		Messages: mirMsgs,
 	}
 
 	base, err := sm.api.ChainHead(sm.ctx)
@@ -288,7 +284,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	nextHeight := base.Height() + 1
 	log.With("validator", sm.ValidatorID).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
 
-	msgs := sm.MirManager.GetMessages(batch)
+	msgs := sm.MirManager.GetSignedMessages(mirMsgs)
 	log.With("validator", sm.ValidatorID).With("epoch", nextHeight).Infof("try to create a block: msgs - %d", len(msgs))
 
 	// include checkpoint in VRF proof field?
@@ -720,6 +716,9 @@ func parseTx(tx []byte) (interface{}, error) {
 	case SignedMessageType:
 		msg, err = types.DecodeSignedMessage(tx[:ln-1])
 	case ConfigMessageType:
+		fmt.Println("confg", tx[:ln-1])
+		panic(1)
+		msg, err = types.DecodeSignedMessage(tx[:ln-1])
 		return nil, fmt.Errorf("config message is not supported")
 	default:
 		err = fmt.Errorf("unknown message type %d", lastByte)

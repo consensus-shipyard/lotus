@@ -108,8 +108,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 					newSet.ConfigurationNumber, newSet.Size(), newSet.GetValidatorIDs())
 
 			lastValidatorSet = newSet
-
-			configRequest = m.ReconfigurationRequest(newSet)
+			configRequest = m.CreateReconfigurationRequest(newSet)
 
 		case toMir := <-m.ToMir:
 			base, err := m.StateManager.api.ChainHead(ctx)
@@ -123,7 +122,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 					Errorw("failed to select messages from mempool", "error", err)
 			}
 
-			requests := m.TransportRequests(msgs)
+			requests := m.CreateTransportRequests(msgs)
 
 			if configRequest != nil {
 				requests = append(requests, configRequest)
