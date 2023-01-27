@@ -77,6 +77,30 @@ debug: build-devnets
 
 spacenet: GOFLAGS+=-tags=spacenet
 spacenet: eudico lotus-seed lotus-keygen lotus-shed
+.PHONY: spacenet
+
+spacenet-unit-test: GOFLAGS+=-tags=spacenet
+spacenet-unit-test:
+	go test $(GOFLAGS) -count=1 -timeout=0 -v  ./chain/consensus/...
+.PHONY: spacenet-unit-test
+
+spacenet-test: GOFLAGS+=-tags=spacenet
+spacenet-test:
+	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=60m -run TestMirConsensus ./itests/mir_test.go
+.PHONY: spacenet-test
+
+spacenet-mangling-test: GOFLAGS+=-tags=spacenet
+spacenet-mangling-test:
+	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=180m -run TestMirConsensusWithMangler ./itests/mir_test.go
+.PHONY: spacenet-mangling-test
+
+spacenet-smoke-test: GOFLAGS+=-tags=spacenet
+spacenet-smoke-test:
+	export GOLOG_LOG_LEVEL="INFO,mir-manager=debug,mir-consensus=debug"; \
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m -run TestMirConsensusSmoke ./itests/mir_test.go
+.PHONY: spacenet-smoke-test
 
 spacenet-test-reconfiguration: GOFLAGS+=-tags=spacenet
 spacenet-test-reconfiguration:
@@ -84,16 +108,10 @@ spacenet-test-reconfiguration:
 	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration ./itests/mir_test.go
 .PHONY: spacenet-test-reconfiguration
 
-spacenet-test: GOFLAGS+=-tags=spacenet
-spacenet-test:
-	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=info,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
-.PHONY: spacenet-test
-
 spacenet-test-race: GOFLAGS+=-tags=spacenet
 spacenet-test-race:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -race -shuffle=on -v -count=1 -timeout=30m ./itests/mir_test.go
+	go test $(GOFLAGS) -race -shuffle=on -v -timeout=60m -count=1 ./itests/mir_test.go
 .PHONY: spacenet-test-race
 
 calibnet: GOFLAGS+=-tags=calibnet

@@ -164,7 +164,7 @@ func (m *Miner) Start(_ context.Context) error {
 					close(stopping)
 					return
 
-				default:
+				default: // nolint
 				}
 			}
 		}()

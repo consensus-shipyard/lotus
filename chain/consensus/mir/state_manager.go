@@ -722,9 +722,6 @@ func parseTx(tx []byte) (interface{}, error) {
 	case SignedMessageType:
 		msg, err = types.DecodeSignedMessage(tx[:ln-1])
 	case ConfigMessageType:
-		fmt.Println("confg", tx[:ln-1])
-		panic(1)
-		msg, err = types.DecodeSignedMessage(tx[:ln-1])
 		return nil, fmt.Errorf("config message is not supported")
 	default:
 		err = fmt.Errorf("unknown message type %d", lastByte)
