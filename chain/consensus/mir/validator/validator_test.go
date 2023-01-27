@@ -11,7 +11,7 @@ import (
 	"github.com/filecoin-project/go-address"
 )
 
-func TestHashIsEqualForEqualMemberships(t *testing.T) {
+func TestHashesAreEqualForEqualMemberships(t *testing.T) {
 	v1, err := NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
 	require.NoError(t, err)
 	v2, err := NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10001/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
@@ -129,7 +129,7 @@ func TestValidatorSetFromJson(t *testing.T) {
 	require.Equal(t, true, vs1.Equal(vs2))
 }
 
-func TestValidatorsToFile(t *testing.T) {
+func TestAddValidatorToFile(t *testing.T) {
 	fileName := "_v_test_file_.tmp"
 	t.Cleanup(func() {
 		os.Remove(fileName) // nolint
@@ -137,20 +137,25 @@ func TestValidatorsToFile(t *testing.T) {
 
 	v1, err := NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
 	require.NoError(t, err)
-	err = v1.AppendToFile(fileName)
+	err = AddValidatorToFile(fileName, v1)
 	require.NoError(t, err)
+
+	vs1 := NewValidatorSet(0, []Validator{v1})
+	vs, err := NewValidatorSetFromFile(fileName)
+	require.NoError(t, err)
+	require.Equal(t, true, vs1.Equal(vs))
 
 	v2, err := NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10001/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
 	require.NoError(t, err)
-	err = v2.AppendToFile(fileName)
+	err = AddValidatorToFile(fileName, v2)
 	require.NoError(t, err)
 
 	v3, err := NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10002/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
 	require.NoError(t, err)
-	err = v3.AppendToFile(fileName)
+	err = AddValidatorToFile(fileName, v3)
 	require.NoError(t, err)
 
-	vs1 := NewValidatorSet(0, []Validator{v1, v2, v3})
+	vs1 = NewValidatorSet(2, []Validator{v1, v2, v3})
 	require.Equal(t, 3, vs1.Size())
 
 	vs2, err := NewValidatorSetFromFile(fileName)

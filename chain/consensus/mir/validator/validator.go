@@ -2,7 +2,6 @@ package validator
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/multiformats/go-multiaddr"
@@ -63,29 +62,6 @@ func (v *Validator) Bytes() ([]byte, error) {
 
 func (v *Validator) String() string {
 	return fmt.Sprintf("%s@%s", v.Addr.String(), v.NetAddr)
-}
-
-// AppendToFile appends the validator to the file.
-func (v *Validator) AppendToFile(name string) error {
-	var err error
-
-	f, err := os.OpenFile(name, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		panic(err)
-	}
-
-	defer func() {
-		cerr := f.Close()
-		if err == nil {
-			err = fmt.Errorf("error closing membership config file: %w", cerr)
-		}
-	}()
-
-	if _, err = f.WriteString(v.String() + "\n"); err != nil {
-		return err
-	}
-
-	return err
 }
 
 func SplitAndTrimEmpty(s, sep, cutset string) []string {

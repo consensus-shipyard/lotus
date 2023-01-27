@@ -37,7 +37,7 @@ var cfgCmd = &cli.Command{
 
 var addValidatorCmd = &cli.Command{
 	Name:  "add-validator",
-	Usage: "Append validator to mir membership configuration",
+	Usage: "Add validator to mir membership configuration",
 	Flags: []cli.Flag{},
 	Action: func(cctx *cli.Context) error {
 		if cctx.Args().Len() != 1 {
@@ -54,16 +54,16 @@ var addValidatorCmd = &cli.Command{
 		}
 
 		membershipFile := path.Join(cctx.String("repo"), MembershipCfgPath)
-		val, err := validator.NewValidatorFromString(cctx.Args().First())
+		v, err := validator.NewValidatorFromString(cctx.Args().First())
 		if err != nil {
 			return fmt.Errorf("error parsing validator from string: %s. Use the following format: <wallet id>@<multiaddr>", err)
 		}
-		// persist validator config in the right path.
-		if err := val.AppendToFile(membershipFile); err != nil {
-			return fmt.Errorf("error exporting membership config: %s", err)
+
+		if err := validator.AddValidatorToFile(membershipFile, v); err != nil {
+			return fmt.Errorf("failed to add validator to file %s: %w", membershipFile, err)
 		}
 
-		log.Infow("Mir validator appended to membership config file")
+		log.Infow("Mir validator added to membership file")
 		return nil
 	},
 }

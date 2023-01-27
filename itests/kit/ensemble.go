@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -1087,34 +1086,6 @@ func (n *Ensemble) SaveMirValidatorsToFile(configNumber uint64, membershipFile s
 	valSet := validator.NewValidatorSetFromValidators(configNumber, vs...)
 	err := valSet.Save(membershipFile)
 	require.NoError(n.t, err)
-}
-
-func (n *Ensemble) AppendMirValidatorsToMembershipFileNew(membershipFile string, miners ...*TestMiner) {
-	for _, m := range miners {
-		id, err := NodeLibp2pAddr(m.mirHost)
-		require.NoError(n.t, err)
-		val, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", m.mirAddr, id))
-		require.NoError(n.t, err)
-		err = ioutil.WriteFile(membershipFile, []byte(val.String()), 0666)
-		require.NoError(n.t, err)
-	}
-}
-
-func (n *Ensemble) OverwriteMirValidatorsInMembershipFile(membershipFile string, miners ...*TestMiner) {
-	f, err := os.OpenFile(membershipFile,
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	require.NoError(n.t, err)
-	defer func() {
-		err = f.Close()
-		require.NoError(n.t, err)
-	}()
-
-	for _, m := range miners {
-		id, err := NodeLibp2pAddr(m.mirHost)
-		require.NoError(n.t, err)
-		_, err = f.WriteString(fmt.Sprintf("%s@%s\n", m.mirAddr, id))
-		require.NoError(n.t, err)
-	}
 }
 
 func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, wg *sync.WaitGroup, delay int, miners ...*TestMiner) {

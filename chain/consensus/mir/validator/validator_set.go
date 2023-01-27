@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -92,6 +93,12 @@ func (s *Set) GetValidators() []Validator {
 	return s.Validators
 }
 
+func (s *Set) AddValidator(v Validator) {
+	s.ConfigurationNumber++
+	s.Validators = append(s.Validators, v)
+	return
+}
+
 func (s *Set) GetValidatorIDs() (ids []address.Address) {
 	for _, v := range s.Validators {
 		ids = append(ids, v.Addr)
@@ -131,6 +138,25 @@ func (s *Set) Save(path string) error {
 
 	_, err = f.Write(b)
 	return err
+}
+
+// AddValidatorToFile adds a validator `v` to the membership file `path`.
+// If the file does not exist it will be created.
+func AddValidatorToFile(path string, v Validator) error {
+	set, err := NewValidatorSetFromFile(path)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		set = NewValidatorSetFromValidators(0, v)
+		return set.Save(path)
+	case err != nil:
+		return fmt.Errorf("error parsing membership file %s: %w", path, err)
+	default:
+	}
+	set.AddValidator(v)
+	if err := set.Save(path); err != nil {
+		return fmt.Errorf("error stroing membership config: %w", err)
+	}
+	return nil
 }
 
 // NewValidatorsFromEnv initializes a validator set based on the data from the environment variable.
@@ -184,7 +210,7 @@ func NewValidatorSetFromValidators(n uint64, vs ...Validator) *Set {
 func loadValidatorSetFromFile(path string) (*Set, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
+		return nil, err
 	}
 	var v Set
 	err = json.Unmarshal(b, &v)
