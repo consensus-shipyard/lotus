@@ -637,6 +637,7 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	log.With("validator", sm.ValidatorID).Debugf("waitForBlock @%v started", height)
 	defer log.With("validator", sm.ValidatorID).Debugf("waitForBlock @%v finished", height)
+
 	// get base to determine the gap to sync and configure timeout.
 	base, err := sm.api.ChainHead(sm.ctx)
 	if err != nil {
@@ -656,6 +657,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	for {
 		select {
 		case <-sm.ctx.Done():
+			return nil
 		case <-time.After(timeout):
 			return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.ValidatorID}
 		default:

@@ -59,8 +59,8 @@ func TestMirConsensusWithMangler(t *testing.T) {
 }
 
 func TestMirConsensusSmoke(t *testing.T) {
-	TestMirOneNodeMining(t)
-	TestMirAllNodesMining(t)
+	TestMirOneNodeMines(t)
+	TestMirAllNodesMine(t)
 	TestMirStartStop(t)
 	TestGenesisBlocksOfValidatorsAndLearners(t)
 	TestMirFNodesNeverStart(t)
@@ -81,9 +81,9 @@ func TestMirAdvancedConsensus(t *testing.T) {
 }
 
 func TestMirConsensus(t *testing.T) {
-	TestMirOneNodeMining(t)
+	TestMirOneNodeMines(t)
 	TestMirTwoNodesMining(t)
-	TestMirAllNodesMining(t)
+	TestMirAllNodesMine(t)
 	TestGenesisBlocksOfValidatorsAndLearners(t)
 	TestMirWhenLearnersJoin(t)
 	TestMirNodesStartWithRandomDelay(t)
@@ -466,8 +466,8 @@ func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirOneNodeMining tests that a Mir node can mine blocks.
-func TestMirOneNodeMining(t *testing.T) {
+// TestMirOneNodeMines tests that a Mir node can mine blocks.
+func TestMirOneNodeMines(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -525,7 +525,7 @@ func TestMirTwoNodesMining(t *testing.T) {
 }
 
 // TestMirAllNodesMining tests that n nodes can mine blocks normally.
-func TestMirAllNodesMining(t *testing.T) {
+func TestMirAllNodesMine(t *testing.T) {
 	t.Run("TestMirAllNodesMining", func(t *testing.T) {
 		var wg sync.WaitGroup
 
@@ -549,7 +549,7 @@ func TestMirAllNodesMining(t *testing.T) {
 // TestMirAllNodesMiningWithMangling run TestMirAllNodesMining with mangler.
 func TestMirAllNodesMiningWithMangling(t *testing.T) {
 	setupMangler(t)
-	TestMirAllNodesMining(t)
+	TestMirAllNodesMine(t)
 }
 
 // TestMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.

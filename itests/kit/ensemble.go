@@ -1062,8 +1062,8 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 	return bms
 }
 
-func (n *Ensemble) mirMembership(miners ...*TestMiner) string {
-	var membership string
+func (n *Ensemble) fixedMirMembership(miners ...*TestMiner) string {
+	membership := fmt.Sprintf("%d;", 0)
 	for _, m := range miners {
 		id, err := NodeLibp2pAddr(m.mirHost)
 		require.NoError(n.t, err)
@@ -1105,7 +1105,7 @@ func (n *Ensemble) Bootstrapped() {
 }
 
 func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg *sync.WaitGroup, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
-	membershipString := n.mirMembership(append(miners, faultyMiners...)...)
+	membershipString := n.fixedMirMembership(append(miners, faultyMiners...)...)
 
 	for i, m := range append(miners, faultyMiners...) {
 		ctx, cancel := context.WithCancel(ctx)
