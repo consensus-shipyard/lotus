@@ -374,7 +374,6 @@ func (m *Manager) CreateConfigurationRequest(set *validator.Set) *mirproto.Reque
 
 	if err := m.ds.Put(m.ctx, ConfigurationIndexKey(m.reconfigurationNonce), v); err != nil {
 		log.With("validator", m.MirID).Errorf("unable to store configuration request: %v", err)
-		panic(1)
 		return nil
 	}
 

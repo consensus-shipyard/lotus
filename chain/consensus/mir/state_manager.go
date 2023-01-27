@@ -424,7 +424,7 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	log.With("validator", sm.MirManager.ValidatorID).Infof("New epoch: updating %d to %d", sm.currentEpoch, nr)
+	log.With("validator", sm.ValidatorID).Infof("New epoch: updating %d to %d", sm.currentEpoch, nr)
 
 	// Sanity check. Generally, the new epoch is always the current epoch plus 1.
 	// At initialization and right after state transfer, sm.currentEpoch already has been initialized
@@ -458,10 +458,10 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
 	if sm.currentEpoch == 0 {
-		return nil, xerrors.Errorf("trying to make a snapshot in epoch", sm.currentEpoch)
+		return nil, xerrors.Errorf("validator %v tried to make a snapshot in epoch %d", sm.ValidatorID, sm.currentEpoch)
 	}
 
-	nextHeight := abi.ChainEpoch(sm.height) + 1
+	nextHeight := sm.height + 1
 	log.With("validator", sm.ValidatorID).Infof("Snapshot started: epoch - %d, height - %d", sm.currentEpoch, sm.height)
 
 	// populating checkpoint template

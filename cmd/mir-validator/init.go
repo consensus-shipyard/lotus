@@ -63,15 +63,9 @@ var initCmd = &cli.Command{
 				return fmt.Errorf("error exporting membership config: %s", err)
 			}
 		} else {
-<<<<<<< HEAD
 			log.Infof("Creating empty membership cfg at %s. Remember to run ./mir-validator add-validator to add more membership validators", membershipFile)
 			if _, err := os.Create(membershipFile); err != nil {
 				return fmt.Errorf("error creating empty membership config in %s", membershipFile)
-=======
-			log.Infof("Creating empty membership cfg at %s. Remember to run ./eudico mir validator add-validator to add more membership validators", mp)
-			if _, err := os.Create(mp); err != nil {
-				return fmt.Errorf("error creating empty membership config in %s", mp)
->>>>>>> spacenet
 			}
 		}
 
