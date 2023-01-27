@@ -89,7 +89,7 @@ issues:
         - golint
     - linters:
       - staticcheck
-      text: "\"github.com/libp2p/go-libp2p-core/crypto\" is deprecated:"
+      text: "SA1019: \"github.com/libp2p/go-libp2p-core"
 
 linters-settings:
   goconst:
