@@ -565,11 +565,11 @@ workflows:
       - gofmt
       - gen-check
       - test-consensus-unit:
-            name: consensus-unit-tests
-            suite: consensus
-            target: "./chain/consensus/..."
-            requires:
-              - lint-all
+         name: consensus-unit-tests
+         suite: consensus
+         target: "./chain/consensus/..."
+         requires:
+           - lint-all
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
