@@ -153,7 +153,7 @@ var runCmd = &cli.Command{
 			}
 			log.Info("Initializing mir validator from checkpoint provided in file: %s", cctx.String("init-checkpoint"))
 		} else if cctx.Int("init-height") != 0 {
-			initCh, err = mir.GetCheckpointByHeight(ctx, ds, abi.ChainEpoch(cctx.Int("init-height")), nil, nil)
+			initCh, err = mir.GetCheckpointByHeight(ctx, ds, abi.ChainEpoch(cctx.Int("init-height")), nil)
 			if err != nil {
 				return xerrors.Errorf("failed to get initial checkpoint from file: %s", err)
 			}
