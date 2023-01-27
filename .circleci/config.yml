@@ -1,3 +1,7 @@
+# FIXME: We may need to return all original jobs and workflows from the lotus config
+# when Eudico/Spacenet is stable and ready for production.
+# For now this config contains only Spacenet related items.
+
 version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@1.3.2
@@ -83,7 +87,6 @@ commands:
           name: fetch all tags
           command: |
             git fetch --all
-
   packer_build:
     description: "Run a packer build"
     parameters:
@@ -97,7 +100,6 @@ commands:
           Arguments to pass to the packer build command
         type: string
         default: ""
-
     steps:
       - run:
           name: "Run a packer build"
@@ -139,14 +141,6 @@ jobs:
           root: "."
           paths:
             - linux
-
-  build-debug:
-    executor: golang
-    steps:
-      - install-deps
-      - prepare
-      - run:
-          command: make debug
   build-spacenet:
     executor: golang
     steps:
@@ -240,6 +234,9 @@ jobs:
     <<: *basic_test
 
   test-consensus-unit:
+    <<: *basic_test
+
+  test-consensus-with-mangler:
     <<: *basic_test
 
   test-conformance:
@@ -496,41 +493,6 @@ jobs:
       - run: go install github.com/hannahhoward/cbor-gen-for
       - run: make type-gen
 
-    # gen-check:
-    #  executor: golang
-    #  steps:
-    #    - install-deps
-    #    - prepare
-    #    - run: make deps
-    #    - run: go install golang.org/x/tools/cmd/goimports
-    #    - run: go install github.com/hannahhoward/cbor-gen-for
-    #    - run: make gen
-    #    - run: git --no-pager diff
-    #    - run: git --no-pager diff --quiet
-    #    - run: make docsgen-cli
-    #    - run: git --no-pager diff
-    #    - run: git --no-pager diff --quiet
-
-  docs-check:
-    executor: golang
-    steps:
-      - install-deps
-      - prepare
-      - run: go install golang.org/x/tools/cmd/goimports
-      - run: zcat build/openrpc/full.json.gz | jq > ../pre-openrpc-full
-      - run: zcat build/openrpc/miner.json.gz | jq > ../pre-openrpc-miner
-      - run: zcat build/openrpc/worker.json.gz | jq > ../pre-openrpc-worker
-      - run: make deps
-      - run: make docsgen
-      - run: zcat build/openrpc/full.json.gz | jq > ../post-openrpc-full
-      - run: zcat build/openrpc/miner.json.gz | jq > ../post-openrpc-miner
-      - run: zcat build/openrpc/worker.json.gz | jq > ../post-openrpc-worker
-      - run: git --no-pager diff
-      - run: diff ../pre-openrpc-full ../post-openrpc-full
-      - run: diff ../pre-openrpc-miner ../post-openrpc-miner
-      - run: diff ../pre-openrpc-worker ../post-openrpc-worker
-      - run: git --no-pager diff --quiet
-
   lint: &lint
     description: |
       Run golangci-lint.
@@ -584,206 +546,6 @@ jobs:
           name: Publish release
           command: ./scripts/publish-release.sh
 
-  publish-snapcraft:
-    description: build and push snapcraft
-    machine:
-      image: ubuntu-2004:202104-01
-    resource_class: 2xlarge
-    parameters:
-      channel:
-        type: string
-        default: "edge"
-        description: snapcraft channel
-    steps:
-      - checkout
-      - run:
-          name: install snapcraft
-          command: sudo snap install snapcraft --classic
-      - run:
-          name: create snapcraft config file
-          command: |
-            mkdir -p ~/.config/snapcraft
-            echo "$SNAPCRAFT_LOGIN_FILE" | base64 -d > ~/.config/snapcraft/snapcraft.cfg
-      - run:
-          name: build snap
-          command: snapcraft --use-lxd
-      - run:
-          name: publish snap
-          command: snapcraft push *.snap --release << parameters.channel >>
-
-  build-and-push-image:
-    description: build and push docker images to public AWS ECR registry
-    executor: aws-cli/default
-    parameters:
-      profile-name:
-        type: string
-        default: "default"
-        description: AWS profile name to be configured.
-
-      aws-access-key-id:
-        type: env_var_name
-        default: AWS_ACCESS_KEY_ID
-        description: >
-          AWS access key id for IAM role. Set this to the name of
-          the environment variable you will set to hold this
-          value, i.e. AWS_ACCESS_KEY.
-
-      aws-secret-access-key:
-        type: env_var_name
-        default: AWS_SECRET_ACCESS_KEY
-        description: >
-          AWS secret key for IAM role. Set this to the name of
-          the environment variable you will set to hold this
-          value, i.e. AWS_SECRET_ACCESS_KEY.
-
-      region:
-        type: env_var_name
-        default: AWS_REGION
-        description: >
-          Name of env var storing your AWS region information,
-          defaults to AWS_REGION
-
-      account-url:
-        type: env_var_name
-        default: AWS_ECR_ACCOUNT_URL
-        description: >
-          Env var storing Amazon ECR account URL that maps to an AWS account,
-          e.g. {awsAccountNum}.dkr.ecr.us-west-2.amazonaws.com
-          defaults to AWS_ECR_ACCOUNT_URL
-
-      dockerfile:
-        type: string
-        default: Dockerfile
-        description: Name of dockerfile to use. Defaults to Dockerfile.
-
-      path:
-        type: string
-        default: .
-        description: Path to the directory containing your Dockerfile and build context. Defaults to . (working directory).
-
-      extra-build-args:
-        type: string
-        default: ""
-        description: >
-          Extra flags to pass to docker build. For examples, see
-          https://docs.docker.com/engine/reference/commandline/build
-
-      repo:
-        type: string
-        description: Name of an Amazon ECR repository
-
-      tag:
-        type: string
-        default: "latest"
-        description: A comma-separated string containing docker image tags to build and push (default = latest)
-
-      target:
-        type: string
-        default: "lotus-all-in-one"
-        description: Docker target to build
-
-    steps:
-      - run:
-          name: Confirm that environment variables are set
-          command: |
-            if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-              echo "No AWS_ACCESS_KEY_ID is set. Skipping build-and-push job ..."
-              circleci-agent step halt
-            fi
-
-      - aws-cli/setup:
-          profile-name: <<parameters.profile-name>>
-          aws-access-key-id: <<parameters.aws-access-key-id>>
-          aws-secret-access-key: <<parameters.aws-secret-access-key>>
-          aws-region: <<parameters.region>>
-
-      - run:
-          name: Log into Amazon ECR
-          command: |
-            aws ecr-public get-login-password --region $<<parameters.region>> --profile <<parameters.profile-name>> | docker login --username AWS --password-stdin $<<parameters.account-url>>
-
-      - checkout
-
-      - setup_remote_docker:
-          version: 19.03.13
-          docker_layer_caching: false
-
-      - run:
-          name: Build docker image
-          command: |
-            registry_id=$(echo $<<parameters.account-url>> | sed "s;\..*;;g")
-
-            docker_tag_args=""
-            IFS="," read -ra DOCKER_TAGS \<<< "<< parameters.tag >>"
-            for tag in "${DOCKER_TAGS[@]}"; do
-              docker_tag_args="$docker_tag_args -t $<<parameters.account-url>>/<<parameters.repo>>:$tag"
-            done
-
-            docker build \
-              <<#parameters.extra-build-args>><<parameters.extra-build-args>><</parameters.extra-build-args>> \
-              --target <<parameters.target>> \
-              -f <<parameters.path>>/<<parameters.dockerfile>> \
-              $docker_tag_args \
-              <<parameters.path>>
-
-      - run:
-          name: Push image to Amazon ECR
-          command: |
-            IFS="," read -ra DOCKER_TAGS \<<< "<< parameters.tag >>"
-            for tag in "${DOCKER_TAGS[@]}"; do
-              docker push $<<parameters.account-url>>/<<parameters.repo>>:${tag}
-            done
-
-  publish-packer-snap:
-    description: build packer image with snap. mainnet only.
-    executor:
-      name: packer
-    steps:
-      - checkout
-      - attach_workspace:
-          at: "."
-      - packer_build:
-          template: tools/packer/lotus-snap.pkr.hcl
-  publish-dockerhub:
-    description: publish to dockerhub
-    machine:
-      image: ubuntu-2004:202010-01
-    parameters:
-      tag:
-        type: string
-        default: latest
-    steps:
-      - checkout
-      - run:
-          name: dockerhub login
-          command: echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
-      - run:
-          name: docker build
-          command: |
-            docker build --target lotus -t filecoin/lotus:<< parameters.tag >> -f Dockerfile.lotus .
-            docker build --target lotus-all-in-one -t filecoin/lotus-all-in-one:<< parameters.tag >> -f Dockerfile.lotus .
-            if [[ ! -z $CIRCLE_SHA1 ]]; then
-              docker build --target lotus -t filecoin/lotus:$CIRCLE_SHA1 -f Dockerfile.lotus .
-              docker build --target lotus-all-in-one -t filecoin/lotus-all-in-one:$CIRCLE_SHA1 -f Dockerfile.lotus .
-            fi
-            if [[ ! -z $CIRCLE_TAG ]]; then
-              docker build --target lotus -t filecoin/lotus:$CIRCLE_TAG -f Dockerfile.lotus .
-              docker build --target lotus-all-in-one -t filecoin/lotus-all-in-one:$CIRCLE_TAG -f Dockerfile.lotus .
-            fi
-      - run:
-          name: docker push
-          command: |
-            docker push filecoin/lotus:<< parameters.tag >>
-            docker push filecoin/lotus-all-in-one:<< parameters.tag >>
-            if [[ ! -z $CIRCLE_SHA1 ]]; then
-              docker push filecoin/lotus:$CIRCLE_SHA1
-              docker push filecoin/lotus-all-in-one:$CIRCLE_SHA1
-            fi
-            if [[ ! -z $CIRCLE_TAG ]]; then
-              docker push filecoin/lotus:$CIRCLE_TAG
-              docker push filecoin/lotus-all-in-one:$CIRCLE_TAG
-            fi
-
 workflows:
   version: 2.1
   ci:
@@ -806,229 +568,12 @@ workflows:
           target: "./itests/mir_test.go"
           requires:
             - unit-tests
-      # FIXME: Uncomment when Eudico/Spacenet is stable and ready for production.
-      # - docs-check
-
-      # NOTE: From here on these are Lotus-specific test which we may not need.
-      # - test:
-      #     name: test-itest-api
-      #     suite: itest-api
-      #     target: "./itests/api_test.go"
-      #
-      # - test:
-      #     name: test-itest-batch_deal
-      #     suite: itest-batch_deal
-      #     target: "./itests/batch_deal_test.go"
-      #
-      # - test:
-      #     name: test-itest-ccupgrade
-      #     suite: itest-ccupgrade
-      #     target: "./itests/ccupgrade_test.go"
-      #
-      # - test:
-      #     name: test-itest-cli
-      #     suite: itest-cli
-      #     target: "./itests/cli_test.go"
-      #
-      # - test:
-      #     name: test-itest-deadlines
-      #     suite: itest-deadlines
-      #     target: "./itests/deadlines_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_512mb
-      #     suite: itest-deals_512mb
-      #     target: "./itests/deals_512mb_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_concurrent
-      #     suite: itest-deals_concurrent
-      #     target: "./itests/deals_concurrent_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_max_staging_deals
-      #     suite: itest-deals_max_staging_deals
-      #     target: "./itests/deals_max_staging_deals_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_offline
-      #     suite: itest-deals_offline
-      #     target: "./itests/deals_offline_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_padding
-      #     suite: itest-deals_padding
-      #     target: "./itests/deals_padding_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_partial_retrieval_dm-level
-      #     suite: itest-deals_partial_retrieval_dm-level
-      #     target: "./itests/deals_partial_retrieval_dm-level_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_partial_retrieval
-      #     suite: itest-deals_partial_retrieval
-      #     target: "./itests/deals_partial_retrieval_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_power
-      #     suite: itest-deals_power
-      #     target: "./itests/deals_power_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_pricing
-      #     suite: itest-deals_pricing
-      #     target: "./itests/deals_pricing_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_publish
-      #     suite: itest-deals_publish
-      #     target: "./itests/deals_publish_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals_retry_deal_no_funds
-      #     suite: itest-deals_retry_deal_no_funds
-      #     target: "./itests/deals_retry_deal_no_funds_test.go"
-      #
-      # - test:
-      #     name: test-itest-deals
-      #     suite: itest-deals
-      #     target: "./itests/deals_test.go"
-      #
-      # - test:
-      #     name: test-itest-gateway
-      #     suite: itest-gateway
-      #     target: "./itests/gateway_test.go"
-      #
-      # - test:
-      #     name: test-itest-get_messages_in_ts
-      #     suite: itest-get_messages_in_ts
-      #     target: "./itests/get_messages_in_ts_test.go"
-      #
-      # - test:
-      #     name: test-itest-multisig
-      #     suite: itest-multisig
-      #     target: "./itests/multisig_test.go"
-      #
-      # - test:
-      #     name: test-itest-nonce
-      #     suite: itest-nonce
-      #     target: "./itests/nonce_test.go"
-      #
-      # - test:
-      #     name: test-itest-paych_api
-      #     suite: itest-paych_api
-      #     target: "./itests/paych_api_test.go"
-      #
-      # - test:
-      #     name: test-itest-paych_cli
-      #     suite: itest-paych_cli
-      #     target: "./itests/paych_cli_test.go"
-      #
-      # - test:
-      #     name: test-itest-sdr_upgrade
-      #     suite: itest-sdr_upgrade
-      #     target: "./itests/sdr_upgrade_test.go"
-      #
-      # - test:
-      #     name: test-itest-sector_finalize_early
-      #     suite: itest-sector_finalize_early
-      #     target: "./itests/sector_finalize_early_test.go"
-      #
-      # - test:
-      #     name: test-itest-sector_miner_collateral
-      #     suite: itest-sector_miner_collateral
-      #     target: "./itests/sector_miner_collateral_test.go"
-      #
-      # - test:
-      #     name: test-itest-sector_pledge
-      #     suite: itest-sector_pledge
-      #     target: "./itests/sector_pledge_test.go"
-      #
-      # - test:
-      #     name: test-itest-sector_terminate
-      #     suite: itest-sector_terminate
-      #     target: "./itests/sector_terminate_test.go"
-      #
-      # - test:
-      #     name: test-itest-self_sent_txn
-      #     suite: itest-self_sent_txn
-      #     target: "./itests/self_sent_txn_test.go"
-      #
-      # - test:
-      #     name: test-itest-tape
-      #     suite: itest-tape
-      #     target: "./itests/tape_test.go"
-      #
-      # - test:
-      #     name: test-itest-verifreg
-      #     suite: itest-verifreg
-      #     target: "./itests/verifreg_test.go"
-      #
-      # - test:
-      #     name: test-itest-wdpost_dispute
-      #     suite: itest-wdpost_dispute
-      #     target: "./itests/wdpost_dispute_test.go"
-      #
-      # - test:
-      #     name: test-itest-wdpost
-      #     suite: itest-wdpost
-      #     target: "./itests/wdpost_test.go"
-      #
-      # - test:
-      #     name: test-unit-cli
-      #     suite: utest-unit-cli
-      #     target: "./cli/... ./cmd/... ./api/..."
-      # - test:
-      #     name: test-unit-node
-      #     suite: utest-unit-node
-      #     target: "./node/..."
-      # - test:
-      #     name: test-unit-rest
-      #     suite: utest-unit-rest
-      #     target: "./api/... ./blockstore/... ./build/... ./chain/... ./cli/... ./cmd/... ./conformance/... ./extern/... ./gateway/... ./journal/... ./lib/... ./markets/... ./node/... ./paychmgr/... ./storage/... ./tools/..."
-      # - test:
-      #     name: test-unit-storage
-      #     suite: utest-unit-storage
-      #     target: "./storage/... ./extern/..."
-      # - test:
-      #     go-test-flags: "-run=TestMulticoreSDR"
-      #     suite: multicore-sdr-check
-      #     target: "./extern/sector-storage/ffiwrapper"
-      #     proofs-log-test: "1"
-      # - test-conformance:
-      #     suite: conformance
-      #     codecov-upload: false
-      #     target: "./conformance"
-      # - test-conformance:
-      #     name: test-conformance-bleeding-edge
-      #     codecov-upload: false
-      #     suite: conformance-bleeding-edge
-      #     target: "./conformance"
-      #     vectors-branch: specs-actors-v7
-      # - trigger-testplans:
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
-      # - build-debug
       - build-spacenet
       - build-all:
           filters:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - build-ntwk-calibration:
-      #     filters:
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - build-ntwk-butterfly:
-      #     filters:
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - build-lotus-soup
       - build-macos:
           filters:
             tags:
@@ -1042,85 +587,23 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - publish:
-      #     requires:
-      #       - build-all
-      #       - build-macos
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - /.*/
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - build-and-push-image:
-      #     dockerfile: Dockerfile.lotus
-      #     path: .
-      #     repo: lotus-dev
-      #     tag: '${CIRCLE_SHA1:0:8}'
-      # - publish-packer-mainnet:
-      #     requires:
-      #       - build-all
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - /.*/
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - publish-packer-calibrationnet:
-      #     requires:
-      #       - build-ntwk-calibration
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - /.*/
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - publish-packer-butterflynet:
-      #     requires:
-      #       - build-ntwk-butterfly
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - /.*/
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - publish-snapcraft:
-      #     name: publish-snapcraft-stable
-      #     channel: stable
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - /.*/
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-      # - publish-dockerhub:
-      #     name: publish-dockerhub
-      #     tag: stable
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - /.*/
-      #       tags:
-      #         only:
-      #           - /^v\d+\.\d+\.\d+(-rc\d+)?$/
 
-  # nightly:
-  #   triggers:
-  #     - schedule:
-  #         cron: "0 0 * * *"
-  #         filters:
-  #           branches:
-  #             only:
-  #               - master
-  #   jobs:
-  #     - publish-snapcraft:
-  #         name: publish-snapcraft-nightly
-  #         channel: edge
-  #     - publish-dockerhub:
-  #         name: publish-dockerhub-nightly
-  #         tag: nightly
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 6 * * *"
+          filters:
+            branches:
+              only:
+                - spacenet
+    jobs:
+      - test-consensus-with-mangler:
+          name: mangler-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 120m -run TestMirConsensusWithMangler"
+          target: "./itests/mir_test.go"
+      - test-consensus:
+          name: mir-consensus-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirConsensus"
+          target: "./itests/mir_test.go"
