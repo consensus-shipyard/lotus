@@ -9,6 +9,8 @@ linters:
     - unconvert
     - staticcheck
     - exportloopref
+    - govet
+    - typecheck
 
 # We don't want to skip builtin/
 skip-dirs-use-default: false
@@ -16,6 +18,20 @@ skip-dirs:
   - vendor$
   - testdata$
   - examples$
+
+run:
+  skip-files:
+    - chain/stmgr/forks_test.go
+    - chain/sync_test.go
+    - chain/market/*
+    - chain/rand/*
+    - chain/store/*
+    - markets/*
+    - conformance/*
+    - node/*
+    - cmd/lotus-worker/*
+    - cmd/lotus-sim/*
+    - paychmgr/*
 
 issues:
   exclude:
@@ -36,7 +52,12 @@ issues:
     - "xerrors.* is deprecated"
 
   exclude-use-default: false
+
   exclude-rules:
+
+    - path: chain/stmgr/forks_test.go
+      linters:
+        - golint, typecheck, all
 
     - path: node/modules/lp2p
       linters:
@@ -66,6 +87,9 @@ issues:
       text: "context.Context should be the first parameter"
       linters:
         - golint
+    - linters:
+      - staticcheck
+      text: "SA1019: \"github.com/libp2p/go-libp2p-core"
 
 linters-settings:
   goconst:

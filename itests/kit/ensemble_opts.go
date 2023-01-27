@@ -31,7 +31,7 @@ type ensembleOpts struct {
 
 var DefaultEnsembleOpts = ensembleOpts{
 	pastOffset: 10000000 * time.Second, // time sufficiently in the past to trigger catch-up mining.
-	upgradeSchedule: stmgr.UpgradeSchedule{{
+	upgradeSchedule: stmgr.UpgradeSchedule{stmgr.Upgrade{
 		Height:  -1,
 		Network: build.TestNetworkVersion,
 	}},

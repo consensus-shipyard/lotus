@@ -567,6 +567,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	case <-out:
 		return nil
 	case <-ctx.Done():
+		log.Errorf("waiting for block: ErrMirCtxCanceledWhileWaitingSnapshot on height %d with timeout %v", height, timeout)
 		return ErrMirCtxCanceledWhileWaitingSnapshot
 	}
 }
