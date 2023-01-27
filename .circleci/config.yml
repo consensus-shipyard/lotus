@@ -236,6 +236,9 @@ jobs:
   test-consensus-unit:
     <<: *basic_test
 
+  test-consensus:
+    <<: *basic_test
+
   test-consensus-with-mangler:
     <<: *basic_test
 
