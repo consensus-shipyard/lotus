@@ -78,7 +78,7 @@ func lp2pID(dir string) (crypto.PrivKey, error) {
 	// if it doesn't exist create a new key
 	exists, err := fileExists(path)
 	if err != nil {
-		return nil, fmt.Errorf("error accessing libp2p file: %w", err)
+		return nil, fmt.Errorf("error accessing file: %w", err)
 	}
 	if !exists {
 		pk, err := genLibp2pKey()
@@ -126,6 +126,9 @@ func newLp2pHost(dir string) (host.Host, error) {
 	path := filepath.Join(dir, MaddrPath)
 	// if it doesn't exist create a new key
 	exists, err := fileExists(path)
+	if err != nil {
+		return nil, fmt.Errorf("error accessing file: %w", err)
+	}
 	if !exists {
 		// use any free endpoints in the host.
 		h, err := libp2p.New(
