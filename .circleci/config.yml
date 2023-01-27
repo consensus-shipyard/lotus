@@ -565,11 +565,11 @@ workflows:
       - gofmt
       - gen-check
       - test-consensus-unit:
-         name: consensus-unit-tests
-         suite: consensus
-         target: "./chain/consensus/..."
-         requires:
-           - lint-all
+          name: consensus-unit-tests
+          suite: consensus
+          target: "./chain/consensus/..."
+          requires:
+            - lint-all
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
@@ -585,12 +585,12 @@ workflows:
           requires:
             - mir-smoke-tests
       - test-mir-reconfiguration:
-        name: mir-reconfiguration-tests
-        suite: consensus
-        go-test-flags: "-tags=spacenet -timeout 60m -run TestMirConsensusWithReconfiguration"
-        target: "./itests/mir_test.go"
-        requires:
-          - mir-smoke-tests
+          name: mir-reconfiguration-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirConsensusWithReconfiguration"
+          target: "./itests/mir_test.go"
+          requires:
+            - mir-smoke-tests
       - build-spacenet
       - build-all:
           filters:
