@@ -236,7 +236,10 @@ jobs:
                 command: |
                   bash <(curl -s https://codecov.io/bash)
 
-  test-consensus:
+  test-consensus-smoke:
+    <<: *basic_test
+
+  test-consensus-unit:
     <<: *basic_test
 
   test-conformance:
