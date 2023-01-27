@@ -336,6 +336,12 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 }
 
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
+	// If we get the configuration message we sent then we remove it from the configuration request storage.
+	if msg.ClientId == sm.MirManager.MirID {
+		sm.MirManager.StoreExecutedConfigurationNumber(msg.ReqNo)
+		sm.MirManager.RemoveAppliedConfigurationRequest(msg.ReqNo)
+	}
+
 	var valSet validator.Set
 	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
 		return err

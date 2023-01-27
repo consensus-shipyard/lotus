@@ -2,7 +2,6 @@ package mirvalidator
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	_ "net/http/pprof"
 	"os"
@@ -142,13 +141,4 @@ func checkpointFromFile(ctx context.Context, ds datastore.Datastore, path string
 		return nil, xerrors.Errorf("error flushing checkpoint for height %d in datastore: %w", snapshot.Height, err)
 	}
 	return ch, nil
-}
-
-func configurationNonceFromDB(ctx context.Context, ds datastore.Datastore) (uint64, error) {
-	b, err := ds.Get(ctx, mir.LastConfigurationNonce)
-	if err != nil {
-		return 0, err
-	}
-	n := binary.LittleEndian.Uint64(b)
-	return n, nil
 }

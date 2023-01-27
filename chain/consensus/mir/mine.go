@@ -14,7 +14,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/mir"
-	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 )
 
 const (
@@ -63,9 +62,12 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
 
-	lastValidatorSet := m.InitialValidatorSet
+	configRequests, err := m.RecoverConfigurationData()
+	if err != nil {
+		return fmt.Errorf("validator %v failed to recover confgiguration requests: %w", addr, err)
+	}
 
-	var configRequest *mirproto.Request
+	lastValidatorSet := m.InitialValidatorSet
 
 	for {
 		// Here we use `ctx.Err()` in the beginning of the `for` loop instead of using it in the `select` statement,
@@ -108,7 +110,11 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 					newSet.ConfigurationNumber, newSet.Size(), newSet.GetValidatorIDs())
 
 			lastValidatorSet = newSet
-			configRequest = m.CreateReconfigurationRequest(newSet)
+			r := m.CreateConfigurationRequest(newSet)
+			if r != nil {
+				configRequests = append(configRequests, r)
+
+			}
 
 		case toMir := <-m.ToMir:
 			base, err := m.StateManager.api.ChainHead(ctx)
@@ -124,9 +130,8 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 
 			requests := m.CreateTransportRequests(msgs)
 
-			if configRequest != nil {
-				requests = append(requests, configRequest)
-				configRequest = nil
+			if len(configRequests) > 0 {
+				requests = append(requests, configRequests...)
 			}
 
 			// We send requests via the channel instead of calling m.SubmitRequests(ctx, requests) explicitly.

@@ -1162,6 +1162,36 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 	}
 }
 
+func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
+	ctx context.Context,
+	configFileName string,
+	wg *sync.WaitGroup,
+	db []*TestDB,
+	miners []*TestMiner,
+) {
+	for i, m := range miners {
+		ctx, cancel := context.WithCancel(ctx)
+		m.stopMir = cancel
+
+		wg.Add(1)
+
+		go func(ctx context.Context, i int, m *TestMiner) {
+			defer wg.Done()
+			m.mirDB = db[i]
+			cfg := mir.Config{
+				SegmentLength: 1,
+			}
+			membership := validator.FileMembership{FileName: configFileName}
+
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return
+			}
+			require.NoError(n.t, err)
+		}(ctx, i, m)
+	}
+}
+
 func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, checkpoint int, miners []*TestMiner, faultyMiners ...*TestMiner) {
 	for i, m := range append(miners, faultyMiners...) {
 		ctx, cancel := context.WithCancel(ctx)

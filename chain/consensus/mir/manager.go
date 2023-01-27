@@ -8,8 +8,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
 
@@ -38,19 +40,27 @@ import (
 )
 
 const (
-	CheckpointDBKeyPrefix = "mir/checkpoints/"
-	InterceptorOutputEnv  = "MIR_INTERCEPTOR_OUTPUT"
-	ManglerEnv            = "MIR_MANGLER"
+	CheckpointDBKeyPrefix         = "mir/checkpoints/"
+	InterceptorOutputEnv          = "MIR_INTERCEPTOR_OUTPUT"
+	ManglerEnv                    = "MIR_MANGLER"
+	ConfigurationRequestsDBPrefix = "mir/configuration/"
 )
 
 var (
-	LatestCheckpointKey    = datastore.NewKey("mir/latest-check")
-	LatestCheckpointPbKey  = datastore.NewKey("mir/latest-check-pb")
-	LastConfigurationNonce = datastore.NewKey("mir/configuration-nonce")
+	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
+	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
+
+	// SentConfigurationNumberKey is used to store SentConfigurationNumber
+	// that is the maximum configuration request number that have been sent.
+	SentConfigurationNumberKey = datastore.NewKey("mir/max-config-number")
+	// ExecutedConfigurationNumberKey is used to store ExecutedConfigurationNumber
+	// that is the maximum configuration request number that have been executed.
+	ExecutedConfigurationNumberKey = datastore.NewKey("mir/min-config-number")
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
+	ctx context.Context
 	// Lotus types.
 	NetName     dtypes.NetworkName
 	ValidatorID address.Address
@@ -137,20 +147,20 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	}
 
 	m := Manager{
-		stopCh:               make(chan struct{}),
-		ValidatorID:          validatorID,
-		NetName:              netName,
-		Pool:                 fifo.New(),
-		MirID:                mirID,
-		interceptor:          interceptor,
-		CryptoManager:        cryptoManager,
-		Net:                  netTransport,
-		ds:                   ds,
-		InitialValidatorSet:  initialValidatorSet,
-		ToMir:                make(chan chan []*mirproto.Request),
-		checkpointRepo:       cfg.CheckpointRepo,
-		segmentLength:        cfg.SegmentLength,
-		reconfigurationNonce: cfg.ConfigurationNonce,
+		ctx:                 ctx,
+		stopCh:              make(chan struct{}),
+		ValidatorID:         validatorID,
+		NetName:             netName,
+		Pool:                fifo.New(),
+		MirID:               mirID,
+		interceptor:         interceptor,
+		CryptoManager:       cryptoManager,
+		Net:                 netTransport,
+		ds:                  ds,
+		InitialValidatorSet: initialValidatorSet,
+		ToMir:               make(chan chan []*mirproto.Request),
+		checkpointRepo:      cfg.CheckpointRepo,
+		segmentLength:       cfg.SegmentLength,
 	}
 
 	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
@@ -306,37 +316,10 @@ func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMess
 	return
 }
 
-func (m *Manager) IncreaseAndPersistConfigurationNonce() {
-	m.reconfigurationNonce++
-
-	rb := make([]byte, 8)
-	binary.LittleEndian.PutUint64(rb, m.reconfigurationNonce)
-	if err := m.ds.Put(context.Background(), LastConfigurationNonce, rb); err != nil {
-		log.With("validator", m.MirID).Warnf("failed to persist configuration number: %v", err)
-	}
-}
-
 func (m *Manager) CreateTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
 	var requests []*mirproto.Request
 	requests = append(requests, m.batchSignedMessages(msgs)...)
 	return requests
-}
-
-func (m *Manager) CreateReconfigurationRequest(set *validator.Set) *mirproto.Request {
-	var b bytes.Buffer
-	if err := set.MarshalCBOR(&b); err != nil {
-		log.With("validator", m.MirID).Errorf("unable to marshall validator set: %v", err)
-		return nil
-	}
-
-	r := mirproto.Request{
-		ClientId: m.MirID,
-		ReqNo:    m.reconfigurationNonce,
-		Type:     ConfigurationRequest,
-		Data:     b.Bytes(),
-	}
-
-	return &r
 }
 
 // batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
@@ -367,4 +350,115 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*
 		requests = append(requests, r)
 	}
 	return requests
+}
+
+func (m *Manager) CreateConfigurationRequest(set *validator.Set) *mirproto.Request {
+	var b bytes.Buffer
+	if err := set.MarshalCBOR(&b); err != nil {
+		log.With("validator", m.MirID).Errorf("unable to marshall validator set: %v", err)
+		return nil
+	}
+
+	r := mirproto.Request{
+		ClientId: m.MirID,
+		ReqNo:    m.reconfigurationNonce,
+		Type:     ConfigurationRequest,
+		Data:     b.Bytes(),
+	}
+
+	v, err := proto.Marshal(&r)
+	if err != nil {
+		log.With("validator", m.MirID).Errorf("unable to marshall configuration request: %v", err)
+		return nil
+	}
+
+	if err := m.ds.Put(m.ctx, ConfigurationIndexKey(m.reconfigurationNonce), v); err != nil {
+		log.With("validator", m.MirID).Errorf("unable to store configuration request: %v", err)
+		panic(1)
+		return nil
+	}
+
+	m.reconfigurationNonce++
+	m.StoreSentConfigurationNumber(m.reconfigurationNonce)
+
+	return &r
+}
+
+func (m *Manager) RecoverConfigurationData() ([]*mirproto.Request, error) {
+	maxNonce := m.RecoverSentConfigurationNumber()
+	minNonce := m.RecoverExecutedConfigurationNumber()
+
+	m.reconfigurationNonce = maxNonce
+
+	// Check do we need recovering configuration data or not.
+	if maxNonce == minNonce && maxNonce == 0 {
+		return nil, nil
+	}
+
+	if minNonce > maxNonce {
+		return nil, fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", m.ValidatorID, minNonce, maxNonce)
+	}
+
+	var configRequests []*mirproto.Request
+
+	for i := minNonce; i < maxNonce; i++ {
+		b, err := m.ds.Get(m.ctx, ConfigurationIndexKey(i))
+		if err != nil {
+			return nil, err
+		}
+
+		r := mirproto.Request{}
+		err = proto.Unmarshal(b, &r)
+		if err != nil {
+			log.With("validator", m.MirID).Errorf("unable to marshall configuration request: %v", err)
+			return nil, err
+		}
+
+		configRequests = append(configRequests, &r)
+	}
+
+	return configRequests, nil
+}
+
+func (m *Manager) StoreSentConfigurationNumber(nonce uint64) {
+	m.storeNumber(SentConfigurationNumberKey, nonce)
+}
+
+func (m *Manager) StoreExecutedConfigurationNumber(nonce uint64) {
+	m.storeNumber(ExecutedConfigurationNumberKey, nonce)
+}
+
+func (m *Manager) RecoverSentConfigurationNumber() uint64 {
+	return m.getNumber(SentConfigurationNumberKey)
+}
+
+func (m *Manager) RecoverExecutedConfigurationNumber() uint64 {
+	return m.getNumber(ExecutedConfigurationNumberKey)
+}
+
+func (m *Manager) storeNumber(key datastore.Key, n uint64) {
+	rb := make([]byte, 8)
+	binary.LittleEndian.PutUint64(rb, n)
+	if err := m.ds.Put(m.ctx, key, rb); err != nil {
+		log.With("validator", m.MirID).Warnf("failed to put configuration number: %v", err)
+	}
+}
+
+func (m *Manager) getNumber(key datastore.Key) uint64 {
+	b, err := m.ds.Get(m.ctx, key)
+	if err != nil {
+		log.With("validator", m.MirID).Warnf("failed to get configuration number: %v", err)
+		return 0
+	}
+	return binary.LittleEndian.Uint64(b)
+}
+
+func (m *Manager) RemoveAppliedConfigurationRequest(nonce uint64) {
+	if err := m.ds.Delete(m.ctx, ConfigurationIndexKey(nonce)); err != nil {
+		log.With("validator", m.MirID).Warnf("failed to remove applied configuration request %d: %v", nonce, err)
+	}
+}
+
+func ConfigurationIndexKey(nonce uint64) datastore.Key {
+	return datastore.NewKey(ConfigurationRequestsDBPrefix + strconv.FormatUint(nonce, 10))
 }

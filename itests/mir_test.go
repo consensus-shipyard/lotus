@@ -9,6 +9,7 @@ package itests
 
 import (
 	"context"
+	"encoding/binary"
 	"math/rand"
 	"os"
 	"sync"
@@ -108,6 +109,106 @@ func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+
+	// Core validators must send 2 messages.
+	for _, m := range miners[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
+
+		nonce, err = db.Get(ctx, mir.ExecutedConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
+	}
+
+	// Added validators must send 1 message.
+	for _, m := range miners[MirTotalValidatorNumber:] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
+	}
+}
+
+// TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
+// if a new validator join the network and after recovery.
+func TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery(t *testing.T) {
+	var wg sync.WaitGroup
+
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		os.Remove(membershipFileName) // nolint
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
+	ens.SaveMirValidatorsToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+
+	bn := make([]byte, 8)
+	recoveredNonce := uint64(4)
+	binary.LittleEndian.PutUint64(bn, recoveredNonce)
+
+	var dbs []*kit.TestDB
+	for i := range miners[:MirTotalValidatorNumber] {
+		_ = i
+		db := kit.NewTestDB()
+		err := db.Put(ctx, mir.SentConfigurationNumberKey, bn)
+		require.NoError(t, err)
+		err = db.Put(ctx, mir.ExecutedConfigurationNumberKey, bn)
+		require.NoError(t, err)
+
+		dbs = append(dbs, db)
+	}
+	for i := range miners[MirTotalValidatorNumber:] {
+		_ = i
+		dbs = append(dbs, kit.NewTestDB())
+	}
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[:MirTotalValidatorNumber], miners[:MirTotalValidatorNumber])
+
+	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> new validators have been added to the membership")
+	ens.SaveMirValidatorsToFile(1, membershipFileName, miners...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
+	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
+	// Start new miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[MirTotalValidatorNumber:], miners[MirTotalValidatorNumber:])
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+
+	// Core validators must send 1 message with recovered "nonce" .
+	for _, m := range miners[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1)+recoveredNonce, binary.LittleEndian.Uint64(nonce))
+
+		nonce, err = db.Get(ctx, mir.ExecutedConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, recoveredNonce, binary.LittleEndian.Uint64(nonce))
+	}
 }
 
 // TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay tests that the reconfiguration mechanism operates normally

@@ -166,14 +166,6 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		var configurationNumber uint64
-		if cctx.Bool("restore-configuration-number") {
-			configurationNumber, err = configurationNonceFromDB(ctx, ds)
-			if err != nil {
-				log.Errorf("failed to get configuration number: %s", err)
-			}
-		}
-
 		membership := validator.NewFileMembership(membershipFile)
 
 		log.Infow("Starting mining with validator", "validator", validatorID)
@@ -181,8 +173,7 @@ var runCmd = &cli.Command{
 			dbPath,
 			initCh,
 			cctx.String("checkpoints-repo"),
-			segmentLength,
-			configurationNumber)
+			segmentLength)
 		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
 	},
 }

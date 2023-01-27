@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -23,9 +24,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/miner"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
@@ -99,6 +100,14 @@ type TestMiner struct {
 	stopMir       context.CancelFunc
 	mirDB         *TestDB
 	mirMembership string
+}
+
+func (tm *TestMiner) GetRawDB() map[datastore.Key][]byte {
+	return tm.mirDB.db
+}
+
+func (tm *TestMiner) GetDB() db.DB {
+	return tm.mirDB
 }
 
 func (tm *TestMiner) PledgeSectors(ctx context.Context, n, existing int, blockNotif <-chan struct{}) {

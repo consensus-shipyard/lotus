@@ -41,8 +41,6 @@ type Config struct {
 	CheckpointRepo string
 	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
 	SegmentLength int
-
-	ConfigurationNonce uint64
 }
 
 func NewConfig(
@@ -50,14 +48,12 @@ func NewConfig(
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 	segmentLength int,
-	configurationNonce uint64,
 ) *Config {
 	return &Config{
-		DatastorePath:      dbPath,
-		InitialCheckpoint:  initCheck,
-		CheckpointRepo:     checkpointRepo,
-		SegmentLength:      segmentLength,
-		ConfigurationNonce: configurationNonce,
+		DatastorePath:     dbPath,
+		InitialCheckpoint: initCheck,
+		CheckpointRepo:    checkpointRepo,
+		SegmentLength:     segmentLength,
 	}
 }
 
