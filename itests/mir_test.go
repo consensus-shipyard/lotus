@@ -64,6 +64,20 @@ func TestMirConsensusSmoke(t *testing.T) {
 	TestMirFNodesNeverStart(t)
 }
 
+func TestMirAdvancedConsensus(t *testing.T) {
+	TestMirWhenLearnersJoin(t)
+	TestMirNodesStartWithRandomDelay(t)
+	TestMirFNodesNeverStart(t)
+	TestMirFNodesStartWithRandomDelay(t)
+	TestMirAllNodesMiningWithMessaging(t)
+	TestMirWithFOmissionNodes(t)
+	TestMirWithFCrashedNodes(t)
+	TestMirWithFCrashedAndRecoveredNodes(t)
+	TestMirFNodesCrashLongTimeApart(t)
+	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
+	TestMirFNodesSleepAndThenOperate(t)
+}
+
 func TestMirConsensus(t *testing.T) {
 	TestMirOneNodeMining(t)
 	TestMirTwoNodesMining(t)

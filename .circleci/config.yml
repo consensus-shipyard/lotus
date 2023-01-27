@@ -239,6 +239,9 @@ jobs:
   test-consensus:
     <<: *basic_test
 
+  test-consensus-advanced:
+    <<: *basic_test
+
   test-consensus-with-mangler:
     <<: *basic_test
 
@@ -559,18 +562,25 @@ workflows:
       - gofmt
       - gen-check
       - test-consensus-unit:
-            name: unit-tests
+            name: consensus-unit-tests
             suite: consensus
             target: "./chain/consensus/..."
             requires:
               - lint-all
       - test-consensus-smoke:
-          name: smoke-tests
+          name: consensus-smoke-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 10m -run TestMirConsensusSmoke"
           target: "./itests/mir_test.go"
           requires:
-            - unit-tests
+            - consensus-unit-tests
+      - test-consensus-advanced:
+          name: consensus-advanced-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirConsensusAdvanced"
+          target: "./itests/mir_test.go"
+          requires:
+            - consensus-smoke-tests
       - build-spacenet
       - build-all:
           filters:
