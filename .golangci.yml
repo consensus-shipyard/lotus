@@ -50,6 +50,7 @@ issues:
     - "Potential hardcoded credentials"
     - "Use of weak random number generator"
     - "xerrors.* is deprecated"
+    - "\"github.com/libp2p/go-libp2p-core/host\" is deprecated"
 
   exclude-use-default: false
 
