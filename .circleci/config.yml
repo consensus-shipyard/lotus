@@ -164,7 +164,7 @@ jobs:
         default: golang
       go-test-flags:
         type: string
-        default: "-tags=spacenet -timeout 21m"
+        default: "-tags=spacenet -timeout 20m"
         description: Flags passed to go test.
       target:
         type: string
