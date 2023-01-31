@@ -1072,7 +1072,7 @@ func (n *Ensemble) fixedMirMembership(miners ...*TestMiner) string {
 	return membership
 }
 
-func (n *Ensemble) SaveMirValidatorsToFile(configNumber uint64, membershipFile string, miners ...*TestMiner) {
+func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile string, miners ...*TestMiner) {
 	var vs []validator.Validator
 
 	for _, m := range miners {
@@ -1163,7 +1163,7 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
 	}
 }
 
-func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, checkpoint int, miners []*TestMiner, faultyMiners ...*TestMiner) {
+func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, miners []*TestMiner, faultyMiners ...*TestMiner) {
 	for i, m := range append(miners, faultyMiners...) {
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel

@@ -26,6 +26,34 @@ type Set struct {
 	Validators          []Validator `json:"validators"`
 }
 
+// NewValidatorSetFromFile reads a validator set based from the file.
+func NewValidatorSetFromFile(path string) (*Set, error) {
+	return loadValidatorSetFromFile(path)
+}
+
+// NewValidatorSetFromString reads a validator set from the string.
+func NewValidatorSetFromString(s string) (*Set, error) {
+	return parseValidatorString(s)
+}
+
+// NewValidatorSetFromValidators creates a validator set from the validators.
+func NewValidatorSetFromValidators(n uint64, vs ...Validator) *Set {
+	return &Set{
+		ConfigurationNumber: n,
+		Validators:          vs[:],
+	}
+}
+
+// NewValidatorSetFromEnv initializes a validator set based on the data from the environment variable.
+func NewValidatorSetFromEnv(env string) (*Set, error) {
+	e := os.Getenv(env)
+	if e == "" {
+		return nil, fmt.Errorf("empty validator string")
+	}
+
+	return parseValidatorString(e)
+}
+
 func NewValidatorSet(n uint64, vals []Validator) *Set {
 	return &Set{
 		ConfigurationNumber: n,
@@ -159,16 +187,6 @@ func AddValidatorToFile(path string, v Validator) error {
 	return nil
 }
 
-// NewValidatorsFromEnv initializes a validator set based on the data from the environment variable.
-func NewValidatorsFromEnv(env string) (*Set, error) {
-	e := os.Getenv(env)
-	if e == "" {
-		return nil, fmt.Errorf("empty validator string")
-	}
-
-	return parseValidatorString(e)
-}
-
 func parseValidatorString(s string) (*Set, error) {
 	var validators []Validator
 	r := strings.Split(s, ";")
@@ -194,19 +212,6 @@ func parseValidatorString(s string) (*Set, error) {
 	return NewValidatorSet(n, validators), nil
 }
 
-// NewValidatorSetFromString reads a validator set from the string.
-func NewValidatorSetFromString(s string) (*Set, error) {
-	return parseValidatorString(s)
-}
-
-// NewValidatorSetFromValidators creates a validator set from the validators.
-func NewValidatorSetFromValidators(n uint64, vs ...Validator) *Set {
-	return &Set{
-		ConfigurationNumber: n,
-		Validators:          vs[:],
-	}
-}
-
 func loadValidatorSetFromFile(path string) (*Set, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -219,11 +224,6 @@ func loadValidatorSetFromFile(path string) (*Set, error) {
 	}
 
 	return &v, nil
-}
-
-// NewValidatorSetFromFile reads a validator set based from the file.
-func NewValidatorSetFromFile(path string) (*Set, error) {
-	return loadValidatorSetFromFile(path)
 }
 
 func SortByteSlices(src [][]byte) {

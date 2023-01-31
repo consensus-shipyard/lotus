@@ -100,22 +100,25 @@ func TestMirConsensus(t *testing.T) {
 }
 
 func TestMirConsensusWithReconfiguration(t *testing.T) {
-	TestMirWithReconfiguration_AddAndRemoveOneNode(t)
-	TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery(t)
-	TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay(t)
-	TestMirWithReconfiguration_AddThreeNodes(t)
-	TestMirWithReconfiguration_AddThreeNodesOneByOne(t)
+	TestMirWithReconfiguration_AddAndRemoveOneValidator(t)
+	TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t)
 	TestMirWithReconfiguration_NewNodeFailsToJoin(t)
+	TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t)
+	TestMirWithReconfiguration_AddOneValidatorAtHeight(t)
+
+	TestMirWithReconfiguration_AddThreeValidators(t)
+	TestMirWithReconfiguration_AddThreeValidatorsOneByOne(t)
 }
 
-// TestMirWithReconfiguration_AddAndRemoveOneNode tests that the reconfiguration mechanism operates normally
+// TestMirWithReconfiguration_AddAndRemoveOneValidator tests that the reconfiguration mechanism operates normally
 // if a new validator joins the network and then leaves it.
-func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
+func TestMirWithReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
-		os.Remove(membershipFileName) // nolint
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,14 +130,14 @@ func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
-	ens.SaveMirValidatorsToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
 
 	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:MirTotalValidatorNumber])
 
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -142,13 +145,13 @@ func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log(">>> new validators have been added to the membership")
-	ens.SaveMirValidatorsToFile(1, membershipFileName, miners...)
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
 	// Start new miners.
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[MirTotalValidatorNumber:])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[MirTotalValidatorNumber:])
 
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -156,7 +159,7 @@ func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log(">>> remove the last added validator from membership")
-	ens.SaveMirValidatorsToFile(2, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.SaveValidatorSetToFile(2, membershipFileName, miners[:MirTotalValidatorNumber]...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
@@ -188,14 +191,15 @@ func TestMirWithReconfiguration_AddAndRemoveOneNode(t *testing.T) {
 	}
 }
 
-// TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
-// if a new validator join the network and after recovery.
-func TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery(t *testing.T) {
+// TestMirWithReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
+// if a new validator joins the network that have produced many blocks.
+func TestMirWithReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
-		os.Remove(membershipFileName) // nolint
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -207,7 +211,56 @@ func TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery(t *testing.T
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
-	ens.SaveMirValidatorsToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:MirTotalValidatorNumber])
+
+	err = kit.AdvanceChain(ctx, 40*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> new validators have been added to the membership")
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
+	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
+	// Start new miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[MirTotalValidatorNumber:])
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+}
+
+// TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
+// if a new validator join the network and after recovery.
+func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.T) {
+	var wg sync.WaitGroup
+
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
 
 	bn := make([]byte, 8)
 	recoveredNonce := uint64(4)
@@ -242,7 +295,7 @@ func TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery(t *testing.T
 	require.NoError(t, err)
 
 	t.Log(">>> new validators have been added to the membership")
-	ens.SaveMirValidatorsToFile(1, membershipFileName, miners...)
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
@@ -268,9 +321,9 @@ func TestMirWithReconfiguration_AddOneNodeWithConfigurationRecovery(t *testing.T
 	}
 }
 
-// TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay tests that the reconfiguration mechanism operates normally
-// if a new validator is added to the membership file of validators with delays.
-func TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay(t *testing.T) {
+// TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay tests that the reconfiguration mechanism operates normally
+// if a new validator is added to the membership files with delays.
+func TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFiles := make([]string, MirTotalValidatorNumber+1)
@@ -280,7 +333,8 @@ func TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay(t *testing.
 
 	t.Cleanup(func() {
 		for i := 0; i < MirTotalValidatorNumber+1; i++ {
-			os.Remove(membershipFiles[i]) // nolint
+			err := os.Remove(membershipFiles[i])
+			require.NoError(t, err)
 		}
 	})
 
@@ -296,17 +350,17 @@ func TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay(t *testing.
 
 	// Append initial validators.
 	for i := 0; i < MirTotalValidatorNumber; i++ {
-		ens.SaveMirValidatorsToFile(0, membershipFiles[i], miners[:MirTotalValidatorNumber]...)
+		ens.SaveValidatorSetToFile(0, membershipFiles[i], miners[:MirTotalValidatorNumber]...)
 	}
 	// Add all validators to the membership file of the new validator.
-	ens.SaveMirValidatorsToFile(0, membershipFiles[MirTotalValidatorNumber], miners[:MirTotalValidatorNumber+1]...)
+	ens.SaveValidatorSetToFile(0, membershipFiles[MirTotalValidatorNumber], miners[:MirTotalValidatorNumber+1]...)
 
 	// Run validators, including the added validator.
 	ens.InterconnectFullNodes()
 	for i := 0; i < MirTotalValidatorNumber; i++ {
-		ens.BeginMirMiningWithMembershipFromFile(ctx, membershipFiles[i], &wg, 0, []*kit.TestMiner{miners[i]})
+		ens.BeginMirMiningWithMembershipFromFile(ctx, membershipFiles[i], &wg, []*kit.TestMiner{miners[i]})
 	}
-	ens.BeginMirMiningWithMembershipFromFile(ctx, membershipFiles[MirTotalValidatorNumber], &wg, 0, miners[MirTotalValidatorNumber:])
+	ens.BeginMirMiningWithMembershipFromFile(ctx, membershipFiles[MirTotalValidatorNumber], &wg, miners[MirTotalValidatorNumber:])
 
 	err := kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -317,7 +371,7 @@ func TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay(t *testing.
 	t.Log(">>> new validator is being added to the membership files")
 	for i := 0; i < MirTotalValidatorNumber; i++ {
 		kit.RandomDelay(i + 10)
-		ens.SaveMirValidatorsToFile(1, membershipFiles[i], miners...)
+		ens.SaveValidatorSetToFile(1, membershipFiles[i], miners...)
 
 		membership, err := validator.NewValidatorSetFromFile(membershipFiles[i])
 		require.NoError(t, err)
@@ -330,16 +384,17 @@ func TestMirWithReconfiguration_AddOneNodeToMembershipFilesWithDelay(t *testing.
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddThreeNodes tests that the reconfiguration mechanism operates normally
+// TestMirWithReconfiguration_AddThreeValidators tests that the reconfiguration mechanism operates normally
 // if 3 new validators join the network at the same time. To add 3 validators we have to have a network with 7 validators.
-func TestMirWithReconfiguration_AddThreeNodes(t *testing.T) {
-	mirTotalValidatorNumber := 7
-	mirAddedValidatorNumber := 3
+func TestMirWithReconfiguration_AddThreeValidators(t *testing.T) {
+	totalValidatorNumber := 7
+	addedValidatorNumber := 3
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
-		os.Remove(membershipFileName) // nolint
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -349,27 +404,27 @@ func TestMirWithReconfiguration_AddThreeNodes(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, mirTotalValidatorNumber+mirAddedValidatorNumber, mirTestOpts...)
-	ens.SaveMirValidatorsToFile(0, membershipFileName, miners[:mirTotalValidatorNumber]...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, totalValidatorNumber+addedValidatorNumber, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:totalValidatorNumber]...)
 
 	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
-	require.Equal(t, mirTotalValidatorNumber, membership.Size())
+	require.Equal(t, totalValidatorNumber, membership.Size())
 
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:mirTotalValidatorNumber])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:totalValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, 20, nodes[:mirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, 20, nodes[:totalValidatorNumber]...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:mirTotalValidatorNumber]...)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:totalValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Log(">>> all new validators have been added to the membership")
-	ens.SaveMirValidatorsToFile(1, membershipFileName, miners...)
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
-	require.Equal(t, mirTotalValidatorNumber+mirAddedValidatorNumber, membership.Size())
+	require.Equal(t, totalValidatorNumber+addedValidatorNumber, membership.Size())
 	// Start new miners.
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[mirTotalValidatorNumber:])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[totalValidatorNumber:])
 
 	err = kit.AdvanceChain(ctx, 100, nodes...)
 	require.NoError(t, err)
@@ -377,15 +432,16 @@ func TestMirWithReconfiguration_AddThreeNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddThreeNodesOneByOne tests that the reconfiguration mechanism operates normally
+// TestMirWithReconfiguration_AddThreeValidatorsOneByOne tests that the reconfiguration mechanism operates normally
 // if 3 new validators join the network one by one.
-func TestMirWithReconfiguration_AddThreeNodesOneByOne(t *testing.T) {
-	mirAddedValidatorNumber := 3
+func TestMirWithReconfiguration_AddThreeValidatorsOneByOne(t *testing.T) {
+	addedValidatorNumber := 3
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
-		os.Remove(membershipFileName) // nolint
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -395,32 +451,40 @@ func TestMirWithReconfiguration_AddThreeNodesOneByOne(t *testing.T) {
 		wg.Wait()
 	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+mirAddedValidatorNumber, mirTestOpts...)
-	ens.SaveMirValidatorsToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+addedValidatorNumber, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
 
 	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:MirTotalValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, 30, nodes[:MirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
-	t.Log(">>> new validators have been added to the membership")
-
-	for i := 0; i < mirAddedValidatorNumber; i++ {
-		ens.SaveMirValidatorsToFile(uint64(i+1), membershipFileName, miners[:MirTotalValidatorNumber+i+1]...)
+	for i := 1; i <= addedValidatorNumber; i++ {
+		t.Logf(">>> new validator %d is being added to the membership", i)
+		ens.SaveValidatorSetToFile(uint64(i), membershipFileName, miners[:MirTotalValidatorNumber+i]...)
 		membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 		require.NoError(t, err)
-		require.Equal(t, MirTotalValidatorNumber+i+1, membership.Size())
-		// Start new miners.
-		ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, []*kit.TestMiner{miners[MirTotalValidatorNumber+i]})
 
-		err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber+i+1]...)
+		require.Equal(t, MirTotalValidatorNumber+i, membership.Size())
+		require.Equal(t, MirTotalValidatorNumber+i, len(miners[:MirTotalValidatorNumber+i]))
+		require.Equal(t, MirTotalValidatorNumber+i-1, len(nodes[1:MirTotalValidatorNumber+i]))
+
+		// Start new miners.
+		ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, []*kit.TestMiner{miners[MirTotalValidatorNumber+i-1]})
+
+		t.Logf(">>> advancing the chain after adding validator %d", i)
+		err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber+i]...)
 		require.NoError(t, err)
+
+		// t.Logf(">>> checking the chain after adding validator %d", i)
+		// err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber+i]...)
+		// require.NoError(t, err)
 	}
 
 	err = kit.AdvanceChain(ctx, 30, nodes...)
@@ -438,7 +502,8 @@ func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
-		os.Remove(membershipFileName) // nolint
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -449,8 +514,8 @@ func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, mirTestOpts...)
-	ens.SaveMirValidatorsToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, 0, miners[:MirTotalValidatorNumber])
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:MirTotalValidatorNumber])
 
 	err := kit.AdvanceChain(ctx, 3*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -458,7 +523,7 @@ func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log(">>> new validators have been added to the membership")
-	ens.SaveMirValidatorsToFile(1, membershipFileName, miners...)
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
 
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -680,7 +745,7 @@ func TestMirMessageFromLearner(t *testing.T) {
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
-	// send funds to learners so they can send a message themselves
+	// Send funds to learners, so they can send a message themselves
 	for _, l := range learners {
 		src, err := nodes[0].WalletDefaultAddress(ctx)
 		require.NoError(t, err)

@@ -165,7 +165,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
 		sm.nextConfigurationNumber = ch.NextConfigNumber
-		sm.restoreConfigurationVotes(ch.Votes)
+		// sm.restoreConfigurationVotes(ch.Votes)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -182,7 +182,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
 		}
 
-		log.With("validator", sm.ValidatorID).Infof("Restoring from checkpoint at height %d ", ch.Height)
 		for _, addr := range connPeers {
 			log.With("validator", sm.ValidatorID).Infof("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
 			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
@@ -258,12 +257,16 @@ func (sm *StateManager) storeConfigurationVotes() []VoteRecord {
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
+	log.With("validator", sm.ValidatorID).Infof("ApplyTXs for epoch %d started", sm.currentEpoch)
+	defer log.With("validator", sm.ValidatorID).Infof("ApplyTXs for epoch %d finished", sm.currentEpoch)
+
 	var mirMsgs []Message
 
 	sm.height++
 
 	// For each request in the batch
 	for _, req := range txs {
+		fmt.Println(">>> applytxs", req.ClientId, req.ReqNo)
 		switch req.Type {
 		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
@@ -377,8 +380,9 @@ func (sm *StateManager) updateNextMembership(valSet *validator.Set) error {
 		return err
 	}
 	sm.nextNewMembership = mbs
-	log.With("validator", sm.ValidatorID).Infof("updateNextMembership: current epoch %d, config number %d, next membership size: %d",
-		sm.currentEpoch, sm.nextConfigurationNumber, len(mbs))
+	log.With("validator", sm.ValidatorID).
+		Infof("updateNextMembership: current epoch %d, config number %d, next membership size: %d",
+			sm.currentEpoch, sm.nextConfigurationNumber, len(mbs))
 	return nil
 }
 
@@ -413,8 +417,9 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 
 	votes := len(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)])
 	nodes := len(sm.memberships[sm.currentEpoch])
-	log.With("validator", sm.ValidatorID).Infof("UpdateAndCheckVotes: valset number %d, epoch %d: votes %d, nodes %d",
-		set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
+	log.With("validator", sm.ValidatorID).
+		Infof("UpdateAndCheckVotes: valset number %d, epoch %d: votes %d, nodes %d",
+			set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
 
 	// We must have f+1 votes at least.
 	if votes < weakQuorum(nodes) {
@@ -437,9 +442,6 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
 	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
 	sm.memberships[nr+ConfigOffset+1] = sm.nextNewMembership
-	log.With("validator", sm.ValidatorID).
-		Infof(">>> nextEpoch: current epoch %d, next epoch %d, epoch %d membership size: %d",
-			sm.currentEpoch, nr, nr+ConfigOffset, len(sm.nextNewMembership))
 
 	// Update current epoch number.
 	sm.currentEpoch = nr
@@ -447,6 +449,10 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	// Garbage-collect previous membership and old voting data.
 	// Note that at initialization and after state transfer, these entries do not exist.
 	delete(sm.memberships, sm.currentEpoch-1)
+
+	log.With("validator", sm.ValidatorID).
+		Infof(">>> New epoch result: current epoch %d, current membership size %d, next membership size: %d, height: %d",
+			sm.currentEpoch, len(sm.memberships[sm.currentEpoch]), len(sm.nextNewMembership), sm.height)
 
 	return sm.nextNewMembership, nil
 }
@@ -457,6 +463,9 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 // in our local state, and it collects the cids for all the blocks verified
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
+	log.With("validator", sm.ValidatorID).Infof("Snapshot for epoch %d started", sm.currentEpoch)
+	defer log.With("validator", sm.ValidatorID).Infof("Snapshot for epoch %d finished", sm.currentEpoch)
+
 	if sm.currentEpoch == 0 {
 		return nil, xerrors.Errorf("validator %v tried to make a snapshot in epoch %d", sm.ValidatorID, sm.currentEpoch)
 	}
@@ -470,14 +479,13 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		Parent:           sm.prevCheckpoint,
 		BlockCids:        make([]cid.Cid, 0),
 		NextConfigNumber: sm.nextConfigurationNumber,
-		Votes:            sm.storeConfigurationVotes(),
+		// Votes:            sm.storeConfigurationVotes(),
 	}
 
 	// put blocks in descending order.
 	i := nextHeight - 1
 
-	// wait the last block to sync for the snapshot before
-	// populating snapshot.
+	// Wait the last block to sync for the snapshot before populating snapshot.
 	log.With("validator", sm.ValidatorID).Infof("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
 	if err := sm.waitForBlock(i); err != nil {
 		return nil, xerrors.Errorf("snapshot: validator %v failed to wait for next block %d: %w", sm.ValidatorID, i, err)
@@ -505,11 +513,13 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 // Checkpoint is triggered by Mir when the committee agrees on the next checkpoint.
 // We persist the checkpoint locally so we can restore from it after a restart
-// or a crash and delivers it to the mining process to include it in the next
-// block
+// or a crash and delivers it to the mining process to include it in the next block.
+//
 // TODO: RestoreState and the persistence of the latest checkpoint locally may
 // be redundant, we may be able to remove the latter.
 func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) error {
+	log.With("validator", sm.ValidatorID).Infof("Checkpoint for epoch %d started", sm.currentEpoch)
+	defer log.With("validator", sm.ValidatorID).Infof("Checkpoint for epoch %d finished", sm.currentEpoch)
 	// deserialize checkpoint data from Mir checkpoint to check that is the
 	// right format.
 	ch := &Checkpoint{}

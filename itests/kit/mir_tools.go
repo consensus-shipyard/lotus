@@ -27,7 +27,7 @@ const (
 func TempFileName(suffix string) string {
 	randBytes := make([]byte, 8)
 	rand.Read(randBytes)
-	return suffix + "_" + hex.EncodeToString(randBytes) + ".tmp"
+	return suffix + "_" + hex.EncodeToString(randBytes) + ".json"
 }
 
 // CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current

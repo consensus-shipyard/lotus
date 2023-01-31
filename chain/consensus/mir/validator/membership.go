@@ -30,5 +30,5 @@ type EnvMembership string
 
 // GetValidatorSet gets the membership config from the input environment variable.
 func (e EnvMembership) GetValidatorSet() (*Set, error) {
-	return NewValidatorsFromEnv(string(e))
+	return NewValidatorSetFromEnv(string(e))
 }

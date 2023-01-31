@@ -115,9 +115,10 @@ func NewStateRand(cs *store.ChainStore, blks []cid.Cid, b beacon.Schedule, netwo
 	// we don't use winningPoSt and we use fake windowPoSt when running
 	// mir consensus (at least for now)
 	if global.IsConsensusAlgorithm(global.MirConsensus) {
-		log.Warn("=================================================================================")
-		log.Warn("DANGER ZONE! YOU ARE USING FAKE RANDOMNESS FOR YOUR VM AND PROOFS. USE WITH CARE!")
-		log.Warn("=================================================================================")
+		// FIXME DENIS - uncomment
+		// log.Warn("=================================================================================")
+		// log.Warn("DANGER ZONE! YOU ARE USING FAKE RANDOMNESS FOR YOUR VM AND PROOFS. USE WITH CARE!")
+		// log.Warn("=================================================================================")
 		return &fakeRand{}
 	}
 
