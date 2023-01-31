@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -52,10 +53,10 @@ var (
 
 	// SentConfigurationNumberKey is used to store SentConfigurationNumber
 	// that is the maximum configuration request number that have been sent.
-	SentConfigurationNumberKey = datastore.NewKey("mir/max-config-number")
-	// ExecutedConfigurationNumberKey is used to store ExecutedConfigurationNumber
-	// that is the maximum configuration request number that have been executed.
-	ExecutedConfigurationNumberKey = datastore.NewKey("mir/min-config-number")
+	SentConfigurationNumberKey = datastore.NewKey("mir/sent-config-number")
+	// AppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
+	// that is the maximum configuration request number that have been applied.
+	AppliedConfigurationNumberKey = datastore.NewKey("mir/applied-config-number")
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
@@ -387,7 +388,7 @@ func (m *Manager) CreateConfigurationRequest(set *validator.Set) *mirproto.Reque
 
 func (m *Manager) RecoverConfigurationData() ([]*mirproto.Request, error) {
 	maxNonce := m.RecoverSentConfigurationNumber()
-	minNonce := m.RecoverExecutedConfigurationNumber()
+	minNonce := m.RecoverAppliedConfigurationNumber()
 
 	m.reconfigurationNonce = maxNonce
 
@@ -426,32 +427,41 @@ func (m *Manager) StoreSentConfigurationNumber(nonce uint64) {
 }
 
 func (m *Manager) StoreExecutedConfigurationNumber(nonce uint64) {
-	m.storeNumber(ExecutedConfigurationNumberKey, nonce)
+	m.storeNumber(AppliedConfigurationNumberKey, nonce)
 }
 
 func (m *Manager) RecoverSentConfigurationNumber() uint64 {
-	return m.getNumber(SentConfigurationNumberKey)
+	b, err := m.ds.Get(m.ctx, SentConfigurationNumberKey)
+	if errors.Is(err, datastore.ErrNotFound) {
+		log.With("validator", m.MirID).Info("stored sent configuration number not found")
+		return 0
+	}
+	if err != nil {
+		log.With("validator", m.MirID).Warnf("failed to get sent configuration number: %v", err)
+		return 0
+	}
+	return binary.LittleEndian.Uint64(b)
 }
 
-func (m *Manager) RecoverExecutedConfigurationNumber() uint64 {
-	return m.getNumber(ExecutedConfigurationNumberKey)
+func (m *Manager) RecoverAppliedConfigurationNumber() uint64 {
+	b, err := m.ds.Get(m.ctx, AppliedConfigurationNumberKey)
+	if errors.Is(err, datastore.ErrNotFound) {
+		log.With("validator", m.MirID).Info("stored executed configuration number not found")
+		return 0
+	}
+	if err != nil {
+		log.With("validator", m.MirID).Warnf("failed to get applied configuration number: %v", err)
+		return 0
+	}
+	return binary.LittleEndian.Uint64(b)
 }
 
 func (m *Manager) storeNumber(key datastore.Key, n uint64) {
 	rb := make([]byte, 8)
 	binary.LittleEndian.PutUint64(rb, n)
 	if err := m.ds.Put(m.ctx, key, rb); err != nil {
-		log.With("validator", m.MirID).Warnf("failed to put configuration number: %v", err)
+		log.With("validator", m.MirID).Warnf("failed to put configuration number by %s: %v", key, err)
 	}
-}
-
-func (m *Manager) getNumber(key datastore.Key) uint64 {
-	b, err := m.ds.Get(m.ctx, key)
-	if err != nil {
-		log.With("validator", m.MirID).Warnf("failed to get configuration number: %v", err)
-		return 0
-	}
-	return binary.LittleEndian.Uint64(b)
 }
 
 func (m *Manager) RemoveAppliedConfigurationRequest(nonce uint64) {
