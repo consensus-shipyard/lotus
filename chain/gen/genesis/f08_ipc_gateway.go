@@ -10,14 +10,15 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 
+	ipctypes "github.com/consensus-shipyard/go-ipc-types/types"
 	bstore "github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/ipfs/go-cid"
-	ipctypes "github.com/consensus-shipyard/go-ipc-types/types"
 )
 
-const bitWidth = 5;
-const minStake = 1000000000000000000;
+const bitWidth = 5
+const minStake = 1000000000000000000
 
 func constructState(store adt.Store, networkName string, checkPeriod int64) (*ipctypes.IPCGatewayState, error) {
 	emptyArrayCid, err := adt.StoreEmptyArray(store, bitWidth)
@@ -43,6 +44,7 @@ func constructState(store adt.Store, networkName string, checkPeriod int64) (*ip
 		CheckPeriod:          ipctypes.ChainEpoch(checkPeriod),
 		Checkpoints:          emptyMapCid,
 		CheckMsgRegistry:     emptyMapCid,
+		Postbox:              emptyMapCid,
 		Nonce:                0,
 		BottomupNonce:        0,
 		BottomupMsgMeta:      emptyArrayCid,
@@ -53,6 +55,7 @@ func constructState(store adt.Store, networkName string, checkPeriod int64) (*ip
 
 func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.Version, networkName string, checkPeriod int64) (*types.Actor, error) {
 	cst := cbor.NewCborStore(bs)
+	networkName = "/root"
 	dst, err := constructState(adt.WrapStore(ctx, cbor.NewCborStore(bs)), networkName, checkPeriod)
 	if err != nil {
 		return nil, err
@@ -65,11 +68,15 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 
 	// generated from rust bundle and coded, should be correct
 	actcid, _ := cid.Decode("bafk2bzaceazqq57zwvfufy66tttef4c5agib53scrmygaytjp5iolzpo6uby4")
+	actcid, ok := actors.GetActorCodeID(av, "ipc_gateway")
+	if !ok {
+		return nil, xerrors.Errorf("failed to get ipc-gateway actor code ID for actors version %d", av)
+	}
 
 	act := &types.Actor{
 		Code:    actcid,
 		Head:    statecid,
-		Balance: big.Zero(),
+		Balance: big.Zero(), //Put some initial balance to the gateway
 	}
 
 	return act, nil
