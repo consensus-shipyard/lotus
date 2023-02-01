@@ -22,6 +22,7 @@ import (
 	"github.com/filecoin-project/lotus/lib/peermgr"
 	"github.com/filecoin-project/lotus/markets/retrievaladapter"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/hello"
 	"github.com/filecoin-project/lotus/node/impl/full"
 	"github.com/filecoin-project/lotus/node/modules"
@@ -32,7 +33,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
-func Fullnode(isBootstrap bool, isLite bool) fx.Option {
+func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Option {
 	var nodeAPIProviders fx.Option
 	if isLite {
 		nodeAPIProviders = liteNodeAPIProviders
@@ -58,6 +59,11 @@ func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 
 			new(dtypes.MpoolLocker),
 		),
+		// Eth APIs
+		fxEitherOr(fevmCfg.EnableEthRPC, fx.Provide(modules.EthEventAPI(fevmCfg)),
+			fx.Provide(func() *full.EthModuleDummy { return &full.EthModuleDummy{} })),
+		fx.Provide(modules.EthEventAPI(fevmCfg)),
+		// bootstrap settings
 		fxOptional(isBootstrap, fx.Provide(peermgr.NewPeerMgr)),
 		fx.Provide(
 			// Consensus settings
@@ -177,7 +183,7 @@ var liteNodeAPIProviders = fx.Provide(
 		return &nonceAPI
 	},
 	func(gateway api.Gateway) (
-		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI) {
-		return gateway, gateway, gateway, gateway
+		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI /*full.EthModuleAPI,*/, full.EthEventAPI) {
+		return gateway, gateway, gateway, gateway /*gateway,*/, gateway
 	},
 )
