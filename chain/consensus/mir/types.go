@@ -148,6 +148,10 @@ func NewVotedValidators(vs ...mir.NodeID) []VotedValidator {
 	return validators
 }
 
+type VoteRecords struct {
+	Records []VoteRecord
+}
+
 // VoteRecord states that VotedValidators voted for the validator set with ValSetHash having number ConfigurationNumber.
 type VoteRecord struct {
 	ConfigurationNumber uint64
@@ -163,8 +167,6 @@ type Checkpoint struct {
 	BlockCids []cid.Cid
 	// Parent checkpoint, i.e. metadata of previous checkpoint committed.
 	Parent ParentMeta
-	// Reconfiguration votes.
-	Votes []VoteRecord
 	// The configuration number that can be accepted.
 	NextConfigNumber uint64
 }

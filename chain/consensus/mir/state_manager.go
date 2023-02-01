@@ -81,7 +81,7 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 		NextCheckpoint:          make(chan *checkpoint.StableCheckpoint, 1),
 		MirManager:              m,
 		currentEpoch:            0,
-		reconfigurationVotes:    make(map[uint64]map[string][]t.NodeID),
+		reconfigurationVotes:    m.RecoverReconfigurationVotes(),
 		api:                     api,
 		ValidatorID:             m.ValidatorID,
 		nextConfigurationNumber: 1,
@@ -165,7 +165,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
 		sm.nextConfigurationNumber = ch.NextConfigNumber
-		// sm.restoreConfigurationVotes(ch.Votes)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -217,41 +216,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	}
 
 	return nil
-}
-
-func restoreConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.NodeID {
-	m := make(map[uint64]map[string][]t.NodeID)
-	for _, v := range voteRecords {
-		if _, exist := m[v.ConfigurationNumber]; !exist {
-			m[v.ConfigurationNumber] = make(map[string][]t.NodeID)
-		}
-		for _, id := range v.VotedValidators {
-			m[v.ConfigurationNumber][v.ValSetHash] = append(m[v.ConfigurationNumber][v.ValSetHash], id.NodeID())
-		}
-	}
-	return m
-}
-
-func storeConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) (votesRecords []VoteRecord) {
-	for n, hashToValidatorsVotes := range reconfigurationVotes {
-		for h, nodeIDs := range hashToValidatorsVotes {
-			e := VoteRecord{
-				ConfigurationNumber: n,
-				ValSetHash:          h,
-				VotedValidators:     NewVotedValidators(nodeIDs...),
-			}
-			votesRecords = append(votesRecords, e)
-		}
-	}
-	return
-}
-
-func (sm *StateManager) restoreConfigurationVotes(voteRecords []VoteRecord) {
-	sm.reconfigurationVotes = restoreConfigurationVotes(voteRecords)
-}
-
-func (sm *StateManager) storeConfigurationVotes() []VoteRecord {
-	return storeConfigurationVotes(sm.reconfigurationVotes)
 }
 
 // ApplyTXs applies transactions received from the availability layer to the app state
@@ -414,6 +378,10 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 	}
 
 	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = append(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)], votingValidator)
+	if err := sm.MirManager.StoreReconfigurationVotes(sm.reconfigurationVotes); err != nil {
+		log.With("validator", sm.ValidatorID).
+			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
+	}
 
 	votes := len(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)])
 	nodes := len(sm.memberships[sm.currentEpoch])

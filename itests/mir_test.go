@@ -8,6 +8,7 @@ package itests
 //     and nodes[MirFaultyValidatorNumber:] are honest nodes.
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"math/rand"
@@ -19,9 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-state-types/big"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
-
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
 )
@@ -263,8 +263,8 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
 
 	bn := make([]byte, 8)
-	recoveredNonce := uint64(4)
-	binary.LittleEndian.PutUint64(bn, recoveredNonce)
+	recoveredRequestNonce := uint64(4)
+	binary.LittleEndian.PutUint64(bn, recoveredRequestNonce)
 
 	var dbs []*kit.TestDB
 	for i := range miners[:MirTotalValidatorNumber] {
@@ -273,6 +273,20 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 		err := db.Put(ctx, mir.SentConfigurationNumberKey, bn)
 		require.NoError(t, err)
 		err = db.Put(ctx, mir.AppliedConfigurationNumberKey, bn)
+		require.NoError(t, err)
+
+		// -- store fake votes
+		recs := []mir.VoteRecord{{
+			ConfigurationNumber: 0, ValSetHash: "hash", VotedValidators: []mir.VotedValidator{{"id1"}},
+		}}
+		r := mir.VoteRecords{
+			Records: recs,
+		}
+
+		br := new(bytes.Buffer)
+		err = r.MarshalCBOR(br)
+		require.NoError(t, err)
+		err = db.Put(ctx, mir.ReconfigurationVotesKey, br.Bytes())
 		require.NoError(t, err)
 
 		dbs = append(dbs, db)
@@ -286,7 +300,6 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
-
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[:MirTotalValidatorNumber], miners[:MirTotalValidatorNumber])
 
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
@@ -294,12 +307,30 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
+	t.Log(">>> check that persisted votes restored")
+	for _, m := range miners[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
+		require.NoError(t, err)
+		var r mir.VoteRecords
+		err = r.UnmarshalCBOR(bytes.NewReader(b))
+		require.NoError(t, err)
+		for _, v := range r.Records {
+			require.Equal(t, uint64(0), v.ConfigurationNumber)
+			require.Equal(t, "hash", v.ValSetHash)
+		}
+		votes := mir.RestoreConfigurationVotes(r.Records)
+		require.Greater(t, MirTotalValidatorNumber, len(votes))
+	}
+
+	var cn uint64 = 1
+
 	t.Log(">>> new validators have been added to the membership")
 	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
-	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
+	require.Equal(t, cn, membership.GetConfigurationNumber())
 	// Start new miners.
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[MirTotalValidatorNumber:], miners[MirTotalValidatorNumber:])
 
@@ -313,11 +344,23 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 		db := m.GetDB()
 		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, uint64(1)+recoveredNonce, binary.LittleEndian.Uint64(nonce))
+		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 
 		nonce, err = db.Get(ctx, mir.AppliedConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, recoveredNonce, binary.LittleEndian.Uint64(nonce))
+		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
+		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
+		require.NoError(t, err)
+		var r mir.VoteRecords
+		err = r.UnmarshalCBOR(bytes.NewReader(b))
+		require.NoError(t, err)
+		for _, v := range r.Records {
+			require.Equal(t, cn, v.ConfigurationNumber)
+		}
+		votes := mir.RestoreConfigurationVotes(r.Records)
+		require.Greater(t, MirTotalValidatorNumber, len(votes))
+
 	}
 }
 

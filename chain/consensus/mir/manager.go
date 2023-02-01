@@ -57,6 +57,8 @@ var (
 	// AppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
 	// that is the maximum configuration request number that have been applied.
 	AppliedConfigurationNumberKey = datastore.NewKey("mir/applied-config-number")
+	// ReconfigurationVotesKey is used to store reconfiguration votes.
+	ReconfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
 )
 
 // Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
@@ -456,6 +458,45 @@ func (m *Manager) RecoverAppliedConfigurationNumber() uint64 {
 	return binary.LittleEndian.Uint64(b)
 }
 
+func (m *Manager) RecoverReconfigurationVotes() map[uint64]map[string][]t.NodeID {
+	votes := make(map[uint64]map[string][]t.NodeID)
+	b, err := m.ds.Get(m.ctx, ReconfigurationVotesKey)
+	if errors.Is(err, datastore.ErrNotFound) {
+		log.With("validator", m.MirID).Info("stored reconfiguration votes not found")
+		return votes
+	}
+	if err != nil {
+		log.With("validator", m.MirID).Warnf("failed to get reconfiguration votes: %v", err)
+		return votes
+	}
+
+	var r VoteRecords
+	if err := r.UnmarshalCBOR(bytes.NewReader(b)); err != nil {
+		log.With("validator", m.MirID).Warnf("failed to unmarshal reconfiguration votes: %v", err)
+		return votes
+	}
+	votes = RestoreConfigurationVotes(r.Records)
+
+	return votes
+}
+
+func (m *Manager) StoreReconfigurationVotes(votes map[uint64]map[string][]t.NodeID) error {
+	recs := StoreConfigurationVotes(votes)
+	r := VoteRecords{
+		Records: recs,
+	}
+
+	b := new(bytes.Buffer)
+	if err := r.MarshalCBOR(b); err != nil {
+		return err
+	}
+	if err := m.ds.Put(m.ctx, ReconfigurationVotesKey, b.Bytes()); err != nil {
+		log.With("validator", m.MirID).Warnf("failed to put reconfiguration votes: %v", err)
+	}
+
+	return nil
+}
+
 func (m *Manager) storeNumber(key datastore.Key, n uint64) {
 	rb := make([]byte, 8)
 	binary.LittleEndian.PutUint64(rb, n)
@@ -472,4 +513,31 @@ func (m *Manager) RemoveAppliedConfigurationRequest(nonce uint64) {
 
 func ConfigurationIndexKey(nonce uint64) datastore.Key {
 	return datastore.NewKey(ConfigurationRequestsDBPrefix + strconv.FormatUint(nonce, 10))
+}
+
+func RestoreConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.NodeID {
+	m := make(map[uint64]map[string][]t.NodeID)
+	for _, v := range voteRecords {
+		if _, exist := m[v.ConfigurationNumber]; !exist {
+			m[v.ConfigurationNumber] = make(map[string][]t.NodeID)
+		}
+		for _, id := range v.VotedValidators {
+			m[v.ConfigurationNumber][v.ValSetHash] = append(m[v.ConfigurationNumber][v.ValSetHash], id.NodeID())
+		}
+	}
+	return m
+}
+
+func StoreConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) (votesRecords []VoteRecord) {
+	for n, hashToValidatorsVotes := range reconfigurationVotes {
+		for h, nodeIDs := range hashToValidatorsVotes {
+			e := VoteRecord{
+				ConfigurationNumber: n,
+				ValSetHash:          h,
+				VotedValidators:     NewVotedValidators(nodeIDs...),
+			}
+			votesRecords = append(votesRecords, e)
+		}
+	}
+	return
 }

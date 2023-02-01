@@ -12,6 +12,7 @@ func main() {
 		mir.ParentMeta{},
 		mir.VoteRecord{},
 		mir.VotedValidator{},
+		mir.VoteRecords{},
 	); err != nil {
 		panic(err)
 	}
