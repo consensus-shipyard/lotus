@@ -63,16 +63,11 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 		fxEitherOr(
 			fevmCfg.EnableEthRPC,
 			fx.Provide(modules.EthEventAPI(fevmCfg)),
-			fx.Provide(
-				func() full.EthModuleAPI {
-					return &full.EthModuleDummy{}
-				}),
+			fx.Provide(func() full.EthModuleAPI { return &full.EthModuleDummy{} }),
 		),
 		fx.Provide(
 			modules.EthEventAPI(fevmCfg),
-			func(event *full.EthEvent) full.EthEventAPI {
-				return event
-			},
+			func(event *full.EthEvent) full.EthEventAPI { return event },
 		),
 		// bootstrap settings
 		fxOptional(isBootstrap, fx.Provide(peermgr.NewPeerMgr)),
