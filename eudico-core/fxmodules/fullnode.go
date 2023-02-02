@@ -2,6 +2,8 @@ package fxmodules
 
 import (
 	"context"
+	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/node/repo"
 	"time"
 
 	metricsi "github.com/ipfs/go-metrics-interface"
@@ -22,6 +24,7 @@ import (
 	"github.com/filecoin-project/lotus/lib/peermgr"
 	"github.com/filecoin-project/lotus/markets/retrievaladapter"
 	"github.com/filecoin-project/lotus/markets/storageadapter"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/hello"
 	"github.com/filecoin-project/lotus/node/impl/full"
 	"github.com/filecoin-project/lotus/node/modules"
@@ -32,7 +35,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
-func Fullnode(isBootstrap bool, isLite bool) fx.Option {
+func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Option {
 	var nodeAPIProviders fx.Option
 	if isLite {
 		nodeAPIProviders = liteNodeAPIProviders
@@ -58,6 +61,22 @@ func Fullnode(isBootstrap bool, isLite bool) fx.Option {
 
 			new(dtypes.MpoolLocker),
 		),
+		// Eth APIs
+		fx.Provide(
+			modules.EthEventAPI(fevmCfg),
+			func(event *full.EthEvent) full.EthEventAPI { return event },
+		),
+		fxEitherOr(
+			fevmCfg.EnableEthRPC,
+			fx.Provide(
+				// You may not like it, but this is what peak performance looks like
+				func(mctx helpers.MetricsCtx, r repo.LockedRepo, lc fx.Lifecycle, cs *store.ChainStore, sm *stmgr.StateManager, evapi modules.EventAPI, mp *messagepool.MessagePool, stateapi full.StateAPI, chainapi full.ChainAPI, mpoolapi full.MpoolAPI) (full.EthModuleAPI, error) {
+					return modules.EthModuleAPI(fevmCfg)(mctx, r, lc, cs, sm, evapi, mp, stateapi, chainapi, mpoolapi)
+				},
+			),
+			fx.Provide(func() full.EthModuleAPI { return &full.EthModuleDummy{} }),
+		),
+		// bootstrap settings
 		fxOptional(isBootstrap, fx.Provide(peermgr.NewPeerMgr)),
 		fx.Provide(
 			// Consensus settings
@@ -177,7 +196,7 @@ var liteNodeAPIProviders = fx.Provide(
 		return &nonceAPI
 	},
 	func(gateway api.Gateway) (
-		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI) {
-		return gateway, gateway, gateway, gateway
+		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI /*full.EthModuleAPI,*/, full.EthEventAPI) {
+		return gateway, gateway, gateway, gateway /*gateway,*/, gateway
 	},
 )
