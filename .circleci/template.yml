@@ -94,37 +94,58 @@ publish-dockerhub:
             docker push filecoin/lotus-all-in-one:$CIRCLE_TAG
           fi
 workflows:
-  version: 2.1
   ci:
     jobs:
+      - build
       - lint-all:
-          concurrency: "16"   # expend all docker 2xlarge CPUs.
-      - mod-tidy-check
-      - gofmt
-      - gen-check
-      - docs-check
+          requires:
+            - build
+      - mod-tidy-check:
+          requires:
+            - build
+      - gofmt:
+          requires:
+            - build
+      - gen-check:
+          requires:
+            - build
+      - docs-check:
+          requires:
+            - build
 
       [[- range $file := .ItestFiles -]]
       [[ with $name := $file | stripSuffix ]]
       - test:
           name: test-itest-[[ $name ]]
+          requires:
+            - build
           suite: itest-[[ $name ]]
           target: "./itests/[[ $file ]]"
-      [[ end ]]
-      [[- end -]]
+          [[- if or (eq $name "worker") (eq $name "deals_concurrent") (eq $name "wdpost_worker_config")]]
+          executor: golang-2xl
+          [[- end]]
+      [[- end ]][[- end]]
 
-      [[range $suite, $pkgs := .UnitSuites]]
+      [[- range $suite, $pkgs := .UnitSuites]]
       - test:
           name: test-[[ $suite ]]
+          requires:
+            - build
           suite: utest-[[ $suite ]]
           target: "[[ $pkgs ]]"
+          [[if eq $suite "unit-cli"]]get-params: true[[end]]
+          [[- if eq $suite "unit-rest"]]executor: golang-2xl[[end]]
       [[- end]]
       - test:
           go-test-flags: "-run=TestMulticoreSDR"
+          requires:
+            - build
           suite: multicore-sdr-check
           target: "./extern/sector-storage/ffiwrapper"
           proofs-log-test: "1"
       - test-conformance:
+          requires:
+            - build
           suite: conformance
           codecov-upload: false
           target: "./conformance"

@@ -458,7 +458,6 @@ jobs:
               sudo mkdir /dev/snd
               sudo mknod /dev/snd/ControlC0 c 1 2
             fi
-
             # docs: https://appimage-builder.readthedocs.io/en/latest/intro/install.html
             sudo apt update
             sudo apt install -y python3-pip python3-setuptools patchelf desktop-file-utils libgdk-pixbuf2.0-dev fakeroot strace
