@@ -104,7 +104,7 @@ func main() {
 			},
 			cliutil.FlagVeryVerbose,
 		},
-		Commands: append(local, append(lcli.CommonCommands /*, &netCmd*/)...),
+		Commands: append(local, lcli.CommonCommands...),
 	}
 	app.Setup()
 	lcli.RunApp(app)

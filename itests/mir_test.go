@@ -1,9 +1,9 @@
 package itests
 
-// These tests check that Mir operates normally.
+// These tests check that Eudico/Mir bundle operates normally.
 //
 // Notes:
-//   - It is assumed that the first F of N nodes can be byzantine
+//   - It is assumed that the first F of N nodes can be byzantine;
 //   - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
 //     and nodes[MirFaultyValidatorNumber:] are honest nodes.
 
@@ -49,12 +49,55 @@ func setupMangler(t *testing.T) {
 	})
 }
 
-// func TestMirMessageFromLearner(t *testing.T) {
-// 	ts := itestsConsensusSuite{opts: []interface{}{kit.ThroughRPC(), kit.MirConsensus()}}
-// 	t.Run("testMirMessageFromLearner", ts.testMirMessageFromLearner)
-// }
+// TestMirConsensusWithMangler tests that Mir operates normally when messaged are dropped or delayed.
+func TestMirConsensusWithMangler(t *testing.T) {
+	TestMirAllNodesMiningWithMangling(t)
+	TestMirAllNodesMiningWithMessagingWithMangler(t)
+	TestMirWhenLearnersJoinWithMangler(t)
+}
 
-// testMirOneNodeMining tests that a Mir node can mine blocks.
+func TestMirConsensusSmoke(t *testing.T) {
+	TestMirOneNodeMining(t)
+	TestMirAllNodesMining(t)
+	TestMirStartStop(t)
+	TestGenesisBlocksOfValidatorsAndLearners(t)
+	TestMirFNodesNeverStart(t)
+}
+
+func TestMirAdvancedConsensus(t *testing.T) {
+	TestMirWhenLearnersJoin(t)
+	TestMirNodesStartWithRandomDelay(t)
+	TestMirFNodesNeverStart(t)
+	TestMirFNodesStartWithRandomDelay(t)
+	TestMirAllNodesMiningWithMessaging(t)
+	TestMirWithFOmissionNodes(t)
+	TestMirWithFCrashedNodes(t)
+	TestMirWithFCrashedAndRecoveredNodes(t)
+	TestMirFNodesCrashLongTimeApart(t)
+	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
+	TestMirFNodesSleepAndThenOperate(t)
+}
+
+func TestMirConsensus(t *testing.T) {
+	TestMirOneNodeMining(t)
+	TestMirTwoNodesMining(t)
+	TestMirAllNodesMining(t)
+	TestGenesisBlocksOfValidatorsAndLearners(t)
+	TestMirWhenLearnersJoin(t)
+	TestMirNodesStartWithRandomDelay(t)
+	TestMirFNodesNeverStart(t)
+	TestMirFNodesStartWithRandomDelay(t)
+	TestMirAllNodesMiningWithMessaging(t)
+	TestMirWithFOmissionNodes(t)
+	TestMirWithFCrashedNodes(t)
+	TestMirWithFCrashedAndRecoveredNodes(t)
+	TestMirStartStop(t)
+	TestMirFNodesCrashLongTimeApart(t)
+	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
+	TestMirFNodesSleepAndThenOperate(t)
+}
+
+// TestMirOneNodeMining tests that a Mir node can mine blocks.
 func TestMirOneNodeMining(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -72,9 +115,10 @@ func TestMirOneNodeMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirTwoNodesMining tests that two Mir nodes can mine blocks.
+// TestMirTwoNodesMining tests that two Mir nodes can mine blocks.
 //
-// NOTE: Its peculiarity is that it uses other mechanisms to instantiate testing comparing to the main tests here.
+// NOTE: The peculiarity of this test is that it uses other mechanisms to instantiate testing
+// comparing to the main tests here.
 func TestMirTwoNodesMining(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -111,32 +155,35 @@ func TestMirTwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirAllNodesMining tests that n nodes can mine blocks normally.
+// TestMirAllNodesMining tests that n nodes can mine blocks normally.
 func TestMirAllNodesMining(t *testing.T) {
-	var wg sync.WaitGroup
+	t.Run("TestMirAllNodesMining", func(t *testing.T) {
+		var wg sync.WaitGroup
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		t.Logf("[*] defer: cancelling %s context", t.Name())
-		cancel()
-		wg.Wait()
-	}()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer func() {
+			t.Logf("[*] defer: cancelling %s context", t.Name())
+			cancel()
+			wg.Wait()
+		}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
-	require.NoError(t, err)
+		err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+		require.NoError(t, err)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+		require.NoError(t, err)
+	})
 }
 
+// TestMirAllNodesMiningWithMangling run TestMirAllNodesMining with mangler.
 func TestMirAllNodesMiningWithMangling(t *testing.T) {
 	setupMangler(t)
 	TestMirAllNodesMining(t)
 }
 
-// testMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
+// TestMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
 func TestMirFNodesNeverStart(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -156,7 +203,7 @@ func TestMirFNodesNeverStart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirWhenLearnersJoin tests that all nodes operate normally
+// TestMirWhenLearnersJoin tests that all nodes operate normally
 // if new learner joins when the network is already started and syncs the whole network.
 func TestMirWhenLearnersJoin(t *testing.T) {
 	var wg sync.WaitGroup
@@ -192,11 +239,13 @@ func TestMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestMirWhenLearnersJoinWithMangler runs TestMirWhenLearnersJoin with mangler.
 func TestMirWhenLearnersJoinWithMangler(t *testing.T) {
 	setupMangler(t)
 	TestMirWhenLearnersJoin(t)
 }
 
+// TestGenesisBlocksOfValidatorsAndLearners tests that genesis for validators and learners are correct.
 func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -232,7 +281,7 @@ func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	}
 }
 
-// testMirMessageFromLearner tests that messages can be sent from learners and validators,
+// TestMirMessageFromLearner tests that messages can be sent from learners and validators,
 // and successfully proposed by validators
 func TestMirMessageFromLearner(t *testing.T) {
 	t.Skip()
@@ -313,7 +362,7 @@ func TestMirMessageFromLearner(t *testing.T) {
 	}
 }
 
-// testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// TestMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if all nodes start with large, random delays (1-2 minutes).
 func TestMirNodesStartWithRandomDelay(t *testing.T) {
 	var wg sync.WaitGroup
@@ -334,7 +383,7 @@ func TestMirNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// TestMirFNodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if f nodes start with large, random delays (1-2 minutes).
 func TestMirFNodesStartWithRandomDelay(t *testing.T) {
 	var wg sync.WaitGroup
@@ -355,7 +404,7 @@ func TestMirFNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
+// TestMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
 func TestMirAllNodesMiningWithMessaging(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -392,12 +441,13 @@ func TestMirAllNodesMiningWithMessaging(t *testing.T) {
 	}
 }
 
+// TestMirAllNodesMiningWithMessagingWithMangler runs TestMirAllNodesMiningWithMessaging with mangler.
 func TestMirAllNodesMiningWithMessagingWithMangler(t *testing.T) {
 	setupMangler(t)
 	TestMirAllNodesMiningWithMessaging(t)
 }
 
-// testMirWithFOmissionNodes tests that n − f nodes operate normally and can recover
+// TestMirWithFOmissionNodes tests that n − f nodes operate normally and can recover
 // if f nodes do not have access to network at the same time.
 func TestMirWithFOmissionNodes(t *testing.T) {
 	var wg sync.WaitGroup
@@ -432,7 +482,7 @@ func TestMirWithFOmissionNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirWithFCrashedNodes tests that n − f nodes operate normally and can recover
+// TestMirWithFCrashedNodes tests that n − f nodes operate normally and can recover
 // if f nodes crash at the same time.
 func TestMirWithFCrashedNodes(t *testing.T) {
 	var wg sync.WaitGroup
@@ -467,35 +517,48 @@ func TestMirWithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirStartStop tests that n − f nodes operate normally and can recover
-// if f nodes crash at the same time.
+// TestMirStartStop tests that Mir nodes can be stopped.
 func TestMirStartStop(t *testing.T) {
-	var wg sync.WaitGroup
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		t.Logf("[*] defer: cancelling %s context", t.Name())
-		cancel()
+	t.Run("TestMirStartStop", func(t *testing.T) {
+		var wg sync.WaitGroup
 		wait := make(chan struct{})
-		go func() {
-			wg.Wait()
-			wait <- struct{}{}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer func() {
+			t.Logf("[*] defer: cancelling %s context", t.Name())
+			cancel()
+			select {
+			case <-time.After(10 * time.Second):
+				t.Fatalf("fail to stop Mir nodes")
+			case <-wait:
+			}
 		}()
-		select {
-		case <-time.After(10 * time.Second):
-			t.Fatalf("fail to stop Mir nodes")
-		case <-wait:
-		}
-	}()
 
-	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+		go func() {
+			// This goroutine is leaking after time.After(x) seconds with panicking.
+			select {
+			case <-time.After(200 * time.Second):
+				panic("test time exceeded")
+			case <-ctx.Done():
+				return
+			}
+		}()
 
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
+		go func() {
+			// This goroutine is leaking after time.After(x) seconds with panicking.
+			wg.Wait()
+			close(wait)
+		}()
+
+		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+
+		err := kit.AdvanceChain(ctx, 20, nodes...)
+		require.NoError(t, err)
+	})
 }
 
-// testMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
+// TestMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
 // and recovered nodes eventually operate normally
 // if f nodes crash and then recover (with only initial state) after a long delay (few minutes).
 func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
@@ -531,7 +594,7 @@ func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirFNodesCrashLongTimeApart tests that n − f nodes operate normally
+// TestMirFNodesCrashLongTimeApart tests that n − f nodes operate normally
 // if f nodes crash, long time apart (few minutes).
 func TestMirFNodesCrashLongTimeApart(t *testing.T) {
 	var wg sync.WaitGroup
@@ -565,7 +628,7 @@ func TestMirFNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
+// TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
 // and partitioned nodes eventually catch up
 // if f nodes have a long period of no network access, but do not crash.
 func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
@@ -604,7 +667,7 @@ func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// testMirFNodesSleepAndThenOperate tests that n − f nodes operate normally without significant interruption
+// TestMirFNodesSleepAndThenOperate tests that n − f nodes operate normally without significant interruption
 // and woken up nodes eventually operate normally
 // if f  nodes sleep for a significant amount of time and then continue operating but keep network connection.
 func TestMirFNodesSleepAndThenOperate(t *testing.T) {

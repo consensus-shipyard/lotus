@@ -81,7 +81,7 @@ func Mine(ctx context.Context, addr address.Address, h host.Host, api v1api.Full
 			if err != nil && !errors.Is(err, mir.ErrStopped) && !errors.Is(err, ErrMirCtxCanceledWhileWaitingSnapshot) {
 				panic(fmt.Errorf("miner consensus error: %w", err))
 			}
-			log.With("addr", addr).Infof("Mir node stopped signal")
+			log.With("addr", addr).Infof("Mir node stopped signal: %v", err)
 			return nil
 
 		case <-ctx.Done():

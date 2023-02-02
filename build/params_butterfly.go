@@ -23,6 +23,7 @@ const GenesisNetworkVersion = network.Version16
 
 var NetworkBundle = "butterflynet"
 var BundleOverrides map[actorstypes.Version]string
+var ActorDebugging = false
 
 const BootstrappersFile = "butterflynet.pi"
 const GenesisFile = "butterflynet.car"
@@ -49,7 +50,8 @@ const UpgradeHyperdriveHeight = -16
 const UpgradeChocolateHeight = -17
 const UpgradeOhSnapHeight = -18
 const UpgradeSkyrHeight = -19
-const UpgradeSharkHeight = abi.ChainEpoch(600)
+const UpgradeSharkHeight = abi.ChainEpoch(-20)
+const UpgradeHyggeHeight = abi.ChainEpoch(600)
 
 var SupportedProofTypes = []abi.RegisteredSealProof{
 	abi.RegisteredSealProof_StackedDrg512MiBV1,

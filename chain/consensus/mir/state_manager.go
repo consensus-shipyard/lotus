@@ -12,15 +12,16 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	t "github.com/filecoin-project/mir/pkg/types"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
-	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 var _ trantor.AppLogic = &StateManager{}
@@ -567,6 +568,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	case <-out:
 		return nil
 	case <-ctx.Done():
+		log.Errorf("waiting for block: ErrMirCtxCanceledWhileWaitingSnapshot on height %d with timeout %v", height, timeout)
 		return ErrMirCtxCanceledWhileWaitingSnapshot
 	}
 }

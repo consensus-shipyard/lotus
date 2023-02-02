@@ -427,7 +427,7 @@ func (n *Ensemble) Start() *Ensemble {
 		shutdownChan := dtypes.ShutdownChan(make(chan struct{}))
 
 		fxProviders := fx.Options(
-			fxmodules.Fullnode(false, full.options.lite),
+			fxmodules.Fullnode(false, full.options.lite, cfg.Fevm),
 			fxmodules.Libp2p(&cfg.Common),
 			fxmodules.Repository(lr, cfg),
 			fxmodules.Blockstore(cfg),
@@ -1083,7 +1083,7 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miner
 	n.Bootstrapped()
 }
 
-// Bootstrap explicitly sets the ensemble as bootstrapped.
+// Bootstrapped explicitly sets the ensemble as bootstrapped.
 func (n *Ensemble) Bootstrapped() {
 	n.bootstrapped = true
 }
