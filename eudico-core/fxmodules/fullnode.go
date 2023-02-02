@@ -2,6 +2,8 @@ package fxmodules
 
 import (
 	"context"
+	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/node/repo"
 	"time"
 
 	metricsi "github.com/ipfs/go-metrics-interface"
@@ -59,19 +61,6 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 
 			new(dtypes.MpoolLocker),
 		),
-		fx.Supply(
-			modules.EventAPI{},
-			// fx.Annotate(
-			// 	new(modules.EventAPI),
-			// )
-		),
-		// Actor event filtering support
-		// fx.Provide(
-		// 	// func() events.EventAPI { return new(modules.EventAPI) },
-		// 	fx.Annotate(
-		// 		func() events.EventAPI { return new(modules.EventAPI) },
-		// 	),
-		// ),
 		// Eth APIs
 		fx.Provide(
 			modules.EthEventAPI(fevmCfg),
@@ -80,8 +69,10 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 		fxEitherOr(
 			fevmCfg.EnableEthRPC,
 			fx.Provide(
-				modules.EthModuleAPI(fevmCfg),
-				func(m *full.EthModule) full.EthModuleAPI { return m },
+				// You may not like it, but this is what peak performance looks like
+				func(mctx helpers.MetricsCtx, r repo.LockedRepo, lc fx.Lifecycle, cs *store.ChainStore, sm *stmgr.StateManager, evapi modules.EventAPI, mp *messagepool.MessagePool, stateapi full.StateAPI, chainapi full.ChainAPI, mpoolapi full.MpoolAPI) (full.EthModuleAPI, error) {
+					return modules.EthModuleAPI(fevmCfg)(mctx, r, lc, cs, sm, evapi, mp, stateapi, chainapi, mpoolapi)
+				},
 			),
 			fx.Provide(func() full.EthModuleAPI { return &full.EthModuleDummy{} }),
 		),
