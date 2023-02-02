@@ -2,9 +2,10 @@ package fxmodules
 
 import (
 	"context"
+	"time"
+
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/node/repo"
-	"time"
 
 	metricsi "github.com/ipfs/go-metrics-interface"
 	"go.uber.org/fx"
@@ -119,7 +120,7 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 
 			// Service: Wallet
 			fx.Annotate(messagesigner.NewMessageSigner, fx.As(new(messagesigner.MsgSigner))),
-			//func(ms *messagesigner.MessageSigner) messagesigner.MsgSigner { return ms },
+			// func(ms *messagesigner.MessageSigner) messagesigner.MsgSigner { return ms },
 			wallet.NewWallet,
 			fx.Annotate(
 				wallet.NewWallet,

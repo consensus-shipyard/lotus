@@ -39,6 +39,7 @@ import (
 const (
 	makeGenFlag     = "eudico-make-genesis"
 	preTemplateFlag = "genesis-template"
+	DefaultSubnetID = "/root"
 )
 
 var daemonStopCmd = &cli.Command{
@@ -122,6 +123,10 @@ func daemonCmd(consensusAlgorithm global.ConsensusAlgorithm) *cli.Command {
 			&cli.StringFlag{
 				Name:  "config",
 				Usage: "specify path of config file to use",
+			},
+			&cli.StringFlag{
+				Name:  "subnet-id",
+				Usage: "ID of the subnet",
 			},
 			// FIXME: This is not the correct place to put this configuration
 			//  option. Ideally it would be part of `config.toml` but at the
@@ -251,6 +256,12 @@ func eudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.
 		if chainfile != "" || snapshot != "" {
 			panic("import chain or snapshot is not supported")
 		}
+
+		subnetID := fx.Provide(DefaultSubnetID)
+		if cctx.String("subnet-id") != "" {
+			subnetID = fx.Provide(cctx.String("subnet-id"))
+		}
+		_ = subnetID
 
 		genesis := fx.Options()
 		if len(genBytes) > 0 {
