@@ -59,15 +59,31 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 
 			new(dtypes.MpoolLocker),
 		),
-		// Eth APIs
-		fxEitherOr(
-			fevmCfg.EnableEthRPC,
-			fx.Provide(modules.EthEventAPI(fevmCfg)),
-			fx.Provide(func() full.EthModuleAPI { return &full.EthModuleDummy{} }),
+		fx.Supply(
+			modules.EventAPI{},
+			// fx.Annotate(
+			// 	new(modules.EventAPI),
+			// )
 		),
+		// Actor event filtering support
+		// fx.Provide(
+		// 	// func() events.EventAPI { return new(modules.EventAPI) },
+		// 	fx.Annotate(
+		// 		func() events.EventAPI { return new(modules.EventAPI) },
+		// 	),
+		// ),
+		// Eth APIs
 		fx.Provide(
 			modules.EthEventAPI(fevmCfg),
 			func(event *full.EthEvent) full.EthEventAPI { return event },
+		),
+		fxEitherOr(
+			fevmCfg.EnableEthRPC,
+			fx.Provide(
+				modules.EthModuleAPI(fevmCfg),
+				func(m *full.EthModule) full.EthModuleAPI { return m },
+			),
+			fx.Provide(func() full.EthModuleAPI { return &full.EthModuleDummy{} }),
 		),
 		// bootstrap settings
 		fxOptional(isBootstrap, fx.Provide(peermgr.NewPeerMgr)),
