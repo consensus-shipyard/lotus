@@ -223,17 +223,17 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 		}
 	}
 
-	// Create ipc gateway actor
-	gatewayAct, err := SetupIPCGateway(ctx, bs, av, "TestGateway", 10)
-	if err != nil {
-		return nil, nil, xerrors.Errorf("setup ipc gateway actor: %w", err)
-	}
-	// 64 is the chosen address to use
-	gatewayAddress, _ := address.NewIDAddress(64)
+	// // Create ipc gateway actor
+	// gatewayAct, err := SetupIPCGateway(ctx, bs, av, "TestGateway", 10)
+	// if err != nil {
+	// 	return nil, nil, xerrors.Errorf("setup ipc gateway actor: %w", err)
+	// }
+	// // 64 is the chosen address to use
+	// gatewayAddress, _ := address.NewIDAddress(64)
 
-	if err := state.SetActor(gatewayAddress, gatewayAct); err != nil {
-		return nil, nil, xerrors.Errorf("set ipc gateway actor: %w", err)
-	}
+	// if err := state.SetActor(gatewayAddress, gatewayAct); err != nil {
+	// 	return nil, nil, xerrors.Errorf("set ipc gateway actor: %w", err)
+	// }
 
 	bact, err := MakeAccountActor(ctx, cst, av, builtin.BurntFundsActorAddr, big.Zero())
 	if err != nil {

@@ -1,8 +1,6 @@
 package actors
 
 import (
-	"fmt"
-
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 
@@ -23,9 +21,6 @@ func GetActorCodeID(av actorstypes.Version, name string) (cid.Cid, bool) {
 	// Actors V8 and above
 	if av >= actorstypes.Version8 {
 		if cids, ok := GetActorCodeIDsFromManifest(av); ok {
-			for n, c := range cids {
-				fmt.Println(">>> CID name", n, c)
-			}
 			c, ok := cids[name]
 			return c, ok
 		}
