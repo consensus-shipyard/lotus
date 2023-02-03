@@ -447,7 +447,6 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		Parent:           sm.prevCheckpoint,
 		BlockCids:        make([]cid.Cid, 0),
 		NextConfigNumber: sm.nextConfigurationNumber,
-		// Votes:            sm.storeConfigurationVotes(),
 	}
 
 	// put blocks in descending order.

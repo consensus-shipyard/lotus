@@ -17,7 +17,7 @@ func TestRestoreConfigurationVotes(t *testing.T) {
 		{34, "hash", NewVotedValidators(vs2...)},
 	}
 
-	m := restoreConfigurationVotes(votes)
+	m := RestoreConfigurationVotes(votes)
 	require.Equal(t, 2, len(m))
 	require.Equal(t, 2, len(m[0]["hash"]))
 	require.Equal(t, 1, len(m[34]["hash"]))
@@ -29,7 +29,7 @@ func TestStoreConfigurationVotes(t *testing.T) {
 	m[0]["aa"] = []types.NodeID{"id1", "id2"}
 	m[0]["bb"] = []types.NodeID{"id1"}
 
-	votes := storeConfigurationVotes(m)
+	votes := StoreConfigurationVotes(m)
 	require.Equal(t, 2, len(votes))
 	require.Equal(t, uint64(0), votes[0].ConfigurationNumber, uint64(0))
 	require.Equal(t, uint64(0), votes[1].ConfigurationNumber, uint64(0))
