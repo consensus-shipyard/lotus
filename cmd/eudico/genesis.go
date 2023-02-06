@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -17,10 +18,6 @@ import (
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
-)
-
-const (
-	defaultTemplateFile = "./eudico/template.json"
 )
 
 var genesisCmd = &cli.Command{
@@ -38,36 +35,31 @@ var genesisNewCmd = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "subnet-id",
+			Value: types.RootStr,
 			Usage: "The ID of the subnet",
 		},
 		&cli.StringFlag{
-			Name:  "template-file",
-			Usage: "genesis template file [template.json]",
+			Name:    "out",
+			Aliases: []string{"o"},
+			Value:   "genesis.car",
+			Usage:   "write output to `FILE`",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		if !cctx.Args().Present() {
-			return xerrors.New("genesis new [genesis]")
-		}
-		sid := cctx.String("subnet-id")
-		if sid == "" {
-			sid = types.RootStr
-			fmt.Printf("Empty subnet ID is provided, %s network will be used\n", sid)
+		if cctx.Args().Len() != 1 {
+			return xerrors.Errorf("Please specify a genesis template.")
 		}
 
+		sid := cctx.String("subnet-id")
 		subnetID, err := types.NewSubnetIDFromString(sid)
 		if err != nil {
 			return xerrors.Errorf("incorrect subnet ID %s: %w", err)
 		}
 
-		tmplFilePath := cctx.String("template-file")
-		if tmplFilePath == "" {
-			tmplFilePath = defaultTemplateFile
-		}
-
+		tmplFilePath := cctx.Args().First()
 		tmplBytes, err := ioutil.ReadFile(tmplFilePath)
 		if err != nil {
-			return xerrors.Errorf("failed to read template file %s: %w", tmplFilePath, err)
+			return xerrors.Errorf("failed to read template %s: %w", tmplFilePath, err)
 		}
 
 		var tmpl genesis.Template
@@ -82,7 +74,7 @@ var genesisNewCmd = &cli.Command{
 			return err
 		}
 
-		genFilePath, err := homedir.Expand(cctx.Args().First() + ".car")
+		genFilePath, err := homedir.Expand(cctx.Args().First() + ".tmp")
 		if err != nil {
 			return err
 		}
@@ -95,8 +87,12 @@ var genesisNewCmd = &cli.Command{
 		bstor := blockstore.WrapIDStore(blockstore.NewMemorySync())
 		sbldr := vm.Syscalls(ffiwrapper.ProofVerifier)
 
-		_, err = testing.MakeGenesis(cctx.Args().First()+".car", genFilePath)(bstor, sbldr, jrnl)()
-		return err
+		_, err = testing.MakeGenesis(cctx.String("out"), genFilePath)(bstor, sbldr, jrnl)()
+		if err != nil {
+			return err
+		}
+
+		return os.Remove(cctx.Args().First() + ".tmp")
 	},
 }
 
