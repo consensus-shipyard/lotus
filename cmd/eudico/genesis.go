@@ -11,9 +11,16 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/types"
 
-	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/gen"
+	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/genesis"
+	"github.com/filecoin-project/lotus/journal"
+	"github.com/filecoin-project/lotus/node/modules/testing"
+	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
+)
+
+const (
+	defaultTemplateFile = "./eudico/template.json"
 )
 
 var genesisCmd = &cli.Command{
@@ -27,52 +34,69 @@ var genesisCmd = &cli.Command{
 
 var genesisNewCmd = &cli.Command{
 	Name:        "new",
-	Description: "create new genesis template",
+	Description: "create new genesis from the template and store it in a car file",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "subnet-id",
 			Usage: "The ID of the subnet",
 		},
+		&cli.StringFlag{
+			Name:  "template-file",
+			Usage: "genesis template file [template.json]",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		if !cctx.Args().Present() {
-			return xerrors.New("genesis new [genesis.json]")
+			return xerrors.New("genesis new [genesis]")
 		}
-		s := cctx.String("subnet-id")
-		if s == "" {
-			s = types.RootStr
-			fmt.Printf("Empty subnet ID is provided, %s network will be used\n", s)
+		sid := cctx.String("subnet-id")
+		if sid == "" {
+			sid = types.RootStr
+			fmt.Printf("Empty subnet ID is provided, %s network will be used\n", sid)
 		}
 
-		id, err := types.NewSubnetIDFromString(s)
+		subnetID, err := types.NewSubnetIDFromString(sid)
 		if err != nil {
 			return xerrors.Errorf("incorrect subnet ID %s: %w", err)
 		}
 
-		out := genesis.Template{
-			NetworkVersion:   build.GenesisNetworkVersion,
-			Accounts:         []genesis.Actor{},
-			Miners:           []genesis.Miner{},
-			VerifregRootKey:  gen.DefaultVerifregRootkeyActor,
-			RemainderAccount: gen.DefaultRemainderAccountActor,
-			NetworkName:      id.String(),
+		tmplFilePath := cctx.String("template-file")
+		if tmplFilePath == "" {
+			tmplFilePath = defaultTemplateFile
 		}
 
-		genb, err := json.MarshalIndent(&out, "", "  ")
+		tmplBytes, err := ioutil.ReadFile(tmplFilePath)
+		if err != nil {
+			return xerrors.Errorf("failed to read template file %s: %w", tmplFilePath, err)
+		}
+
+		var tmpl genesis.Template
+		if err := json.Unmarshal(tmplBytes, &tmpl); err != nil {
+			return err
+		}
+
+		tmpl.NetworkName = subnetID.String()
+
+		tmplBytes, err = json.MarshalIndent(&tmpl, "", "  ")
 		if err != nil {
 			return err
 		}
 
-		genf, err := homedir.Expand(cctx.Args().First())
+		genFilePath, err := homedir.Expand(cctx.Args().First() + ".car")
 		if err != nil {
 			return err
 		}
 
-		if err := ioutil.WriteFile(genf, genb, 0644); err != nil {
-			return err
+		if err := ioutil.WriteFile(genFilePath, tmplBytes, 0644); err != nil {
+			return xerrors.Errorf("failed to create genesis file %s: %w", genFilePath, err)
 		}
 
-		return nil
+		jrnl := journal.NilJournal()
+		bstor := blockstore.WrapIDStore(blockstore.NewMemorySync())
+		sbldr := vm.Syscalls(ffiwrapper.ProofVerifier)
+
+		_, err = testing.MakeGenesis(cctx.Args().First()+".car", genFilePath)(bstor, sbldr, jrnl)()
+		return err
 	},
 }
 
