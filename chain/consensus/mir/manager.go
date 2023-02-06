@@ -120,10 +120,7 @@ func NewManager(ctx context.Context, validatorID address.Address, h host.Host, a
 	logger := newManagerLogger(mirID)
 
 	// Create Mir modules.
-	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
-	if err != nil {
-		return nil, fmt.Errorf("validator %v failed to create network transport: %w", validatorID, err)
-	}
+	netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(mirID), h, logger)
 
 	cryptoManager, err := NewCryptoManager(validatorID, api)
 	if err != nil {
