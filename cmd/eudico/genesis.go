@@ -51,7 +51,7 @@ var genesisNewCmd = &cli.Command{
 		sid := cctx.String("subnet-id")
 		subnetID, err := types.NewSubnetIDFromString(sid)
 		if err != nil {
-			return xerrors.Errorf("incorrect subnet ID %s: %w", err)
+			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}
 
 		tmplFilePath := cctx.Args().First()
