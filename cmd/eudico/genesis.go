@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
@@ -17,6 +18,10 @@ import (
 	"github.com/filecoin-project/lotus/journal"
 	"github.com/filecoin-project/lotus/node/modules/testing"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
+)
+
+const (
+	genesisTemplateFileName = "genesis/genesis.json"
 )
 
 var genesisCmd = &cli.Command{
@@ -44,17 +49,18 @@ var genesisNewCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-		if cctx.Args().Len() != 1 {
-			return xerrors.Errorf("Please specify a genesis template.")
-		}
-
 		sid := cctx.String("subnet-id")
 		subnetID, err := types.NewSubnetIDFromString(sid)
 		if err != nil {
 			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}
 
-		tmplFilePath := cctx.Args().First()
+		e, err := os.Executable()
+		if err != nil {
+			return err
+		}
+
+		tmplFilePath := filepath.Join(filepath.Dir(e), genesisTemplateFileName)
 		tmplBytes, err := ioutil.ReadFile(tmplFilePath)
 		if err != nil {
 			return xerrors.Errorf("failed to read template %s: %w", tmplFilePath, err)

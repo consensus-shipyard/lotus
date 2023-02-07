@@ -23,7 +23,7 @@ var eudCmds = []*cli.Command{
 	lcli.WithCategory("daemon", tpowCmd),
 	lcli.WithCategory("daemon", filcnsCmd),
 	lcli.WithCategory("daemon", mirCmd),
-	lcli.WithCategory("daemon", genesisCmd),
+	genesisCmd,
 }
 
 var log = logging.Logger("eudico")
