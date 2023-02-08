@@ -221,16 +221,12 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
-	log.With("validator", sm.ValidatorID).Infof("ApplyTXs for epoch %d started", sm.currentEpoch)
-	defer log.With("validator", sm.ValidatorID).Infof("ApplyTXs for epoch %d finished", sm.currentEpoch)
-
 	var mirMsgs []Message
 
 	sm.height++
 
 	// For each request in the batch
 	for _, req := range txs {
-		fmt.Println(">>> applytxs", req.ClientId, req.ReqNo)
 		switch req.Type {
 		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
