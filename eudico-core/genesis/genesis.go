@@ -45,11 +45,6 @@ func MakeGenesis(ctx context.Context, outFilePath string, subnetID string) error
 	}
 	tmpl.NetworkName = subnetID
 
-	tmplBytes, err = json.MarshalIndent(&tmpl, "", "  ")
-	if err != nil {
-		return err
-	}
-
 	jrnl := journal.NilJournal()
 	bs := blockstore.WrapIDStore(blockstore.NewMemorySync())
 	sbldr := vm.Syscalls(ffiwrapper.ProofVerifier)
