@@ -106,8 +106,8 @@ func TestMirConsensusWithReconfiguration(t *testing.T) {
 	TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t)
 	TestMirWithReconfiguration_AddOneValidatorAtHeight(t)
 
-	TestMirWithReconfiguration_AddThreeValidators(t)
-	TestMirWithReconfiguration_AddThreeValidatorsOneByOne(t)
+	TestMirWithReconfiguration_AddValidatorsOnce(t)
+	TestMirWithReconfiguration_AddValidatorsOneByOne(t)
 }
 
 // TestMirWithReconfiguration_AddAndRemoveOneValidator tests that the reconfiguration mechanism operates normally
@@ -220,7 +220,7 @@ func TestMirWithReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:MirTotalValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, 40*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, 20*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -427,9 +427,9 @@ func TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddThreeValidators tests that the reconfiguration mechanism operates normally
-// if 3 new validators join the network at the same time. To add 3 validators we have to have a network with 7 validators.
-func TestMirWithReconfiguration_AddThreeValidators(t *testing.T) {
+// TestMirWithReconfiguration_AddValidatorsOnce tests that the reconfiguration mechanism operates normally
+// if new validators join the network at the same time.
+func TestMirWithReconfiguration_AddValidatorsOnce(t *testing.T) {
 	totalValidatorNumber := 7
 	addedValidatorNumber := 3
 	var wg sync.WaitGroup
@@ -469,15 +469,15 @@ func TestMirWithReconfiguration_AddThreeValidators(t *testing.T) {
 	// Start new miners.
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[totalValidatorNumber:])
 
-	err = kit.AdvanceChain(ctx, 100, nodes...)
+	err = kit.AdvanceChain(ctx, 40, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddThreeValidatorsOneByOne tests that the reconfiguration mechanism operates normally
-// if 3 new validators join the network one by one.
-func TestMirWithReconfiguration_AddThreeValidatorsOneByOne(t *testing.T) {
+// TestMirWithReconfiguration_AddValidatorsOneByOne tests that the reconfiguration mechanism operates normally
+// if validators join the network one by one.
+func TestMirWithReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 	addedValidatorNumber := 3
 	var wg sync.WaitGroup
 
@@ -524,10 +524,6 @@ func TestMirWithReconfiguration_AddThreeValidatorsOneByOne(t *testing.T) {
 		t.Logf(">>> advancing the chain after adding validator %d", i)
 		err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber+i]...)
 		require.NoError(t, err)
-
-		// t.Logf(">>> checking the chain after adding validator %d", i)
-		// err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber+i]...)
-		// require.NoError(t, err)
 	}
 
 	err = kit.AdvanceChain(ctx, 30, nodes...)

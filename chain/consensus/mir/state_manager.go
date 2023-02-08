@@ -252,7 +252,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	log.With("validator", sm.ValidatorID).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
 
 	msgs := sm.MirManager.GetSignedMessages(mirMsgs)
-	log.With("validator", sm.ValidatorID).With("epoch", nextHeight).Infof("try to create a block: msgs - %d", len(msgs))
+	log.With("validator", sm.ValidatorID).With("epoch", sm.currentEpoch).
+		With("height", nextHeight).Infof("try to create a block: msgs - %d", len(msgs))
 
 	// include checkpoint in VRF proof field?
 	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
