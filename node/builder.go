@@ -259,7 +259,7 @@ func Base() Option {
 	)
 }
 
-// Config sets up constructors based on the provided Config
+// ConfigCommon sets up constructors based on the provided Config
 func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 	// setup logging early
 	lotuslog.SetLevelsFromConfig(cfg.Logging.SubsystemLevels)
