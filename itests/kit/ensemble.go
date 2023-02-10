@@ -52,6 +52,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/cmd/lotus-seed/seed"
 	"github.com/filecoin-project/lotus/cmd/lotus-worker/sealworker"
+	"github.com/filecoin-project/lotus/gateway"
 	"github.com/filecoin-project/lotus/eudico-core/fxmodules"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/genesis"
@@ -218,7 +219,7 @@ func (n *Ensemble) FullNode(full *TestFullNode, opts ...NodeOpt) *Ensemble {
 		n.genesis.accounts = append(n.genesis.accounts, genacc)
 	}
 
-	*full = TestFullNode{t: n.t, options: options, DefaultKey: key}
+	*full = TestFullNode{t: n.t, options: options, DefaultKey: key, EthSubRouter: gateway.NewEthSubHandler()}
 
 	n.inactive.fullnodes = append(n.inactive.fullnodes, full)
 	return n

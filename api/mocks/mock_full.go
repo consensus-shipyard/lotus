@@ -10,19 +10,11 @@ import (
 	reflect "reflect"
 	time "time"
 
-	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
-	cid "github.com/ipfs/go-cid"
-	blocks "github.com/ipfs/go-libipfs/blocks"
-	metrics "github.com/libp2p/go-libp2p/core/metrics"
-	network0 "github.com/libp2p/go-libp2p/core/network"
-	peer "github.com/libp2p/go-libp2p/core/peer"
-	protocol "github.com/libp2p/go-libp2p/core/protocol"
-
 	address "github.com/filecoin-project/go-address"
 	bitfield "github.com/filecoin-project/go-bitfield"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
+	jsonrpc "github.com/filecoin-project/go-jsonrpc"
 	auth "github.com/filecoin-project/go-jsonrpc/auth"
 	abi "github.com/filecoin-project/go-state-types/abi"
 	big "github.com/filecoin-project/go-state-types/big"
@@ -32,7 +24,6 @@ import (
 	crypto "github.com/filecoin-project/go-state-types/crypto"
 	dline "github.com/filecoin-project/go-state-types/dline"
 	network "github.com/filecoin-project/go-state-types/network"
-
 	api "github.com/filecoin-project/lotus/api"
 	apitypes "github.com/filecoin-project/lotus/api/types"
 	miner0 "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
@@ -41,6 +32,14 @@ import (
 	alerting "github.com/filecoin-project/lotus/journal/alerting"
 	dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	imports "github.com/filecoin-project/lotus/node/repo/imports"
+	gomock "github.com/golang/mock/gomock"
+	uuid "github.com/google/uuid"
+	cid "github.com/ipfs/go-cid"
+	blocks "github.com/ipfs/go-libipfs/blocks"
+	metrics "github.com/libp2p/go-libp2p/core/metrics"
+	network0 "github.com/libp2p/go-libp2p/core/network"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	protocol "github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // MockFullNode is a mock of FullNode interface.
@@ -1388,18 +1387,18 @@ func (mr *MockFullNodeMockRecorder) EthSendRawTransaction(arg0, arg1 interface{}
 }
 
 // EthSubscribe mocks base method.
-func (m *MockFullNode) EthSubscribe(arg0 context.Context, arg1 string, arg2 *ethtypes.EthSubscriptionParams) (<-chan ethtypes.EthSubscriptionResponse, error) {
+func (m *MockFullNode) EthSubscribe(arg0 context.Context, arg1 jsonrpc.RawParams) (ethtypes.EthSubscriptionID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EthSubscribe", arg0, arg1, arg2)
-	ret0, _ := ret[0].(<-chan ethtypes.EthSubscriptionResponse)
+	ret := m.ctrl.Call(m, "EthSubscribe", arg0, arg1)
+	ret0, _ := ret[0].(ethtypes.EthSubscriptionID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // EthSubscribe indicates an expected call of EthSubscribe.
-func (mr *MockFullNodeMockRecorder) EthSubscribe(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockFullNodeMockRecorder) EthSubscribe(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthSubscribe", reflect.TypeOf((*MockFullNode)(nil).EthSubscribe), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthSubscribe", reflect.TypeOf((*MockFullNode)(nil).EthSubscribe), arg0, arg1)
 }
 
 // EthUninstallFilter mocks base method.
@@ -4124,4 +4123,19 @@ func (m *MockFullNode) WalletVerify(arg0 context.Context, arg1 address.Address, 
 func (mr *MockFullNodeMockRecorder) WalletVerify(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WalletVerify", reflect.TypeOf((*MockFullNode)(nil).WalletVerify), arg0, arg1, arg2, arg3)
+}
+
+// Web3ClientVersion mocks base method.
+func (m *MockFullNode) Web3ClientVersion(arg0 context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Web3ClientVersion", arg0)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Web3ClientVersion indicates an expected call of Web3ClientVersion.
+func (mr *MockFullNodeMockRecorder) Web3ClientVersion(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Web3ClientVersion", reflect.TypeOf((*MockFullNode)(nil).Web3ClientVersion), arg0)
 }

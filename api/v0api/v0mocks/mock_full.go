@@ -9,15 +9,6 @@ import (
 	reflect "reflect"
 	time "time"
 
-	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
-	cid "github.com/ipfs/go-cid"
-	blocks "github.com/ipfs/go-libipfs/blocks"
-	metrics "github.com/libp2p/go-libp2p/core/metrics"
-	network0 "github.com/libp2p/go-libp2p/core/network"
-	peer "github.com/libp2p/go-libp2p/core/peer"
-	protocol "github.com/libp2p/go-libp2p/core/protocol"
-
 	address "github.com/filecoin-project/go-address"
 	bitfield "github.com/filecoin-project/go-bitfield"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -32,7 +23,6 @@ import (
 	crypto "github.com/filecoin-project/go-state-types/crypto"
 	dline "github.com/filecoin-project/go-state-types/dline"
 	network "github.com/filecoin-project/go-state-types/network"
-
 	api "github.com/filecoin-project/lotus/api"
 	apitypes "github.com/filecoin-project/lotus/api/types"
 	v0api "github.com/filecoin-project/lotus/api/v0api"
@@ -42,6 +32,14 @@ import (
 	marketevents "github.com/filecoin-project/lotus/markets/loggers"
 	dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	imports "github.com/filecoin-project/lotus/node/repo/imports"
+	gomock "github.com/golang/mock/gomock"
+	uuid "github.com/google/uuid"
+	cid "github.com/ipfs/go-cid"
+	blocks "github.com/ipfs/go-libipfs/blocks"
+	metrics "github.com/libp2p/go-libp2p/core/metrics"
+	network0 "github.com/libp2p/go-libp2p/core/network"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	protocol "github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // MockFullNode is a mock of FullNode interface.
