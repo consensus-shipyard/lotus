@@ -228,7 +228,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		log.Infof("Interceptor initialized")
 		m.interceptor, err = eventlog.NewRecorder(
 			t.NodeID(mirID),
-			interceptorOutput,
+			interceptorOutput+"/"+mirID,
 			logging.Decorate(logger, "Interceptor: "),
 		)
 		if err != nil {
