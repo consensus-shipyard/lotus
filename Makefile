@@ -87,25 +87,25 @@ spacenet-unit-test:
 spacenet-test: GOFLAGS+=-tags=spacenet
 spacenet-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=60m -run TestMirConsensus ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=60m -run TestMir ./itests/mir_test.go
 .PHONY: spacenet-test
 
 spacenet-mangling-test: GOFLAGS+=-tags=spacenet
 spacenet-mangling-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=180m -run TestMirConsensusWithMangler ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=180m -run TestMirWithMangler ./itests/mir_test.go
 .PHONY: spacenet-mangling-test
 
 spacenet-smoke-test: GOFLAGS+=-tags=spacenet
 spacenet-smoke-test:
 	export GOLOG_LOG_LEVEL="INFO,mir-manager=debug,mir-consensus=debug"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m -run TestMirConsensusSmoke ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m -run TestMirSmoke ./itests/mir_test.go
 .PHONY: spacenet-smoke-test
 
 spacenet-test-reconfiguration: GOFLAGS+=-tags=spacenet
 spacenet-test-reconfiguration:
 	export GOLOG_LOG_LEVEL="ERROR,mir-consensus=info,mir-manager=error" MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirWithReconfiguration ./itests/mir_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=30m -run TestMirReconfiguration ./itests/mir_test.go
 .PHONY: spacenet-test-reconfiguration
 
 spacenet-test-race: GOFLAGS+=-tags=spacenet

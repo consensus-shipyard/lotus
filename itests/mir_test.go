@@ -51,67 +51,9 @@ func setupMangler(t *testing.T) {
 	})
 }
 
-// TestMirConsensusWithMangler tests that Mir operates normally when messaged are dropped or delayed.
-func TestMirConsensusWithMangler(t *testing.T) {
-	TestMirAllNodesMiningWithMangling(t)
-	TestMirAllNodesMiningWithMessagingWithMangler(t)
-	TestMirWhenLearnersJoinWithMangler(t)
-}
-
-func TestMirConsensusSmoke(t *testing.T) {
-	TestMirOneNodeMines(t)
-	TestMirAllNodesMine(t)
-	TestMirStartStop(t)
-	TestGenesisBlocksOfValidatorsAndLearners(t)
-	TestMirFNodesNeverStart(t)
-}
-
-func TestMirConsensusAdvanced(t *testing.T) {
-	TestMirWhenLearnersJoin(t)
-	TestMirNodesStartWithRandomDelay(t)
-	TestMirFNodesNeverStart(t)
-	TestMirFNodesStartWithRandomDelay(t)
-	TestMirAllNodesMiningWithMessaging(t)
-	TestMirWithFOmissionNodes(t)
-	TestMirWithFCrashedNodes(t)
-	TestMirWithFCrashedAndRecoveredNodes(t)
-	TestMirFNodesCrashLongTimeApart(t)
-	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
-	TestMirFNodesSleepAndThenOperate(t)
-}
-
-func TestMirConsensus(t *testing.T) {
-	TestMirOneNodeMines(t)
-	TestMirTwoNodesMining(t)
-	TestMirAllNodesMine(t)
-	TestGenesisBlocksOfValidatorsAndLearners(t)
-	TestMirWhenLearnersJoin(t)
-	TestMirNodesStartWithRandomDelay(t)
-	TestMirFNodesNeverStart(t)
-	TestMirFNodesStartWithRandomDelay(t)
-	TestMirAllNodesMiningWithMessaging(t)
-	TestMirWithFOmissionNodes(t)
-	TestMirWithFCrashedNodes(t)
-	TestMirWithFCrashedAndRecoveredNodes(t)
-	TestMirStartStop(t)
-	TestMirFNodesCrashLongTimeApart(t)
-	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
-	TestMirFNodesSleepAndThenOperate(t)
-}
-
-func TestMirConsensusWithReconfiguration(t *testing.T) {
-	TestMirWithReconfiguration_AddAndRemoveOneValidator(t)
-	TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t)
-	TestMirWithReconfiguration_NewNodeFailsToJoin(t)
-	TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t)
-	TestMirWithReconfiguration_AddOneValidatorAtHeight(t)
-	TestMirWithReconfiguration_AddValidatorsOnce(t)
-	TestMirWithReconfiguration_AddValidatorsOneByOne(t)
-}
-
-// TestMirWithReconfiguration_AddAndRemoveOneValidator tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_AddAndRemoveOneValidator tests that the reconfiguration mechanism operates normally
 // if a new validator joins the network and then leaves it.
-func TestMirWithReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
+func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
@@ -190,9 +132,9 @@ func TestMirWithReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	}
 }
 
-// TestMirWithReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
 // if a new validator joins the network that have produced 100 blocks.
-func TestMirWithReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
+func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
@@ -239,9 +181,9 @@ func TestMirWithReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
 // if a new validator join the network and after recovery.
-func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.T) {
+func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
@@ -363,9 +305,9 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 	}
 }
 
-// TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_AddOneValidatorToMembershipWithDelay tests that the reconfiguration mechanism operates normally
 // if a new validator is added to the membership files with delays.
-func TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
+func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFiles := make([]string, MirTotalValidatorNumber+1)
@@ -426,9 +368,9 @@ func TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddValidatorsOnce tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_AddValidatorsOnce tests that the reconfiguration mechanism operates normally
 // if new validators join the network at the same time.
-func TestMirWithReconfiguration_AddValidatorsOnce(t *testing.T) {
+func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 	initialValidatorNumber := 4
 	addedValidatorNumber := 2
 	var wg sync.WaitGroup
@@ -474,9 +416,9 @@ func TestMirWithReconfiguration_AddValidatorsOnce(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_AddValidatorsOneByOne tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_AddValidatorsOneByOne tests that the reconfiguration mechanism operates normally
 // if validators join the network one by one.
-func TestMirWithReconfiguration_AddValidatorsOneByOne(t *testing.T) {
+func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 	addedValidatorNumber := 3
 	var wg sync.WaitGroup
 
@@ -532,10 +474,10 @@ func TestMirWithReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWithReconfiguration_NewNodeFailsToJoin tests that the reconfiguration mechanism operates normally
+// TestMirReconfiguration_NewNodeFailsToJoin tests that the reconfiguration mechanism operates normally
 // if a new validator cannot join the network.
 // In this test we don't stop the faulty validator explicitly, instead, we don't spawn it.
-func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
+func TestMirReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
@@ -569,8 +511,8 @@ func TestMirWithReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirOneNodeMines tests that a Mir node can mine blocks.
-func TestMirOneNodeMines(t *testing.T) {
+// TestMirSmoke_OneNodeMines tests that a Mir node can mine blocks.
+func TestMirSmoke_OneNodeMines(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -587,11 +529,11 @@ func TestMirOneNodeMines(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirTwoNodesMining tests that two Mir nodes can mine blocks.
+// TestMirBasic_TwoNodesMining tests that two Mir nodes can mine blocks.
 //
 // NOTE: The peculiarity of this test is that it uses other mechanisms to instantiate testing
 // comparing to the main tests here.
-func TestMirTwoNodesMining(t *testing.T) {
+func TestMirBasic_TwoNodesMining(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -627,8 +569,8 @@ func TestMirTwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirAllNodesMining tests that n nodes can mine blocks normally.
-func TestMirAllNodesMine(t *testing.T) {
+// TestMirSmoke_AllNodesMine tests that n nodes can mine blocks normally.
+func TestMirSmoke_AllNodesMine(t *testing.T) {
 	t.Run("TestMirAllNodesMining", func(t *testing.T) {
 		var wg sync.WaitGroup
 
@@ -649,14 +591,14 @@ func TestMirAllNodesMine(t *testing.T) {
 	})
 }
 
-// TestMirAllNodesMiningWithMangling run TestMirAllNodesMining with mangler.
-func TestMirAllNodesMiningWithMangling(t *testing.T) {
+// TestMirWithMangler_AllNodesMining run TestMirBasic_AllNodesMining with mangler.
+func TestMirWithMangler_AllNodesMining(t *testing.T) {
 	setupMangler(t)
-	TestMirAllNodesMine(t)
+	TestMirSmoke_AllNodesMine(t)
 }
 
-// TestMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
-func TestMirFNodesNeverStart(t *testing.T) {
+// TestMirBasic_FNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
+func TestMirBasic_FNodesNeverStart(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -675,9 +617,9 @@ func TestMirFNodesNeverStart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWhenLearnersJoin tests that all nodes operate normally
+// TestMirBasic_WhenLearnersJoin tests that all nodes operate normally
 // if new learner joins when the network is already started and syncs the whole network.
-func TestMirWhenLearnersJoin(t *testing.T) {
+func TestMirBasic_WhenLearnersJoin(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -711,14 +653,14 @@ func TestMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWhenLearnersJoinWithMangler runs TestMirWhenLearnersJoin with mangler.
-func TestMirWhenLearnersJoinWithMangler(t *testing.T) {
+// TestMirWithMangler_WhenLearnersJoin runs TestMir_WhenLearnersJoin with mangler.
+func TestMirWithMangler_WhenLearnersJoin(t *testing.T) {
 	setupMangler(t)
-	TestMirWhenLearnersJoin(t)
+	TestMirBasic_WhenLearnersJoin(t)
 }
 
-// TestGenesisBlocksOfValidatorsAndLearners tests that genesis for validators and learners are correct.
-func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
+// TestMirSmoke_GenesisBlocksOfValidatorsAndLearners tests that genesis for validators and learners are correct.
+func TestMirSmoke_GenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
@@ -753,9 +695,9 @@ func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	}
 }
 
-// TestMirMessageFromLearner tests that messages can be sent from learners and validators,
+// TestMirBasic_MessageFromLearner tests that messages can be sent from learners and validators,
 // and successfully proposed by validators
-func TestMirMessageFromLearner(t *testing.T) {
+func TestMirBasic_MessageFromLearner(t *testing.T) {
 	t.Skip()
 	var wg sync.WaitGroup
 
@@ -834,9 +776,9 @@ func TestMirMessageFromLearner(t *testing.T) {
 	}
 }
 
-// TestMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// TestMirBasic_NodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if all nodes start with large, random delays (1-2 minutes).
-func TestMirNodesStartWithRandomDelay(t *testing.T) {
+func TestMirBasic_NodesStartWithRandomDelay(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -855,9 +797,9 @@ func TestMirNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirFNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// TestMirBasic_FNodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if f nodes start with large, random delays (1-2 minutes).
-func TestMirFNodesStartWithRandomDelay(t *testing.T) {
+func TestMirBasic_FNodesStartWithRandomDelay(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -876,8 +818,8 @@ func TestMirFNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
-func TestMirAllNodesMiningWithMessaging(t *testing.T) {
+// TestMirBasic_AllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
+func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -913,15 +855,15 @@ func TestMirAllNodesMiningWithMessaging(t *testing.T) {
 	}
 }
 
-// TestMirAllNodesMiningWithMessagingWithMangler runs TestMirAllNodesMiningWithMessaging with mangler.
-func TestMirAllNodesMiningWithMessagingWithMangler(t *testing.T) {
+// TestMirWithMangler_AllNodesMiningWithMessaging runs TestMir_AllNodesMiningWithMessaging with mangler.
+func TestMirWithMangler_AllNodesMiningWithMessaging(t *testing.T) {
 	setupMangler(t)
-	TestMirAllNodesMiningWithMessaging(t)
+	TestMirBasic_AllNodesMiningWithMessaging(t)
 }
 
-// TestMirWithFOmissionNodes tests that n − f nodes operate normally and can recover
+// TestMirBasic_WithFOmissionNodes tests that n − f nodes operate normally and can recover
 // if f nodes do not have access to network at the same time.
-func TestMirWithFOmissionNodes(t *testing.T) {
+func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -954,9 +896,9 @@ func TestMirWithFOmissionNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWithFCrashedNodes tests that n − f nodes operate normally and can recover
+// TestMirBasic_WithFCrashedNodes tests that n − f nodes operate normally and can recover
 // if f nodes crash at the same time.
-func TestMirWithFCrashedNodes(t *testing.T) {
+func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -989,8 +931,8 @@ func TestMirWithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirStartStop tests that Mir nodes can be stopped.
-func TestMirStartStop(t *testing.T) {
+// TestMirSmoke_StartStop tests that Mir nodes can be stopped.
+func TestMirSmoke_StartStop(t *testing.T) {
 	t.Run("TestMirStartStop", func(t *testing.T) {
 		var wg sync.WaitGroup
 		wait := make(chan struct{})
@@ -1030,10 +972,10 @@ func TestMirStartStop(t *testing.T) {
 	})
 }
 
-// TestMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
+// TestMirBasic_WithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
 // and recovered nodes eventually operate normally
 // if f nodes crash and then recover (with only initial state) after a long delay (few minutes).
-func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
+func TestMirBasic_WithFCrashedAndRecoveredNodes(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1066,9 +1008,9 @@ func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirFNodesCrashLongTimeApart tests that n − f nodes operate normally
+// TestMirBasic_FNodesCrashLongTimeApart tests that n − f nodes operate normally
 // if f nodes crash, long time apart (few minutes).
-func TestMirFNodesCrashLongTimeApart(t *testing.T) {
+func TestMirBasic_FNodesCrashLongTimeApart(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1100,10 +1042,10 @@ func TestMirFNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
+// TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
 // and partitioned nodes eventually catch up
 // if f nodes have a long period of no network access, but do not crash.
-func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
+func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1137,12 +1079,4 @@ func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	time.Sleep(10 * time.Second)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 	require.NoError(t, err)
-}
-
-// TestMirFNodesSleepAndThenOperate tests that n − f nodes operate normally without significant interruption
-// and woken up nodes eventually operate normally
-// if f  nodes sleep for a significant amount of time and then continue operating but keep network connection.
-func TestMirFNodesSleepAndThenOperate(t *testing.T) {
-	// TBD
-	t.Skip()
 }
