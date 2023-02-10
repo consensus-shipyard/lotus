@@ -276,7 +276,7 @@ func TestMirWithReconfiguration_AddOneValidatorWithConfigurationRecovery(t *test
 
 		// -- store fake votes
 		recs := []mir.VoteRecord{{
-			ConfigurationNumber: 0, ValSetHash: "hash", VotedValidators: []mir.VotedValidator{{"id1"}},
+			ConfigurationNumber: 0, ValSetHash: "hash", VotedValidators: []mir.VotedValidator{{ID: "id1"}},
 		}}
 		r := mir.VoteRecords{
 			Records: recs,
