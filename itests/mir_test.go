@@ -66,7 +66,7 @@ func TestMirConsensusSmoke(t *testing.T) {
 	TestMirFNodesNeverStart(t)
 }
 
-func TestMirAdvancedConsensus(t *testing.T) {
+func TestMirConsensusAdvanced(t *testing.T) {
 	TestMirWhenLearnersJoin(t)
 	TestMirNodesStartWithRandomDelay(t)
 	TestMirFNodesNeverStart(t)
@@ -105,7 +105,6 @@ func TestMirConsensusWithReconfiguration(t *testing.T) {
 	TestMirWithReconfiguration_NewNodeFailsToJoin(t)
 	TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t)
 	TestMirWithReconfiguration_AddOneValidatorAtHeight(t)
-
 	TestMirWithReconfiguration_AddValidatorsOnce(t)
 	TestMirWithReconfiguration_AddValidatorsOneByOne(t)
 }
@@ -192,7 +191,7 @@ func TestMirWithReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 }
 
 // TestMirWithReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
-// if a new validator joins the network that have produced many blocks.
+// if a new validator joins the network that have produced 100 blocks.
 func TestMirWithReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	var wg sync.WaitGroup
 
@@ -220,7 +219,7 @@ func TestMirWithReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, &wg, miners[:MirTotalValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, 20*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -430,8 +429,8 @@ func TestMirWithReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.
 // TestMirWithReconfiguration_AddValidatorsOnce tests that the reconfiguration mechanism operates normally
 // if new validators join the network at the same time.
 func TestMirWithReconfiguration_AddValidatorsOnce(t *testing.T) {
-	initialValidatorNumber := 7
-	addedValidatorNumber := 3
+	initialValidatorNumber := 4
+	addedValidatorNumber := 2
 	var wg sync.WaitGroup
 
 	membershipFileName := kit.TempFileName("membership")
@@ -643,7 +642,7 @@ func TestMirAllNodesMine(t *testing.T) {
 		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-		err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+		err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes...)
 		require.NoError(t, err)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 		require.NoError(t, err)

@@ -34,6 +34,14 @@ type Batch struct {
 	Messages []Message
 }
 
+type ErrMirCtxCanceledWhileWaitingBlock struct {
+	Addr address.Address
+}
+
+func (e ErrMirCtxCanceledWhileWaitingBlock) Error() string {
+	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
+}
+
 type StateManager struct {
 	// parent context
 	ctx context.Context
@@ -83,7 +91,7 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 		currentEpoch:            0,
 		reconfigurationVotes:    m.RecoverReconfigurationVotes(),
 		api:                     api,
-		ValidatorID:             m.ValidatorID,
+		ValidatorID:             m.lotusID,
 		nextConfigurationNumber: 1,
 	}
 
@@ -99,11 +107,11 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 	// checkpoint
 	ch, err := sm.firstEpochCheckpoint()
 	if err != nil {
-		return nil, xerrors.Errorf("validator %v failed to get checkpoint for epoch 0: %w", m.ValidatorID, err)
+		return nil, xerrors.Errorf("validator %v failed to get checkpoint for epoch 0: %w", m.mirID, err)
 	}
 	c, err := ch.Cid()
 	if err != nil {
-		return nil, xerrors.Errorf("validator %v failed to get cid for checkpoint: %w", m.ValidatorID, err)
+		return nil, xerrors.Errorf("validator %v failed to get cid for checkpoint: %w", m.mirID, err)
 	}
 	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
 
@@ -295,13 +303,13 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("validator %v unable to sync a block: %w", sm.ValidatorID, err)
 	}
 
-	log.With("validator", sm.MirManager.ValidatorID).With("epoch", sm.currentEpoch).Infof("mined a block at height %d", bh.Header.Height)
+	log.With("validator", sm.MirManager.mirID).With("epoch", sm.currentEpoch).Infof("mined a block at height %d", bh.Header.Height)
 	return nil
 }
 
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	// If we get the configuration message we sent then we remove it from the configuration request storage.
-	if msg.ClientId == sm.MirManager.MirID {
+	if msg.ClientId == sm.MirManager.mirID {
 		sm.MirManager.StoreExecutedConfigurationNumber(msg.ReqNo)
 		sm.MirManager.RemoveAppliedConfigurationRequest(msg.ReqNo)
 	}
@@ -633,7 +641,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 		case <-sm.ctx.Done():
 			return nil
 		case <-time.After(timeout):
-			return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.ValidatorID}
+			return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.lotusID}
 		default:
 			if head == height {
 				return nil
