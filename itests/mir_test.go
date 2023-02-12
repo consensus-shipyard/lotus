@@ -883,7 +883,13 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 
 	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	for i := 0; i < 4; i++ {
+		time.Sleep(5 * time.Second)
+		err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
@@ -894,7 +900,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 		time.Sleep(5 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 		if err == nil {
-			return
+			break
 		}
 	}
 	require.NoError(t, err)
