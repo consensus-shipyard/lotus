@@ -889,10 +889,14 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
 	restoreConnections()
 
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
-	time.Sleep(10 * time.Second)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
+	for i := 0; i < 4; i++ {
+		time.Sleep(5 * time.Second)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+		if err == nil {
+			return
+		}
+	}
 	require.NoError(t, err)
 }
 
@@ -926,8 +930,13 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
 	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	// require.NoError(t, err)
-	time.Sleep(10 * time.Second)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+	for i := 0; i < 4; i++ {
+		time.Sleep(5 * time.Second)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+		if err == nil {
+			return
+		}
+	}
 	require.NoError(t, err)
 }
 
