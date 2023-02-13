@@ -133,19 +133,6 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	}
 
 	var interceptor *eventlog.Recorder
-	interceptorOutput := os.Getenv(InterceptorOutputEnv)
-	if interceptorOutput != "" {
-		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized")
-		interceptor, err = eventlog.NewRecorder(
-			t.NodeID(mirID),
-			interceptorOutput,
-			logging.Decorate(logger, "Interceptor: "),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("validator %v failed to create interceptor: %w", mirID, err)
-		}
-	}
 
 	if cfg.SegmentLength < 0 {
 		return nil, fmt.Errorf("validator %v segment length must not be negative", mirID)
@@ -237,7 +224,23 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	}
 
 	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
-	m.mirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
+
+	interceptorOutput := os.Getenv(InterceptorOutputEnv)
+	if interceptorOutput != "" {
+		// TODO: Persist in repo path?
+		log.Infof("Interceptor initialized")
+		m.interceptor, err = eventlog.NewRecorder(
+			t.NodeID(mirID),
+			interceptorOutput+"/"+mirID,
+			logging.Decorate(logger, "Interceptor: "),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create interceptor: %w", err)
+		}
+		m.mirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
+	} else {
+		m.mirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create Mir node: %w", mirID, err)
 	}

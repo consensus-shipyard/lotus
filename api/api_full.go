@@ -16,6 +16,7 @@ import (
 	datatransfer "github.com/filecoin-project/go-data-transfer"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
+	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/builtin/v8/paych"
@@ -795,15 +796,15 @@ type FullNode interface {
 	EthGetTransactionByBlockHashAndIndex(ctx context.Context, blkHash ethtypes.EthHash, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error)    //perm:read
 	EthGetTransactionByBlockNumberAndIndex(ctx context.Context, blkNum ethtypes.EthUint64, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error) //perm:read
 
-	EthGetCode(ctx context.Context, address ethtypes.EthAddress, blkOpt string) (ethtypes.EthBytes, error)                                         //perm:read
-	EthGetStorageAt(ctx context.Context, address ethtypes.EthAddress, position ethtypes.EthBytes, blkParam string) (ethtypes.EthBytes, error)      //perm:read
-	EthGetBalance(ctx context.Context, address ethtypes.EthAddress, blkParam string) (ethtypes.EthBigInt, error)                                   //perm:read
-	EthChainId(ctx context.Context) (ethtypes.EthUint64, error)                                                                                    //perm:read
-	NetVersion(ctx context.Context) (string, error)                                                                                                //perm:read
-	NetListening(ctx context.Context) (bool, error)                                                                                                //perm:read
-	EthProtocolVersion(ctx context.Context) (ethtypes.EthUint64, error)                                                                            //perm:read
-	EthGasPrice(ctx context.Context) (ethtypes.EthBigInt, error)                                                                                   //perm:read
-	EthFeeHistory(ctx context.Context, blkCount ethtypes.EthUint64, newestBlk string, rewardPercentiles []float64) (ethtypes.EthFeeHistory, error) //perm:read
+	EthGetCode(ctx context.Context, address ethtypes.EthAddress, blkOpt string) (ethtypes.EthBytes, error)                                    //perm:read
+	EthGetStorageAt(ctx context.Context, address ethtypes.EthAddress, position ethtypes.EthBytes, blkParam string) (ethtypes.EthBytes, error) //perm:read
+	EthGetBalance(ctx context.Context, address ethtypes.EthAddress, blkParam string) (ethtypes.EthBigInt, error)                              //perm:read
+	EthChainId(ctx context.Context) (ethtypes.EthUint64, error)                                                                               //perm:read
+	NetVersion(ctx context.Context) (string, error)                                                                                           //perm:read
+	NetListening(ctx context.Context) (bool, error)                                                                                           //perm:read
+	EthProtocolVersion(ctx context.Context) (ethtypes.EthUint64, error)                                                                       //perm:read
+	EthGasPrice(ctx context.Context) (ethtypes.EthBigInt, error)                                                                              //perm:read
+	EthFeeHistory(ctx context.Context, p jsonrpc.RawParams) (ethtypes.EthFeeHistory, error)                                                   //perm:read
 
 	EthMaxPriorityFeePerGas(ctx context.Context) (ethtypes.EthBigInt, error)                      //perm:read
 	EthEstimateGas(ctx context.Context, tx ethtypes.EthCall) (ethtypes.EthUint64, error)          //perm:read
@@ -841,10 +842,13 @@ type FullNode interface {
 	//  - logs: notify new event logs that match a criteria
 	// params contains additional parameters used with the log event type
 	// The client will receive a stream of EthSubscriptionResponse values until EthUnsubscribe is called.
-	EthSubscribe(ctx context.Context, eventType string, params *ethtypes.EthSubscriptionParams) (<-chan ethtypes.EthSubscriptionResponse, error) //perm:write
+	EthSubscribe(ctx context.Context, params jsonrpc.RawParams) (ethtypes.EthSubscriptionID, error) //perm:write
 
 	// Unsubscribe from a websocket subscription
 	EthUnsubscribe(ctx context.Context, id ethtypes.EthSubscriptionID) (bool, error) //perm:write
+
+	// Returns the client version
+	Web3ClientVersion(ctx context.Context) (string, error) //perm:read
 
 	// CreateBackup creates node backup onder the specified file name. The
 	// method requires that the lotus daemon is running with the
@@ -854,6 +858,12 @@ type FullNode interface {
 
 	RaftState(ctx context.Context) (*RaftStateData, error) //perm:read
 	RaftLeader(ctx context.Context) (peer.ID, error)       //perm:read
+}
+
+// reverse interface to the client, called after EthSubscribe
+type EthSubscriber interface {
+	// note: the parameter is ethtypes.EthSubscriptionResponse serialized as json object
+	EthSubscription(ctx context.Context, r jsonrpc.RawParams) error // rpc_method:eth_subscription notify:true
 }
 
 type StorageAsk struct {

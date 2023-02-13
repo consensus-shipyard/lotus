@@ -11,6 +11,8 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
+	builtin2 "github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/builtin/v10/eam"
 	"github.com/filecoin-project/go-state-types/exitcode"
 
 	"github.com/filecoin-project/lotus/api"
@@ -22,7 +24,7 @@ import (
 	"github.com/filecoin-project/lotus/itests/kit"
 )
 
-// TestEthAccountAbstraction goes over the account abstraction workflow:
+// TestEthAccountAbstraction goes over the placeholder creation and promotion workflow:
 // - an placeholder is created when it receives a message
 // - the placeholder turns into an EOA when it sends a message
 func TestEthAccountAbstraction(t *testing.T) {
@@ -65,12 +67,13 @@ func TestEthAccountAbstraction(t *testing.T) {
 	msgFromPlaceholder := &types.Message{
 		From: placeholderAddress,
 		// self-send because an "eth tx payload" can't be to a filecoin address?
-		To: placeholderAddress,
+		To:     placeholderAddress,
+		Method: builtin2.MethodsEVM.InvokeContract,
 	}
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
-	txArgs, err := ethtypes.EthTxArgsFromMessage(msgFromPlaceholder)
+	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
 	require.NoError(t, err)
 
 	digest, err := txArgs.ToRlpUnsignedMsg()
@@ -98,15 +101,16 @@ func TestEthAccountAbstraction(t *testing.T) {
 	// Send another message, it should succeed without any code CID changes
 
 	msgFromPlaceholder = &types.Message{
-		From:  placeholderAddress,
-		To:    placeholderAddress,
-		Nonce: 1,
+		From:   placeholderAddress,
+		To:     placeholderAddress,
+		Method: builtin2.MethodsEVM.InvokeContract,
+		Nonce:  1,
 	}
 
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
-	txArgs, err = ethtypes.EthTxArgsFromMessage(msgFromPlaceholder)
+	txArgs, err = ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
 	require.NoError(t, err)
 
 	digest, err = txArgs.ToRlpUnsignedMsg()
@@ -150,9 +154,10 @@ func TestEthAccountAbstractionFailure(t *testing.T) {
 
 	// create a placeholder actor at the target address
 	msgCreatePlaceholder := &types.Message{
-		From:  client.DefaultKey.Address,
-		To:    placeholderAddress,
-		Value: abi.TokenAmount(types.MustParseFIL("100")),
+		From:   client.DefaultKey.Address,
+		To:     placeholderAddress,
+		Value:  abi.TokenAmount(types.MustParseFIL("100")),
+		Method: builtin2.MethodsEVM.InvokeContract,
 	}
 	smCreatePlaceholder, err := client.MpoolPushMessage(ctx, msgCreatePlaceholder, nil)
 	require.NoError(t, err)
@@ -170,15 +175,16 @@ func TestEthAccountAbstractionFailure(t *testing.T) {
 
 	// send a message from the placeholder address
 	msgFromPlaceholder := &types.Message{
-		From:  placeholderAddress,
-		To:    placeholderAddress,
-		Value: abi.TokenAmount(types.MustParseFIL("20")),
+		From:   placeholderAddress,
+		To:     placeholderAddress,
+		Value:  abi.TokenAmount(types.MustParseFIL("20")),
+		Method: builtin2.MethodsEVM.InvokeContract,
 	}
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
 	msgFromPlaceholder.Value = abi.TokenAmount(types.MustParseFIL("1000"))
-	txArgs, err := ethtypes.EthTxArgsFromMessage(msgFromPlaceholder)
+	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
 	require.NoError(t, err)
 
 	digest, err := txArgs.ToRlpUnsignedMsg()
@@ -207,16 +213,17 @@ func TestEthAccountAbstractionFailure(t *testing.T) {
 	// Send a valid message now, it should succeed without any code CID changes
 
 	msgFromPlaceholder = &types.Message{
-		From:  placeholderAddress,
-		To:    placeholderAddress,
-		Nonce: 1,
-		Value: abi.NewTokenAmount(1),
+		From:   placeholderAddress,
+		To:     placeholderAddress,
+		Nonce:  1,
+		Value:  abi.NewTokenAmount(1),
+		Method: builtin2.MethodsEVM.InvokeContract,
 	}
 
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
-	txArgs, err = ethtypes.EthTxArgsFromMessage(msgFromPlaceholder)
+	txArgs, err = ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
 	require.NoError(t, err)
 
 	digest, err = txArgs.ToRlpUnsignedMsg()
@@ -312,4 +319,52 @@ func TestEthAccountAbstractionFailsFromEvmActor(t *testing.T) {
 	_, err = client.GasEstimateMessageGas(ctx, msgFromContract, nil, types.EmptyTSK)
 	require.Error(t, err, "expected gas estimation to fail")
 	require.Contains(t, err.Error(), "SysErrSenderInvalid")
+}
+
+func TestEthAccountManagerPermissions(t *testing.T) {
+	kit.QuietMiningLogs()
+
+	client, _, ens := kit.EnsembleMinimal(t, kit.MockProofs(), kit.ThroughRPC())
+	ens.InterconnectAll().BeginMining(10 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// setup f1/f3/f4 accounts
+
+	wsp, err := client.WalletNew(ctx, types.KTSecp256k1)
+	require.NoError(t, err)
+
+	wbl, err := client.WalletNew(ctx, types.KTBLS)
+	require.NoError(t, err)
+
+	wdl, err := client.WalletNew(ctx, types.KTDelegated)
+	require.NoError(t, err)
+
+	def := client.DefaultKey.Address
+
+	// send some funds
+	client.ExpectSend(ctx, def, wsp, types.FromFil(10), "")
+	client.ExpectSend(ctx, def, wbl, types.FromFil(10), "")
+	client.ExpectSend(ctx, def, wdl, types.FromFil(10), "")
+	require.NoError(t, err)
+
+	// make sure that EAM only allows CreateExternal to be called by accounts
+	client.ExpectSend(ctx, wsp, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "not one of supported (18)", client.MakeSendCall(builtin2.MethodsEAM.Create, &eam.CreateParams{Nonce: 0}))
+	client.ExpectSend(ctx, wbl, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "not one of supported (18)", client.MakeSendCall(builtin2.MethodsEAM.Create, &eam.CreateParams{Nonce: 0}))
+	client.ExpectSend(ctx, wdl, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "not one of supported (18)", client.MakeSendCall(builtin2.MethodsEAM.Create, &eam.CreateParams{Nonce: 0}))
+
+	client.ExpectSend(ctx, wsp, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "not one of supported (18)", client.MakeSendCall(builtin2.MethodsEAM.Create2, &eam.Create2Params{}))
+	client.ExpectSend(ctx, wbl, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "not one of supported (18)", client.MakeSendCall(builtin2.MethodsEAM.Create2, &eam.Create2Params{}))
+	client.ExpectSend(ctx, wdl, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "not one of supported (18)", client.MakeSendCall(builtin2.MethodsEAM.Create2, &eam.Create2Params{}))
+
+	contractHex, err := os.ReadFile("contracts/SimpleCoin.hex")
+	require.NoError(t, err)
+	contract, err := hex.DecodeString(string(contractHex))
+	require.NoError(t, err)
+	contractParams := abi.CborBytes(contract)
+
+	client.ExpectSend(ctx, wsp, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "", client.MakeSendCall(builtin2.MethodsEAM.CreateExternal, &contractParams))
+	client.ExpectSend(ctx, wbl, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "", client.MakeSendCall(builtin2.MethodsEAM.CreateExternal, &contractParams))
+	client.ExpectSend(ctx, wdl, builtin2.EthereumAddressManagerActorAddr, big.Zero(), "", client.MakeSendCall(builtin2.MethodsEAM.CreateExternal, &contractParams))
 }
