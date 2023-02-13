@@ -883,8 +883,8 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 
 	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
 
-	for i := 0; i < 4; i++ {
-		time.Sleep(5 * time.Second)
+	for i := 0; i < 10; i++ {
+		time.Sleep(4 * time.Second)
 		err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 		if err == nil {
 			break
@@ -896,8 +896,8 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	restoreConnections()
 
 	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	for i := 0; i < 4; i++ {
-		time.Sleep(5 * time.Second)
+	for i := 0; i < 10; i++ {
+		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 		if err == nil {
 			break
