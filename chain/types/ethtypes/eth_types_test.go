@@ -36,13 +36,19 @@ func TestEthIntUnmarshalJSON(t *testing.T) {
 		{[]byte("\"0x0\""), EthUint64(0)},
 		{[]byte("\"0x41\""), EthUint64(65)},
 		{[]byte("\"0x400\""), EthUint64(1024)},
+		{[]byte("\"0\""), EthUint64(0)},
+		{[]byte("\"41\""), EthUint64(41)},
+		{[]byte("\"400\""), EthUint64(400)},
+		{[]byte("0"), EthUint64(0)},
+		{[]byte("100"), EthUint64(100)},
+		{[]byte("1024"), EthUint64(1024)},
 	}
 
 	for _, tc := range testcases {
 		var i EthUint64
 		err := i.UnmarshalJSON(tc.Input.([]byte))
 		require.Nil(t, err)
-		require.Equal(t, i, tc.Output)
+		require.Equal(t, tc.Output, i)
 	}
 }
 
@@ -93,6 +99,48 @@ func TestEthHash(t *testing.T) {
 		h1, err := EthHashFromCid(c)
 		require.Nil(t, err)
 		require.Equal(t, h, h1)
+
+		jm, err := json.Marshal(h)
+		require.NoError(t, err)
+		require.Equal(t, hash, string(jm))
+	}
+}
+
+func TestEthFilterID(t *testing.T) {
+	testcases := []string{
+		`"0x013dbb9442ca9667baccc6230fcd5c1c4b2d4d2870f4bd20681d4d47cfd15184"`,
+		`"0xab8653edf9f51785664a643b47605a7ba3d917b5339a0724e7642c114d0e4738"`,
+	}
+
+	for _, hash := range testcases {
+		var h EthFilterID
+		err := h.UnmarshalJSON([]byte(hash))
+
+		require.Nil(t, err)
+		require.Equal(t, h.String(), strings.Replace(hash, `"`, "", -1))
+
+		jm, err := json.Marshal(h)
+		require.NoError(t, err)
+		require.Equal(t, hash, string(jm))
+	}
+}
+
+func TestEthSubscriptionID(t *testing.T) {
+	testcases := []string{
+		`"0x013dbb9442ca9667baccc6230fcd5c1c4b2d4d2870f4bd20681d4d47cfd15184"`,
+		`"0xab8653edf9f51785664a643b47605a7ba3d917b5339a0724e7642c114d0e4738"`,
+	}
+
+	for _, hash := range testcases {
+		var h EthSubscriptionID
+		err := h.UnmarshalJSON([]byte(hash))
+
+		require.Nil(t, err)
+		require.Equal(t, h.String(), strings.Replace(hash, `"`, "", -1))
+
+		jm, err := json.Marshal(h)
+		require.NoError(t, err)
+		require.Equal(t, hash, string(jm))
 	}
 }
 
@@ -174,7 +222,7 @@ func TestEthFilterResultMarshalJSON(t *testing.T) {
 		TransactionHash:  hash1,
 		BlockHash:        hash2,
 		BlockNumber:      53,
-		Topics:           []EthBytes{hash1[:]},
+		Topics:           []EthHash{hash1},
 		Data:             EthBytes(hash1[:]),
 		Address:          addr,
 	}

@@ -183,3 +183,7 @@ func NewSlashFilter(ds dtypes.MetadataDS) *slashfilter.SlashFilter {
 func UpgradeSchedule() stmgr.UpgradeSchedule {
 	return filcns.DefaultUpgradeSchedule()
 }
+
+func EnableStoringEvents(cs *store.ChainStore) {
+	cs.StoreEvents(true)
+}
