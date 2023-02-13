@@ -324,7 +324,7 @@ func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sys vm.Syscal
 			return cid.Undef, xerrors.Errorf("setting power state: %w", err)
 		}
 
-		rewact, err := SetupRewardActor(ctx, cs.StateBlockstore(), big.Zero(), av)
+		rewact, err := SetupRewardActor(ctx, cs.StateBlockstore(), big.Zero(), av, "/root")
 		if err != nil {
 			return cid.Undef, xerrors.Errorf("setup reward actor: %w", err)
 		}

@@ -166,7 +166,7 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 
 	// Setup reward
 	// RewardActor's state is overwritten by SetupStorageMiners, but needs to exist for miner creation messages
-	rewact, err := SetupRewardActor(ctx, bs, big.Zero(), av)
+	rewact, err := SetupRewardActor(ctx, bs, big.Zero(), av, template.NetworkName)
 	if err != nil {
 		return nil, nil, xerrors.Errorf("setup reward actor: %w", err)
 	}
