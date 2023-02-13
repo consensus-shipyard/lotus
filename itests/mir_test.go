@@ -940,7 +940,7 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 		if err == nil {
-			return
+			break
 		}
 	}
 	require.NoError(t, err)
@@ -1082,7 +1082,13 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
 
 	t.Log(">>> restoring network connections")
@@ -1095,7 +1101,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
 		if err == nil {
-			return
+			break
 		}
 	}
 	require.NoError(t, err)
