@@ -15,7 +15,7 @@ require (
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
-	github.com/consensus-shipyard/go-ipc-types v0.0.0-20230207154039-4d705306d867
+	github.com/consensus-shipyard/go-ipc-types v0.0.0-20230213135627-73b82026528f
 	github.com/containerd/cgroups v1.0.4
 	github.com/coreos/go-systemd/v22 v22.4.0
 	github.com/detailyang/go-fallocate v0.0.0-20180908115635-432fa640bd2e
@@ -187,7 +187,6 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cilium/ebpf v0.4.0 // indirect
-	github.com/consensus-shipyard/go-ipc-types v0.0.0-20230125082907-5fc3bc1d93c8 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20170627025303-887ab5e44cc3 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
@@ -362,5 +361,3 @@ require (
 replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 
 replace github.com/filecoin-project/test-vectors => ./extern/test-vectors
-
-replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types

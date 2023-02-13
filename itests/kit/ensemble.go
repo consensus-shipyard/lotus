@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	ipctypes "github.com/consensus-shipyard/go-ipc-types/types"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -1192,7 +1193,7 @@ func (n *Ensemble) generateGenesis() *genesis.Template {
 		NetworkVersion:   n.genesis.version,
 		Accounts:         n.genesis.accounts,
 		Miners:           n.genesis.miners,
-		NetworkName:      "test",
+		NetworkName:      ipctypes.RootSubnet.String(),
 		Timestamp:        uint64(time.Now().Unix() - int64(n.options.pastOffset.Seconds())),
 		VerifregRootKey:  verifRoot,
 		RemainderAccount: gen.DefaultRemainderAccountActor,

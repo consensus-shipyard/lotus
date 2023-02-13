@@ -6,12 +6,12 @@ import (
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/manifest"
 
 	bstore "github.com/filecoin-project/lotus/blockstore"
-	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/reward"
@@ -36,8 +36,11 @@ func SetupRewardActor(ctx context.Context, bs bstore.Blockstore, qaPower big.Int
 	}
 
 	act := &types.Actor{
-		Code:    actcid,
-		Balance: types.BigInt{Int: build.InitialRewardBalance},
+		Code: actcid,
+		// Balance: types.BigInt{Int: build.InitialRewardBalance},
+		// NOTE: for IPC and spacenet, rewards are handled by the IPC gateway in subnets,
+		// let's not allocate any initial balance into the reward actor.
+		Balance: abi.NewTokenAmount(0),
 		Head:    statecid,
 	}
 
