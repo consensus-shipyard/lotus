@@ -79,6 +79,9 @@ func loadManifests(netw string) error {
 			}
 
 			root, actorCids, err = readBundleManifest(fi)
+			if err != nil {
+				return err
+			}
 			fi.Close() //nolint
 
 		} else {
@@ -87,9 +90,6 @@ func loadManifests(netw string) error {
 			if err != nil {
 				return err
 			}
-		}
-		if err != nil {
-			return err
 		}
 		newMetadata = append(newMetadata, &BuiltinActorsMetadata{
 			Network:     netw,
