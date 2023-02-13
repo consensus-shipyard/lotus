@@ -88,6 +88,9 @@ func loadManifests(netw string) error {
 				return err
 			}
 		}
+		if err != nil {
+			return err
+		}
 		newMetadata = append(newMetadata, &BuiltinActorsMetadata{
 			Network:     netw,
 			Version:     av,
