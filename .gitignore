@@ -56,6 +56,7 @@ lotus-wal*
 mir-event-logs
 
 devgen.car
+genesis.car
 
 
 # The following files are checked into git and result

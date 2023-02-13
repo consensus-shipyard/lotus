@@ -67,9 +67,10 @@ var (
 	ConnectionManagerKey = special{9}  // Libp2p option
 	AutoNATSvcKey        = special{10} // Libp2p option
 	BandwidthReporterKey = special{11} // Libp2p option
-	ConnGaterKey         = special{12} // libp2p option
+	ConnGaterKey         = special{12} // Libp2p option
 	DAGStoreKey          = special{13} // constructor returns multiple values
 	ResourceManagerKey   = special{14} // Libp2p option
+	UserAgentKey         = special{15} // Libp2p option
 )
 
 type invoke int
@@ -125,6 +126,8 @@ const (
 	GoRPCServer
 
 	SetApiEndpointKey
+
+	StoreEventsKey
 
 	_nInvokes // keep this last
 )
@@ -259,7 +262,7 @@ func Base() Option {
 	)
 }
 
-// Config sets up constructors based on the provided Config
+// ConfigCommon sets up constructors based on the provided Config
 func ConfigCommon(cfg *config.Common, enableLibp2pNode bool) Option {
 	// setup logging early
 	lotuslog.SetLevelsFromConfig(cfg.Logging.SubsystemLevels)
