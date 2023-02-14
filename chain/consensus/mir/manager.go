@@ -457,8 +457,6 @@ func (m *Manager) CreateConfigurationRequest(set *validator.Set) *mirproto.Reque
 		Data:     b.Bytes(),
 	}
 
-	fmt.Println("conf req >>>>", r.ClientId, r.ReqNo)
-
 	v, err := proto.Marshal(&r)
 	if err != nil {
 		log.With("validator", m.mirID).Errorf("unable to marshall configuration request: %v", err)

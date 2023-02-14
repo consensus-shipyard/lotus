@@ -2,7 +2,6 @@ package validator
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"testing"
 
@@ -120,7 +119,6 @@ func TestValidatorSetFromJson(t *testing.T) {
 
 	vs2 := NewValidatorSet(2, []Validator{v1, v2})
 	js := vs2.JSONString()
-	fmt.Println(vs2.JSONString())
 
 	var vs1 Set
 	err = json.Unmarshal([]byte(js), &vs1)
