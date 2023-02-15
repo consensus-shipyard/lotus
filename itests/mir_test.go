@@ -571,24 +571,23 @@ func TestMirBasic_TwoNodesMining(t *testing.T) {
 
 // TestMirSmoke_AllNodesMine tests that n nodes can mine blocks normally.
 func TestMirSmoke_AllNodesMine(t *testing.T) {
-	t.Run("TestMirAllNodesMining", func(t *testing.T) {
-		var wg sync.WaitGroup
+	var wg sync.WaitGroup
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer func() {
-			t.Logf("[*] defer: cancelling %s context", t.Name())
-			cancel()
-			wg.Wait()
-		}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+	}()
 
-		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
 
-		err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes...)
-		require.NoError(t, err)
-		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
-		require.NoError(t, err)
-	})
+	err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+
 }
 
 // TestMirWithMangler_AllNodesMining run TestMirBasic_AllNodesMining with mangler.
@@ -853,6 +852,33 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
 		require.NoError(t, err)
 	}
+}
+
+// TestMirBasic_MiningWithOneByzantineNode tests that sending messages mechanism operates normally
+// in a presence of one byzantine node.
+func TestMirBasic_MiningWithOneByzantineNode(t *testing.T) {
+	var wg sync.WaitGroup
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		wg.Wait()
+	}()
+
+	nodes, twinNodes, miners, twinMiners, ens := kit.EnsembleMirNodesWithByzantineTwins(t, 4, mirTestOpts...)
+	ens.Connect(nodes[0], nodes[3])
+	ens.Connect(nodes[3], nodes[1])
+
+	ens.Connect(nodes[1], twinNodes[0])
+	ens.Connect(twinNodes[0], nodes[2])
+
+	ens.BeginMirMining(ctx, &wg, append(miners, twinMiners...)...)
+
+	err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, append(nodes, twinNodes...)...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
 }
 
 // TestMirWithMangler_AllNodesMiningWithMessaging runs TestMir_AllNodesMiningWithMessaging with mangler.
