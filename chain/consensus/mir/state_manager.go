@@ -89,7 +89,7 @@ func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeA
 		NextCheckpoint:          make(chan *checkpoint.StableCheckpoint, 1),
 		MirManager:              m,
 		currentEpoch:            0,
-		reconfigurationVotes:    m.RecoverReconfigurationVotes(),
+		reconfigurationVotes:    m.recoverReconfigurationVotes(),
 		api:                     api,
 		ValidatorID:             m.lotusID,
 		nextConfigurationNumber: 1,
@@ -308,10 +308,10 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 }
 
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
-	// If we get the configuration message we sent then we remove it from the configuration request storage.
+	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.MirManager.mirID {
-		sm.MirManager.StoreExecutedConfigurationNumber(msg.ReqNo)
-		sm.MirManager.RemoveAppliedConfigurationRequest(msg.ReqNo)
+		sm.MirManager.storeExecutedConfigurationNumber(msg.ReqNo)
+		sm.MirManager.removeAppliedConfigurationRequest(msg.ReqNo)
 	}
 
 	var valSet validator.Set
@@ -383,7 +383,7 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 	}
 
 	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = append(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)], votingValidator)
-	if err := sm.MirManager.StoreReconfigurationVotes(sm.reconfigurationVotes); err != nil {
+	if err := sm.MirManager.storeReconfigurationVotes(sm.reconfigurationVotes); err != nil {
 		log.With("validator", sm.ValidatorID).
 			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
 	}
@@ -634,13 +634,16 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	}
 	log.With("validator", sm.ValidatorID).Debugf("waiting for block on height %d with timeout %v", height, timeout)
 	head := abi.ChainEpoch(0)
+	after := time.NewTimer(timeout)
+	defer after.Stop()
+
 	// poll until we get the desired height.
 	// TODO: We may be able to add a slight sleep here if needed.
 	for {
 		select {
 		case <-sm.ctx.Done():
 			return nil
-		case <-time.After(timeout):
+		case <-after.C:
 			return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.lotusID}
 		default:
 			if head == height {
