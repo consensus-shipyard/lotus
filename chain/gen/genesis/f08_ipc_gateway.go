@@ -90,7 +90,7 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 	// to mint new tokens in subnets when top-down messages are executed.
 	// This balance is zero in the root, as now top-down messages can be executed in the root.
 	balance := abi.NewTokenAmount(0)
-	if network != &ipctypes.RootSubnet {
+	if *network != ipctypes.RootSubnet {
 		balance = types.BigInt{Int: build.InitialRewardBalance}
 	}
 
