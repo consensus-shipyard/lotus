@@ -230,9 +230,8 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 	if err != nil {
 		return nil, nil, xerrors.Errorf("setup ipc gateway actor: %w", err)
 	}
-	gatewayAddress, _ := address.NewIDAddress(64)
 
-	if err := state.SetActor(gatewayAddress, gatewayAct); err != nil {
+	if err := state.SetActor(DefaultIPCGatewayAddr, gatewayAct); err != nil {
 		return nil, nil, xerrors.Errorf("set ipc gateway actor: %w", err)
 	}
 

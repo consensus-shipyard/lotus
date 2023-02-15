@@ -3,6 +3,8 @@ package genesis
 import (
 	"context"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
+	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"golang.org/x/xerrors"
 
@@ -12,7 +14,6 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/specs-actors/v7/actors/util/adt"
 
-	ipctypes "github.com/consensus-shipyard/go-ipc-types/types"
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -20,9 +21,6 @@ import (
 )
 
 const (
-	// IPCGatewayManifestID is the id used to index the gateway actor
-	// in the builtin-actors bundle.
-	IPCGatewayManifestID = "ipc_gateway"
 	// Default checkpoint period for the IPC gateway.
 	DefaultCheckpointPeriod = 10
 
@@ -36,7 +34,7 @@ var (
 	DefaultIPCGatewayAddr, _ = address.NewIDAddress(64)
 )
 
-func constructState(store adt.Store, network *ipctypes.SubnetID, checkPeriod int64) (*ipctypes.IPCGatewayState, error) {
+func constructState(store adt.Store, network ipctypes.SubnetID, checkPeriod int64) (*gateway.State, error) {
 	emptyArrayCid, err := adt.StoreEmptyArray(store, bitWidth)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
@@ -47,12 +45,12 @@ func constructState(store adt.Store, network *ipctypes.SubnetID, checkPeriod int
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
 	}
 
-	return &ipctypes.IPCGatewayState{
-		NetworkName:          *network,
+	return &gateway.State{
+		NetworkName:          network,
 		TotalSubnets:         0,
 		MinStake:             big.NewInt(minStake),
 		Subnets:              emptyMapCid,
-		CheckPeriod:          ipctypes.ChainEpoch(checkPeriod),
+		CheckPeriod:          abi.ChainEpoch(checkPeriod),
 		Checkpoints:          emptyMapCid,
 		CheckMsgRegistry:     emptyMapCid,
 		Postbox:              emptyMapCid,
@@ -81,7 +79,7 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 		return nil, err
 	}
 
-	actcid, ok := actors.GetActorCodeID(av, IPCGatewayManifestID)
+	actcid, ok := actors.GetActorCodeID(av, gateway.ManifestID)
 	if !ok {
 		return nil, xerrors.Errorf("failed to get ipc-gateway actor code ID for actors version %d", av)
 	}
@@ -90,7 +88,7 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 	// to mint new tokens in subnets when top-down messages are executed.
 	// This balance is zero in the root, as now top-down messages can be executed in the root.
 	balance := abi.NewTokenAmount(0)
-	if network != &ipctypes.RootSubnet {
+	if network != ipctypes.RootSubnet {
 		balance = types.BigInt{Int: build.InitialRewardBalance}
 	}
 

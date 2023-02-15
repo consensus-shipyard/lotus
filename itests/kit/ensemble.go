@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	ipctypes "github.com/consensus-shipyard/go-ipc-types/types"
+	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
