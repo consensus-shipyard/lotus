@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/ipfs/go-datastore"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
@@ -21,9 +21,6 @@ const (
 )
 
 var (
-	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
-	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
-
 	// SentConfigurationNumberKey is used to store SentConfigurationNumber
 	// that is the maximum configuration request number (nonce) that has been sent.
 	SentConfigurationNumberKey = datastore.NewKey("mir/sent-config-number")
@@ -48,12 +45,20 @@ func NewConfigurationManager(ctx context.Context, ds db.DB, id string) *Configur
 	}
 }
 
-// RecoverConfigurationData recovers configuration related data from the persistent database.
+// GetConfigurationData recovers configuration related data from the persistent database.
 //
 // It recovers configuration number, and configuration requests that may be not applied.
-func (c *ConfigurationManager) RecoverConfigurationData() ([]*mirproto.Request, uint64, error) {
-	sentNumber := c.recoverSentConfigurationNumber()
-	appliedNumber := c.recoverAppliedConfigurationNumber()
+func (c *ConfigurationManager) GetConfigurationData() ([]*mirproto.Request, uint64, error) {
+	// o is the offset to distinguish cases when there are no applied configuration requests and when the
+	// applied reconfiguration request number is 0.
+	// Since we use uint64 we cannot return -1 when there are no applied configurations.
+	o := uint64(1)
+
+	sentNumber := c.GetSentConfigurationNumber()
+	appliedNumber, found := c.GetAppliedConfigurationNumber()
+	if !found {
+		o = 0
+	}
 
 	if sentNumber == appliedNumber && sentNumber == 0 {
 		return nil, 0, nil
@@ -65,7 +70,7 @@ func (c *ConfigurationManager) RecoverConfigurationData() ([]*mirproto.Request, 
 	// Check do we need recovering configuration data or not.
 	var configRequests []*mirproto.Request
 
-	for i := appliedNumber; i < sentNumber; i++ {
+	for i := appliedNumber + o; i <= sentNumber; i++ {
 		b, err := c.ds.Get(c.ctx, configurationIndexKey(i))
 		if err != nil {
 			return nil, 0, err
@@ -84,20 +89,29 @@ func (c *ConfigurationManager) RecoverConfigurationData() ([]*mirproto.Request, 
 	return configRequests, sentNumber, nil
 }
 
-// StoreConfigurationData stored a configuration request and the corresponding configuration number in the persistent database.
-func (c *ConfigurationManager) StoreConfigurationData(r *mirproto.Request, n uint64) error {
+// StoreConfigurationRequest stored a configuration request and the corresponding configuration number in the persistent database.
+func (c *ConfigurationManager) StoreConfigurationRequest(r *mirproto.Request, n uint64) error {
 	v, err := proto.Marshal(r)
 	if err != nil {
 		return err
 	}
-
-	if err := c.ds.Put(c.ctx, configurationIndexKey(n), v); err != nil {
-		return err
-	}
-	return nil
+	return c.ds.Put(c.ctx, configurationIndexKey(n), v)
 }
 
-func (c *ConfigurationManager) RemoveAppliedConfigurationRequest(nonce uint64) {
+// GetConfigurationRequest gets a configuration request from the persistent database.
+func (c *ConfigurationManager) GetConfigurationRequest(n uint64) (*mirproto.Request, error) {
+	b, err := c.ds.Get(c.ctx, configurationIndexKey(n))
+	if err != nil {
+		return nil, err
+	}
+	var r mirproto.Request
+	if err := proto.Unmarshal(b, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (c *ConfigurationManager) RemoveConfigurationRequest(nonce uint64) {
 	if err := c.ds.Delete(c.ctx, configurationIndexKey(nonce)); err != nil {
 		log.With("validator", c.id).Warnf("failed to remove applied configuration request %d: %v", nonce, err)
 	}
@@ -107,11 +121,11 @@ func (c *ConfigurationManager) StoreSentConfigurationNumber(nonce uint64) {
 	c.storeNumber(SentConfigurationNumberKey, nonce)
 }
 
-func (c *ConfigurationManager) StoreExecutedConfigurationNumber(nonce uint64) {
+func (c *ConfigurationManager) StoreAppliedConfigurationNumber(nonce uint64) {
 	c.storeNumber(AppliedConfigurationNumberKey, nonce)
 }
 
-func (c *ConfigurationManager) recoverSentConfigurationNumber() uint64 {
+func (c *ConfigurationManager) GetSentConfigurationNumber() uint64 {
 	b, err := c.ds.Get(c.ctx, SentConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", c.id).Info("stored sent configuration number not found")
@@ -124,20 +138,21 @@ func (c *ConfigurationManager) recoverSentConfigurationNumber() uint64 {
 	return binary.LittleEndian.Uint64(b)
 }
 
-func (c *ConfigurationManager) recoverAppliedConfigurationNumber() uint64 {
+func (c *ConfigurationManager) GetAppliedConfigurationNumber() (uint64, bool) {
+	found := true
 	b, err := c.ds.Get(c.ctx, AppliedConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", c.id).Info("stored executed configuration number not found")
-		return 0
+		return 0, !found
 	}
 	if err != nil {
 		log.With("validator", c.id).Warnf("failed to get applied configuration number: %v", err)
-		return 0
+		return 0, !found
 	}
-	return binary.LittleEndian.Uint64(b)
+	return binary.LittleEndian.Uint64(b), found
 }
 
-func (c *ConfigurationManager) RecoverReconfigurationVotes() map[uint64]map[string][]t.NodeID {
+func (c *ConfigurationManager) GetReconfigurationVotes() map[uint64]map[string][]t.NodeID {
 	votes := make(map[uint64]map[string][]t.NodeID)
 	b, err := c.ds.Get(c.ctx, ReconfigurationVotesKey)
 	if errors.Is(err, datastore.ErrNotFound) {
@@ -154,7 +169,7 @@ func (c *ConfigurationManager) RecoverReconfigurationVotes() map[uint64]map[stri
 		log.With("validator", c.id).Warnf("failed to unmarshal reconfiguration votes: %v", err)
 		return votes
 	}
-	votes = RestoreConfigurationVotes(r.Records)
+	votes = GetConfigurationVotes(r.Records)
 
 	return votes
 }
@@ -188,7 +203,7 @@ func configurationIndexKey(nonce uint64) datastore.Key {
 	return datastore.NewKey(ConfigurationRequestsDBPrefix + strconv.FormatUint(nonce, 10))
 }
 
-func RestoreConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.NodeID {
+func GetConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.NodeID {
 	m := make(map[uint64]map[string][]t.NodeID)
 	for _, v := range voteRecords {
 		if _, exist := m[v.ConfigurationNumber]; !exist {

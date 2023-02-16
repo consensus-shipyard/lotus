@@ -260,7 +260,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
 
-	configRequests, configNonce, err := m.confManager.RecoverConfigurationData()
+	configRequests, configNonce, err := m.confManager.GetConfigurationData()
 	if err != nil {
 		return fmt.Errorf("validator %v failed to recover confgiguration requests: %w", m.mirID, err)
 	}
@@ -326,7 +326,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 					Errorw("failed to select messages from mempool", "error", err)
 			}
 
-			requests := m.CreateTransportRequests(msgs)
+			requests := m.createTransportRequests(msgs)
 
 			if len(configRequests) > 0 {
 				requests = append(requests, configRequests...)
@@ -398,7 +398,7 @@ func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMess
 	return
 }
 
-func (m *Manager) CreateTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
+func (m *Manager) createTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
 	var requests []*mirproto.Request
 	requests = append(requests, m.batchSignedMessages(msgs)...)
 	return requests
@@ -448,7 +448,7 @@ func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirpro
 		Data:     b.Bytes(),
 	}
 
-	if err := m.confManager.StoreConfigurationData(&r, m.reconfigurationNonce); err != nil {
+	if err := m.confManager.StoreConfigurationRequest(&r, m.reconfigurationNonce); err != nil {
 		log.With("validator", m.mirID).Errorf("unable to store configuration request: %v", err)
 		return nil
 	}

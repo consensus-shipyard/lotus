@@ -26,7 +26,10 @@ import (
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
 
-var _ trantor.AppLogic = &StateManager{}
+var (
+	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
+	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
+)
 
 type Message []byte
 
@@ -41,6 +44,8 @@ type ErrMirCtxCanceledWhileWaitingBlock struct {
 func (e ErrMirCtxCanceledWhileWaitingBlock) Error() string {
 	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
 }
+
+var _ trantor.AppLogic = &StateManager{}
 
 type StateManager struct {
 	// parent context
@@ -103,7 +108,7 @@ func NewStateManager(
 		nextConfigurationNumber: 1,
 	}
 
-	sm.reconfigurationVotes = sm.confManager.RecoverReconfigurationVotes()
+	sm.reconfigurationVotes = sm.confManager.GetReconfigurationVotes()
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
@@ -320,8 +325,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.MirManager.mirID {
-		sm.confManager.StoreExecutedConfigurationNumber(msg.ReqNo)
-		sm.confManager.RemoveAppliedConfigurationRequest(msg.ReqNo)
+		sm.confManager.StoreAppliedConfigurationNumber(msg.ReqNo)
+		sm.confManager.RemoveConfigurationRequest(msg.ReqNo)
 	}
 
 	var valSet validator.Set

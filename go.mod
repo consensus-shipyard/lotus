@@ -64,7 +64,6 @@ require (
 	github.com/gdamore/tcell/v2 v2.2.0
 	github.com/go-kit/kit v0.12.0
 	github.com/go-openapi/spec v0.19.11
-	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -168,6 +167,7 @@ require (
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9
 	golang.org/x/tools v0.1.12
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 	gotest.tools v2.2.0+incompatible
 )
@@ -223,6 +223,7 @@ require (
 	github.com/go-openapi/swag v0.19.11 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -351,7 +352,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220505152158-f39f71e6c8f3 // indirect
 	google.golang.org/grpc v1.50.1 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

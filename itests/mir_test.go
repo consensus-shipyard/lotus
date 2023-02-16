@@ -241,7 +241,9 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[:MirTotalValidatorNumber], miners[:MirTotalValidatorNumber])
+
+	ens.InterconnectFullNodes()
+	ens.BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[:MirTotalValidatorNumber], miners[:MirTotalValidatorNumber])
 
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -260,7 +262,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 			require.Equal(t, uint64(0), v.ConfigurationNumber)
 			require.Equal(t, "hash", v.ValSetHash)
 		}
-		votes := mir.RestoreConfigurationVotes(r.Records)
+		votes := mir.GetConfigurationVotes(r.Records)
 		require.Greater(t, MirTotalValidatorNumber, len(votes))
 	}
 
@@ -273,14 +275,15 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	require.Equal(t, cn, membership.GetConfigurationNumber())
 	// Start new miners.
-	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[MirTotalValidatorNumber:], miners[MirTotalValidatorNumber:])
+	ens.InterconnectFullNodes()
+	ens.BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, &wg, dbs[MirTotalValidatorNumber:], miners[MirTotalValidatorNumber:])
 
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 
-	// Core validators must send 1 message with recovered "nonce" .
+	// Core validators must send 1 message with recovered "nonce".
 	for _, m := range miners[:MirTotalValidatorNumber] {
 		db := m.GetDB()
 		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
@@ -299,9 +302,8 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		for _, v := range r.Records {
 			require.Equal(t, cn, v.ConfigurationNumber)
 		}
-		votes := mir.RestoreConfigurationVotes(r.Records)
+		votes := mir.GetConfigurationVotes(r.Records)
 		require.Greater(t, MirTotalValidatorNumber, len(votes))
-
 	}
 }
 
