@@ -18,7 +18,9 @@ import (
 )
 
 var NetworkBundle = "devnet"
-var BundleOverrides map[actorstypes.Version]string
+var BundleOverrides = map[actorstypes.Version]string{
+	actorstypes.Version10: "ipc-actors",
+}
 var ActorDebugging = false
 
 // FIXME: The following will be used to address this issue:

@@ -3,9 +3,11 @@ package genesis
 import (
 	"context"
 
+	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/manifest"
@@ -18,7 +20,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
-func SetupRewardActor(ctx context.Context, bs bstore.Blockstore, qaPower big.Int, av actorstypes.Version) (*types.Actor, error) {
+func SetupRewardActor(ctx context.Context, bs bstore.Blockstore, qaPower big.Int, av actorstypes.Version, networkName string) (*types.Actor, error) {
 	cst := cbor.NewCborStore(bs)
 	rst, err := reward.MakeState(adt.WrapStore(ctx, cst), av, qaPower)
 	if err != nil {
@@ -35,9 +37,17 @@ func SetupRewardActor(ctx context.Context, bs bstore.Blockstore, qaPower big.Int
 		return nil, xerrors.Errorf("failed to get reward actor code ID for actors version %d", av)
 	}
 
+	// For IPC and spacenet, rewards are handled by the IPC gateway in subnets,
+	// let's not allocate any initial balance into the reward actor if this is not
+	// the rootnet.
+	balance := abi.NewTokenAmount(0)
+	if networkName == ipctypes.RootSubnet.String() {
+		balance = types.BigInt{Int: build.InitialRewardBalance}
+	}
+
 	act := &types.Actor{
 		Code:    actcid,
-		Balance: types.BigInt{Int: build.InitialRewardBalance},
+		Balance: balance,
 		Head:    statecid,
 	}
 

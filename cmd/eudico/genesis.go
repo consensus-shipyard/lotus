@@ -1,10 +1,9 @@
 package main
 
 import (
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
-
-	"github.com/consensus-shipyard/go-ipc-types/types"
 
 	"github.com/filecoin-project/lotus/eudico-core/genesis"
 )
@@ -23,7 +22,7 @@ var genesisNewCmd = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "subnet-id",
-			Value: types.RootStr,
+			Value: sdk.RootStr,
 			Usage: "The ID of the subnet",
 		},
 		&cli.StringFlag{
@@ -35,7 +34,7 @@ var genesisNewCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		sid := cctx.String("subnet-id")
-		subnetID, err := types.NewSubnetIDFromString(sid)
+		subnetID, err := sdk.NewSubnetIDFromString(sid)
 		if err != nil {
 			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}

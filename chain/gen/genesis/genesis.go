@@ -166,7 +166,7 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 
 	// Setup reward
 	// RewardActor's state is overwritten by SetupStorageMiners, but needs to exist for miner creation messages
-	rewact, err := SetupRewardActor(ctx, bs, big.Zero(), av)
+	rewact, err := SetupRewardActor(ctx, bs, big.Zero(), av, template.NetworkName)
 	if err != nil {
 		return nil, nil, xerrors.Errorf("setup reward actor: %w", err)
 	}
@@ -221,6 +221,18 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 		if err := state.SetActor(datacap.Address, dcapact); err != nil {
 			return nil, nil, xerrors.Errorf("set datacap actor: %w", err)
 		}
+	}
+
+	// Create ipc gateway actor
+	// TODO: We shouldn't use the default checkpoint period here, this value should be passed
+	// by the genesis template, or as a variable when initializing the subnet.
+	gatewayAct, err := SetupIPCGateway(ctx, bs, av, template.NetworkName, int64(DefaultCheckpointPeriod))
+	if err != nil {
+		return nil, nil, xerrors.Errorf("setup ipc gateway actor: %w", err)
+	}
+
+	if err := state.SetActor(DefaultIPCGatewayAddr, gatewayAct); err != nil {
+		return nil, nil, xerrors.Errorf("set ipc gateway actor: %w", err)
 	}
 
 	bact, err := MakeAccountActor(ctx, cst, av, builtin.BurntFundsActorAddr, big.Zero())
