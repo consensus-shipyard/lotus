@@ -107,6 +107,8 @@
   * [GasEstimateMessageGas](#GasEstimateMessageGas)
 * [I](#I)
   * [ID](#ID)
+* [Ipc](#Ipc)
+  * [IpcAddSubnetActor](#IpcAddSubnetActor)
 * [Log](#Log)
   * [LogAlerts](#LogAlerts)
   * [LogList](#LogList)
@@ -3104,6 +3106,38 @@ Perms: read
 Inputs: `null`
 
 Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
+
+## Ipc
+
+
+### IpcAddSubnetActor
+IPC-specific methods
+
+
+Perms: write
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
+    "Name": "string value",
+    "IpcGatewayAddr": 42,
+    "Consensus": 0,
+    "MinValidatorStake": "0",
+    "MinValidators": 42,
+    "FinalityThreshold": 10101,
+    "CheckPeriod": 10101,
+    "Genesis": "Ynl0ZSBhcnJheQ=="
+  }
+]
+```
+
+Response: `"f01234"`
 
 ## Log
 

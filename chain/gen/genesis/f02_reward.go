@@ -3,7 +3,7 @@ package genesis
 import (
 	"context"
 
-	ipctypes "github.com/consensus-shipyard/go-ipc-types/types"
+	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"golang.org/x/xerrors"
 

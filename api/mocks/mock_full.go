@@ -10,6 +10,16 @@ import (
 	reflect "reflect"
 	time "time"
 
+	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
+	gomock "github.com/golang/mock/gomock"
+	uuid "github.com/google/uuid"
+	cid "github.com/ipfs/go-cid"
+	blocks "github.com/ipfs/go-libipfs/blocks"
+	metrics "github.com/libp2p/go-libp2p/core/metrics"
+	network0 "github.com/libp2p/go-libp2p/core/network"
+	peer "github.com/libp2p/go-libp2p/core/peer"
+	protocol "github.com/libp2p/go-libp2p/core/protocol"
+
 	address "github.com/filecoin-project/go-address"
 	bitfield "github.com/filecoin-project/go-bitfield"
 	datatransfer "github.com/filecoin-project/go-data-transfer"
@@ -24,6 +34,7 @@ import (
 	crypto "github.com/filecoin-project/go-state-types/crypto"
 	dline "github.com/filecoin-project/go-state-types/dline"
 	network "github.com/filecoin-project/go-state-types/network"
+
 	api "github.com/filecoin-project/lotus/api"
 	apitypes "github.com/filecoin-project/lotus/api/types"
 	miner0 "github.com/filecoin-project/lotus/chain/actors/builtin/miner"
@@ -32,14 +43,6 @@ import (
 	alerting "github.com/filecoin-project/lotus/journal/alerting"
 	dtypes "github.com/filecoin-project/lotus/node/modules/dtypes"
 	imports "github.com/filecoin-project/lotus/node/repo/imports"
-	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
-	cid "github.com/ipfs/go-cid"
-	blocks "github.com/ipfs/go-libipfs/blocks"
-	metrics "github.com/libp2p/go-libp2p/core/metrics"
-	network0 "github.com/libp2p/go-libp2p/core/network"
-	peer "github.com/libp2p/go-libp2p/core/peer"
-	protocol "github.com/libp2p/go-libp2p/core/protocol"
 )
 
 // MockFullNode is a mock of FullNode interface.
@@ -1504,6 +1507,21 @@ func (m *MockFullNode) ID(arg0 context.Context) (peer.ID, error) {
 func (mr *MockFullNodeMockRecorder) ID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockFullNode)(nil).ID), arg0)
+}
+
+// IpcAddSubnetActor mocks base method.
+func (m *MockFullNode) IpcAddSubnetActor(arg0 context.Context, arg1 address.Address, arg2 subnetactor.ConstructParams) (address.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IpcAddSubnetActor", arg0, arg1, arg2)
+	ret0, _ := ret[0].(address.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IpcAddSubnetActor indicates an expected call of IpcAddSubnetActor.
+func (mr *MockFullNodeMockRecorder) IpcAddSubnetActor(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IpcAddSubnetActor), arg0, arg1, arg2)
 }
 
 // LogAlerts mocks base method.
