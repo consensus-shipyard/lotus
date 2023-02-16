@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/lotus/node/impl/client"
 	"github.com/filecoin-project/lotus/node/impl/common"
 	"github.com/filecoin-project/lotus/node/impl/full"
+	"github.com/filecoin-project/lotus/node/impl/ipc"
 	"github.com/filecoin-project/lotus/node/impl/market"
 	"github.com/filecoin-project/lotus/node/impl/net"
 	"github.com/filecoin-project/lotus/node/impl/paych"
@@ -36,6 +37,7 @@ type FullNodeAPI struct {
 	full.SyncAPI
 	full.RaftAPI
 	full.EthAPI
+	ipc.IpcAPI
 
 	DS          dtypes.MetadataDS
 	NetworkName dtypes.NetworkName

@@ -624,6 +624,7 @@ workflows:
       - test-mir:
           name: mir-consensus-tests
           suite: consensus
+<<<<<<< HEAD
           go-test-flags: "-tags=spacenet -timeout 60m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - test-mir-reconfiguration:

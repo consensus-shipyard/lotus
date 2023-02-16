@@ -66,7 +66,11 @@ func LoadBundles(ctx context.Context, bs blockstore.Blockstore, versions ...acto
 			err  error
 		)
 		if path, ok := build.BundleOverrides[av]; ok {
-			root, err = LoadBundleFromFile(ctx, bs, path)
+			if build.IsIPCActorOverride(path) {
+				root, err = build.GetIPCActorsBundle(ctx, bs)
+			} else {
+				root, err = LoadBundleFromFile(ctx, bs, path)
+			}
 		} else if embedded, ok := build.GetEmbeddedBuiltinActorsBundle(av); ok {
 			root, err = LoadBundle(ctx, bs, bytes.NewReader(embedded))
 		} else {

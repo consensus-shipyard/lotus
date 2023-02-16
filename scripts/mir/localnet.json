@@ -112,7 +112,7 @@
       ]
     }
   ],
-  "NetworkName": "localnet-059bb756-cde4-41ca-a3f8-3576866c469f",
+    "NetworkName": "/root",
   "VerifregRootKey": {
     "Type": "multisig",
     "Balance": "0",

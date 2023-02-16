@@ -15,7 +15,7 @@ require (
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
-	github.com/consensus-shipyard/go-ipc-types v0.0.0-20230207154039-4d705306d867
+	github.com/consensus-shipyard/go-ipc-types v0.1.1
 	github.com/containerd/cgroups v1.0.4
 	github.com/coreos/go-systemd/v22 v22.4.0
 	github.com/detailyang/go-fallocate v0.0.0-20180908115635-432fa640bd2e

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	blocks "github.com/ipfs/go-libipfs/blocks"
@@ -858,6 +859,9 @@ type FullNode interface {
 
 	RaftState(ctx context.Context) (*RaftStateData, error) //perm:read
 	RaftLeader(ctx context.Context) (peer.ID, error)       //perm:read
+
+	// IPC-specific methods
+	IpcAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) //perm:write
 }
 
 // reverse interface to the client, called after EthSubscribe

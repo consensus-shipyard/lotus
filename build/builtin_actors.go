@@ -28,6 +28,11 @@ import (
 //go:embed actors/*.tar.zst
 var embeddedBuiltinActorReleases embed.FS
 
+const IPCCarPath = "actors/ipc-actors.car"
+
+//go:embed actors/ipc-actors.car
+var ipcActorsFs embed.FS
+
 func init() {
 	if BundleOverrides == nil {
 		BundleOverrides = make(map[actorstypes.Version]string)
@@ -61,9 +66,30 @@ func loadManifests(netw string) error {
 	var newMetadata []*BuiltinActorsMetadata
 	// First, prefer overrides.
 	for av, path := range BundleOverrides {
-		root, actorCids, err := readBundleManifestFromFile(path)
-		if err != nil {
-			return err
+		var (
+			root      cid.Cid
+			actorCids map[string]cid.Cid
+			err       error
+		)
+		// if the version bundle is to be overridden by the ipc-actors bundle
+		if IsIPCActorOverride(path) {
+			fi, err := ipcActorsFs.Open(IPCCarPath)
+			if err != nil {
+				return xerrors.Errorf("couldn't open ipc-actors.car: %w", err)
+			}
+
+			root, actorCids, err = readBundleManifest(fi)
+			if err != nil {
+				return err
+			}
+			fi.Close() //nolint
+
+		} else {
+			// else we use a path override
+			root, actorCids, err = readBundleManifestFromFile(path)
+			if err != nil {
+				return err
+			}
 		}
 		newMetadata = append(newMetadata, &BuiltinActorsMetadata{
 			Network:     netw,
@@ -263,4 +289,29 @@ func GetEmbeddedBuiltinActorsBundle(version actorstypes.Version) ([]byte, bool) 
 		}
 		return car, true
 	}
+}
+
+// GetIPCActorsBundle gets the specific bundle including ipc actors from the embedded car file.
+func GetIPCActorsBundle(ctx context.Context, bs blockstore.Blockstore) (cid.Cid, error) {
+	f, err := ipcActorsFs.Open(IPCCarPath)
+	if err != nil {
+		return cid.Undef, xerrors.Errorf("error opening ipc-actors bundle: %w", err)
+	}
+	defer f.Close() //nolint
+
+	hdr, err := car.LoadCar(ctx, bs, f)
+	if err != nil {
+		return cid.Undef, xerrors.Errorf("error loading builtin actors bundle: %w", err)
+	}
+
+	if len(hdr.Roots) != 1 {
+		return cid.Undef, xerrors.Errorf("expected one root when loading actors bundle, got %d", len(hdr.Roots))
+	}
+	return hdr.Roots[0], nil
+}
+
+// IsIPCActorOverride checks if the override should point to the ipc-actors or
+// some other generic path.
+func IsIPCActorOverride(path string) bool {
+	return path == "ipc-actors"
 }
