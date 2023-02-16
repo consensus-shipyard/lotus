@@ -64,6 +64,8 @@ type StateManager struct {
 
 	MirManager *Manager
 
+	confManager *ConfigurationManager
+
 	// reconfigurationVotes implements ConfigurationNumber->ValSetHash->[]NodeID mapping.
 	reconfigurationVotes map[uint64]map[string][]t.NodeID
 
@@ -83,17 +85,25 @@ type StateManager struct {
 	height abi.ChainEpoch
 }
 
-func NewStateManager(ctx context.Context, initialMembership map[t.NodeID]t.NodeAddress, m *Manager, api v1api.FullNode) (*StateManager, error) {
+func NewStateManager(
+	ctx context.Context,
+	initialMembership map[t.NodeID]t.NodeAddress,
+	m *Manager,
+	cm *ConfigurationManager,
+	api v1api.FullNode,
+) (*StateManager, error) {
 	sm := StateManager{
 		ctx:                     ctx,
 		NextCheckpoint:          make(chan *checkpoint.StableCheckpoint, 1),
 		MirManager:              m,
+		confManager:             cm,
 		currentEpoch:            0,
-		reconfigurationVotes:    m.recoverReconfigurationVotes(),
 		api:                     api,
 		ValidatorID:             m.lotusID,
 		nextConfigurationNumber: 1,
 	}
+
+	sm.reconfigurationVotes = sm.confManager.RecoverReconfigurationVotes()
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
@@ -310,8 +320,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.MirManager.mirID {
-		sm.MirManager.storeExecutedConfigurationNumber(msg.ReqNo)
-		sm.MirManager.removeAppliedConfigurationRequest(msg.ReqNo)
+		sm.confManager.StoreExecutedConfigurationNumber(msg.ReqNo)
+		sm.confManager.RemoveAppliedConfigurationRequest(msg.ReqNo)
 	}
 
 	var valSet validator.Set
@@ -383,7 +393,7 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 	}
 
 	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = append(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)], votingValidator)
-	if err := sm.MirManager.storeReconfigurationVotes(sm.reconfigurationVotes); err != nil {
+	if err := sm.confManager.StoreReconfigurationVotes(sm.reconfigurationVotes); err != nil {
 		log.With("validator", sm.ValidatorID).
 			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
 	}
