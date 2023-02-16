@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-graphsync"
@@ -401,6 +402,8 @@ func init() {
 		FromBlock: pstring("2301220"),
 		Address:   []ethtypes.EthAddress{ethaddr},
 	})
+
+	addExample(subnetactor.ConsensusType(0))
 }
 
 func GetAPIType(name, pkg string) (i interface{}, t reflect.Type, permStruct []reflect.Type) {
