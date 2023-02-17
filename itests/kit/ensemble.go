@@ -1104,7 +1104,7 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners
 
 // BeginMirMiningWithError simulates an error in Mine function.
 func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	for _, m := range append(miners) {
+	for _, m := range miners {
 		m := m
 
 		ctx, cancel := context.WithCancel(ctx)
