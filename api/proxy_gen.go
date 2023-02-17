@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -318,6 +319,10 @@ type FullNodeMethods struct {
 	GasEstimateMessageGas func(p0 context.Context, p1 *types.Message, p2 *MessageSendSpec, p3 types.TipSetKey) (*types.Message, error) `perm:"read"`
 
 	IpcAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
+
+	IpcReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) `perm:"read"`
+
+	IpcReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
 
 	MarketAddBalance func(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) `perm:"sign"`
 
@@ -2419,6 +2424,28 @@ func (s *FullNodeStruct) IpcAddSubnetActor(p0 context.Context, p1 address.Addres
 
 func (s *FullNodeStub) IpcAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
 	return *new(address.Address), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IpcReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
+	if s.Internal.IpcReadGatewayState == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IpcReadGatewayState(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IpcReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *FullNodeStruct) IpcReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
+	if s.Internal.IpcReadSubnetActorState == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IpcReadSubnetActorState(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IpcReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *FullNodeStruct) MarketAddBalance(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) {
