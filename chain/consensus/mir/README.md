@@ -41,3 +41,18 @@ and how to set up the membership list.
 
 ### Automated 4-node network
 If you don't even want to know what is happening under-the-hood, and you just want to run a 4-node network fast, run `./scripts/mir/4-node-net.sh`.
+
+## Reconfiguration
+
+A configuration consists of `configuration_number` and `validators`.
+The current subnet configuration is stored in `mir.validators` file.
+Please take a look at an example of a configuration [here](/scripts/mir/mir-config/node0/mir.validators).
+
+A user is responsible for setting the correct configuration number in the configuration file.
+For example, if the current configuration number is `0`, then
+to add a new validator into the subnet, all users should set `configuration_number` to `1` and add
+the new validator into `validators`.
+If the majority of the current validators agree on this new configuration,
+then the new validator will be added into the subnet.
+
+To run a demo version of a subnet with reconfiguration take a look at [this](/scripts/mir/README.md) document.
