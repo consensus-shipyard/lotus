@@ -23,6 +23,7 @@ import (
 	mocknet "github.com/libp2p/go-libp2p/p2p/net/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -1090,12 +1091,12 @@ func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile st
 	require.NoError(n.t, err)
 }
 
-func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, wg *sync.WaitGroup, delay int, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelayForFaultyNodes(ctx, wg, delay, miners)
+func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Group, delay int, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelayForFaultyNodes(ctx, g, delay, miners)
 }
 
-func (n *Ensemble) BeginMirMining(ctx context.Context, wg *sync.WaitGroup, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelay(ctx, wg, 0, miners...)
+func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelay(ctx, g, 0, miners...)
 	// once validators start mining mark the network as bootstrapped so no
 	// new genesis are generated.
 	n.Bootstrapped()
@@ -1106,17 +1107,23 @@ func (n *Ensemble) Bootstrapped() {
 	n.bootstrapped = true
 }
 
-func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg *sync.WaitGroup, delay int, miners []*TestMiner, faultyMiners ...*TestMiner) {
+func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
+	ctx context.Context,
+	g *errgroup.Group,
+	delay int,
+	miners []*TestMiner,
+	faultyMiners ...*TestMiner,
+) {
 	membershipString := n.fixedMirMembership(append(miners, faultyMiners...)...)
 
 	for i, m := range append(miners, faultyMiners...) {
+		i := i
+		m := m
+
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel
 
-		wg.Add(1)
-
-		go func(ctx context.Context, i int, m *TestMiner) {
-			defer wg.Done()
+		g.Go(func() error {
 			m.mirMembership = membershipString
 			m.mirDB = NewTestDB()
 			cfg := mir.Config{
@@ -1128,29 +1135,33 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(ctx context.Context, wg
 			}
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
-				return
+				return nil
 			}
-			require.NoError(n.t, err)
-		}(ctx, i, m)
+			return err
+		})
 	}
 }
 
 func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
 	ctx context.Context,
 	configFileName string,
-	wg *sync.WaitGroup,
+	g *errgroup.Group,
 	db []*TestDB,
 	miners []*TestMiner,
 ) {
 	for i, m := range miners {
+		i := i
+		m := m
+
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel
 
-		wg.Add(1)
-
-		go func(ctx context.Context, i int, m *TestMiner) {
-			defer wg.Done()
-			m.mirDB = db[i]
+		g.Go(func() error {
+			if db != nil && db[i] != nil {
+				m.mirDB = db[i]
+			} else {
+				return fmt.Errorf("unable to find DB for miner %v", m)
+			}
 			cfg := mir.Config{
 				SegmentLength: 1,
 			}
@@ -1158,22 +1169,27 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
 
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
-				return
+				return nil
 			}
-			require.NoError(n.t, err)
-		}(ctx, i, m)
+			return err
+		})
 	}
 }
 
-func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, configFileName string, wg *sync.WaitGroup, miners []*TestMiner, faultyMiners ...*TestMiner) {
-	for i, m := range append(miners, faultyMiners...) {
+func (n *Ensemble) BeginMirMiningWithMembershipFromFile(
+	ctx context.Context,
+	configFileName string,
+	g *errgroup.Group,
+	miners []*TestMiner,
+	faultyMiners ...*TestMiner,
+) {
+	for _, m := range append(miners, faultyMiners...) {
+		m := m
+
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel
 
-		wg.Add(1)
-
-		go func(ctx context.Context, i int, m *TestMiner) {
-			defer wg.Done()
+		g.Go(func() error {
 			m.mirDB = NewTestDB()
 			cfg := mir.Config{
 				SegmentLength: 1,
@@ -1182,10 +1198,10 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(ctx context.Context, con
 
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
-				return
+				return nil
 			}
-			require.NoError(n.t, err)
-		}(ctx, i, m)
+			return err
+		})
 	}
 }
 

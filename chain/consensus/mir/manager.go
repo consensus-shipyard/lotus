@@ -240,8 +240,8 @@ func NewManager(ctx context.Context,
 }
 
 func (m *Manager) Serve(ctx context.Context) error {
-	log.With("validator", m.mirID).Infof("Mir manager %s starting", m.mirID)
-	defer log.With("validator", m.mirID).Infof("Mir manager %s stopped", m.mirID)
+	log.With("validator", m.mirID).Info("Mir manager serve starting")
+	defer log.With("validator", m.mirID).Info("Mir manager serve stopped")
 
 	log.With("validator", m.mirID).
 		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
@@ -339,8 +339,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 // Stop stops the manager and all its components.
 func (m *Manager) Stop() {
-	log.With("validator", m.mirID).Infof("Mir manager shutting down")
-	defer log.With("validator", m.mirID).Info("Mir manager shut down")
+	log.With("validator", m.mirID).Infof("Mir manager stopping")
+	defer log.With("validator", m.mirID).Info("Mir manager stopped")
 
 	if m.stopped {
 		log.With("validator", m.mirID).Warnf("Mir manager has already been stopped")

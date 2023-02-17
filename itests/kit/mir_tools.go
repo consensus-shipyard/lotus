@@ -143,6 +143,9 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 		// poll until we get the desired height.
 		// TODO: We may be able to add a slight sleep here if needed.
 		for head != height {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			base, err := api.ChainHead(ctx)
 			if err != nil {
 				return err
