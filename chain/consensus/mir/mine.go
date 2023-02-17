@@ -7,12 +7,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 
 	"github.com/filecoin-project/go-address"
+
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 )
 
-// Mine implements "block mining" using the Mir framework.
 func Mine(ctx context.Context,
 	addr address.Address,
 	h host.Host,

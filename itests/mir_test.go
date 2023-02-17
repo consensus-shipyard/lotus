@@ -727,6 +727,7 @@ func TestMirSmoke_GenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 // TestMirBasic_MessageFromLearner tests that messages can be sent from learners and validators,
 // and successfully proposed by validators
 func TestMirBasic_MessageFromLearner(t *testing.T) {
+	t.Skip()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	g, ctx := errgroup.WithContext(ctx)

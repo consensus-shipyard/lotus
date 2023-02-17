@@ -46,7 +46,6 @@ const (
 	ReconfigurationInterval = 2000 * time.Millisecond
 )
 
-// Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
 	ctx context.Context
 	ds  db.DB
