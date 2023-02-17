@@ -37,11 +37,11 @@ type Batch struct {
 	Messages []Message
 }
 
-type ErrMirCtxCanceledWhileWaitingBlock struct {
+type CtxCanceledWhileWaitingForBlockError struct {
 	Addr address.Address
 }
 
-func (e ErrMirCtxCanceledWhileWaitingBlock) Error() string {
+func (e CtxCanceledWhileWaitingForBlockError) Error() string {
 	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
 }
 
@@ -659,7 +659,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 		case <-sm.ctx.Done():
 			return nil
 		case <-after.C:
-			return ErrMirCtxCanceledWhileWaitingBlock{sm.MirManager.lotusID}
+			return CtxCanceledWhileWaitingForBlockError{sm.MirManager.lotusID}
 		default:
 			if head == height {
 				return nil

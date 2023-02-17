@@ -115,7 +115,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	// Core validators must send 2 messages.
 	for _, m := range miners[:MirTotalValidatorNumber] {
 		db := m.GetDB()
-		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
 
@@ -127,7 +127,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	// Added validators must send 1 message.
 	for _, m := range miners[MirTotalValidatorNumber:] {
 		db := m.GetDB()
-		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
 	}
@@ -214,7 +214,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	for i := range miners[:MirTotalValidatorNumber] {
 		_ = i
 		db := kit.NewTestDB()
-		err := db.Put(ctx, mir.SentConfigurationNumberKey, bn)
+		err := db.Put(ctx, mir.NextConfigurationNumberKey, bn)
 		require.NoError(t, err)
 		err = db.Put(ctx, mir.AppliedConfigurationNumberKey, bn)
 		require.NoError(t, err)
@@ -290,7 +290,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	// Core validators must send 1 message with recovered "nonce".
 	for _, m := range miners[:MirTotalValidatorNumber] {
 		db := m.GetDB()
-		nonce, err := db.Get(ctx, mir.SentConfigurationNumberKey)
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 

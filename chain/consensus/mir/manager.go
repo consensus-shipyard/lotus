@@ -453,7 +453,7 @@ func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirpro
 	}
 
 	m.reconfigurationNonce++
-	m.confManager.StoreSentConfigurationNumber(m.reconfigurationNonce)
+	m.confManager.StoreNextConfigurationNumber(m.reconfigurationNonce)
 
 	return &r
 }

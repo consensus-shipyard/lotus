@@ -21,9 +21,9 @@ const (
 )
 
 var (
-	// SentConfigurationNumberKey is used to store SentConfigurationNumber
+	// NextConfigurationNumberKey is used to store SentConfigurationNumber
 	// that is the maximum configuration request number (nonce) that has been sent.
-	SentConfigurationNumberKey = datastore.NewKey("mir/sent-config-number")
+	NextConfigurationNumberKey = datastore.NewKey("mir/next-config-number")
 	// AppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
 	// that is the maximum configuration request number that has been applied.
 	AppliedConfigurationNumberKey = datastore.NewKey("mir/applied-config-number")
@@ -48,29 +48,29 @@ func NewConfigurationManager(ctx context.Context, ds db.DB, id string) *Configur
 // GetConfigurationData recovers configuration related data from the persistent database.
 //
 // It recovers configuration number, and configuration requests that may be not applied.
-func (c *ConfigurationManager) GetConfigurationData() ([]*mirproto.Request, uint64, error) {
+func (c *ConfigurationManager) GetConfigurationData() (reqs []*mirproto.Request, nextReqNo uint64, err error) {
 	// o is the offset to distinguish cases when there are no applied configuration requests and when the
 	// applied reconfiguration request number is 0.
 	// Since we use uint64 we cannot return -1 when there are no applied configurations.
 	o := uint64(1)
 
-	sentNumber := c.GetSentConfigurationNumber()
+	nextReqNo = c.GetNextConfigurationNumber()
 	appliedNumber, found := c.GetAppliedConfigurationNumber()
 	if !found {
 		o = 0
 	}
 
-	if sentNumber == appliedNumber && sentNumber == 0 {
+	if nextReqNo == appliedNumber && nextReqNo == 0 {
 		return nil, 0, nil
 	}
-	if appliedNumber > sentNumber {
-		return nil, 0, fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", c.id, appliedNumber, sentNumber)
+	if appliedNumber > nextReqNo {
+		return nil, 0, fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", c.id, appliedNumber, nextReqNo)
 	}
 
 	// Check do we need recovering configuration data or not.
 	var configRequests []*mirproto.Request
 
-	for i := appliedNumber + o; i <= sentNumber; i++ {
+	for i := appliedNumber + o; i <= nextReqNo; i++ {
 		b, err := c.ds.Get(c.ctx, configurationIndexKey(i))
 		if err != nil {
 			return nil, 0, err
@@ -86,7 +86,7 @@ func (c *ConfigurationManager) GetConfigurationData() ([]*mirproto.Request, uint
 		configRequests = append(configRequests, &r)
 	}
 
-	return configRequests, sentNumber, nil
+	return configRequests, nextReqNo, nil
 }
 
 // StoreConfigurationRequest stored a configuration request and the corresponding configuration number in the persistent database.
@@ -111,22 +111,22 @@ func (c *ConfigurationManager) GetConfigurationRequest(n uint64) (*mirproto.Requ
 	return &r, nil
 }
 
-func (c *ConfigurationManager) RemoveConfigurationRequest(nonce uint64) {
-	if err := c.ds.Delete(c.ctx, configurationIndexKey(nonce)); err != nil {
-		log.With("validator", c.id).Warnf("failed to remove applied configuration request %d: %v", nonce, err)
+func (c *ConfigurationManager) RemoveConfigurationRequest(n uint64) {
+	if err := c.ds.Delete(c.ctx, configurationIndexKey(n)); err != nil {
+		log.With("validator", c.id).Warnf("failed to remove applied configuration request %d: %v", n, err)
 	}
 }
 
-func (c *ConfigurationManager) StoreSentConfigurationNumber(nonce uint64) {
-	c.storeNumber(SentConfigurationNumberKey, nonce)
+func (c *ConfigurationManager) StoreNextConfigurationNumber(n uint64) {
+	c.storeNumber(NextConfigurationNumberKey, n)
 }
 
-func (c *ConfigurationManager) StoreAppliedConfigurationNumber(nonce uint64) {
-	c.storeNumber(AppliedConfigurationNumberKey, nonce)
+func (c *ConfigurationManager) StoreAppliedConfigurationNumber(n uint64) {
+	c.storeNumber(AppliedConfigurationNumberKey, n)
 }
 
-func (c *ConfigurationManager) GetSentConfigurationNumber() uint64 {
-	b, err := c.ds.Get(c.ctx, SentConfigurationNumberKey)
+func (c *ConfigurationManager) GetNextConfigurationNumber() uint64 {
+	b, err := c.ds.Get(c.ctx, NextConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", c.id).Info("stored sent configuration number not found")
 		return 0
@@ -138,8 +138,8 @@ func (c *ConfigurationManager) GetSentConfigurationNumber() uint64 {
 	return binary.LittleEndian.Uint64(b)
 }
 
-func (c *ConfigurationManager) GetAppliedConfigurationNumber() (uint64, bool) {
-	found := true
+func (c *ConfigurationManager) GetAppliedConfigurationNumber() (n uint64, found bool) {
+	found = true
 	b, err := c.ds.Get(c.ctx, AppliedConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", c.id).Info("stored executed configuration number not found")
@@ -199,13 +199,13 @@ func (c *ConfigurationManager) storeNumber(key datastore.Key, n uint64) {
 	}
 }
 
-func configurationIndexKey(nonce uint64) datastore.Key {
-	return datastore.NewKey(ConfigurationRequestsDBPrefix + strconv.FormatUint(nonce, 10))
+func configurationIndexKey(n uint64) datastore.Key {
+	return datastore.NewKey(ConfigurationRequestsDBPrefix + strconv.FormatUint(n, 10))
 }
 
-func GetConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.NodeID {
+func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string][]t.NodeID {
 	m := make(map[uint64]map[string][]t.NodeID)
-	for _, v := range voteRecords {
+	for _, v := range vr {
 		if _, exist := m[v.ConfigurationNumber]; !exist {
 			m[v.ConfigurationNumber] = make(map[string][]t.NodeID)
 		}
@@ -216,7 +216,8 @@ func GetConfigurationVotes(voteRecords []VoteRecord) map[uint64]map[string][]t.N
 	return m
 }
 
-func StoreConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) (votesRecords []VoteRecord) {
+func StoreConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) []VoteRecord {
+	var vs []VoteRecord
 	for n, hashToValidatorsVotes := range reconfigurationVotes {
 		for h, nodeIDs := range hashToValidatorsVotes {
 			e := VoteRecord{
@@ -224,8 +225,8 @@ func StoreConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.Node
 				ValSetHash:          h,
 				VotedValidators:     NewVotedValidators(nodeIDs...),
 			}
-			votesRecords = append(votesRecords, e)
+			vs = append(vs, e)
 		}
 	}
-	return
+	return vs
 }

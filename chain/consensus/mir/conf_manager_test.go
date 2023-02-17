@@ -81,8 +81,8 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	require.NoError(t, err)
 	cm := NewConfigurationManager(context.Background(), ds, "id1")
 
-	cm.StoreSentConfigurationNumber(100)
-	n := cm.GetSentConfigurationNumber()
+	cm.StoreNextConfigurationNumber(100)
+	n := cm.GetNextConfigurationNumber()
 	require.Equal(t, uint64(100), n)
 
 	cm.StoreAppliedConfigurationNumber(200)
@@ -129,7 +129,7 @@ func TestConfigurationManagerRecoverData(t *testing.T) {
 	err = cm.StoreConfigurationRequest(&r0, r0.ReqNo)
 	require.NoError(t, err)
 	nonce++
-	cm.StoreSentConfigurationNumber(r0.ReqNo)
+	cm.StoreNextConfigurationNumber(r0.ReqNo)
 
 	// Store the second request.
 	r1 := requestpb.Request{
@@ -142,7 +142,7 @@ func TestConfigurationManagerRecoverData(t *testing.T) {
 	err = cm.StoreConfigurationRequest(&r1, r1.ReqNo)
 	require.NoError(t, err)
 	nonce++
-	cm.StoreSentConfigurationNumber(r1.ReqNo)
+	cm.StoreNextConfigurationNumber(r1.ReqNo)
 
 	// Recover the state and check it is correct.
 
