@@ -16,6 +16,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -297,4 +298,11 @@ func NodeLibp2pAddr(h host.Host) (m multiaddr.Multiaddr, err error) {
 func RandomDelay(seconds int) {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
+}
+
+type fakeMembership struct {
+}
+
+func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
+	return nil, fmt.Errorf("no validators")
 }

@@ -1018,45 +1018,88 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 
 // TestMirSmoke_StartStop tests that Mir nodes can be stopped.
 func TestMirSmoke_StartStop(t *testing.T) {
-	t.Run("TestMirStartStop", func(t *testing.T) {
-		wait := make(chan struct{})
+	wait := make(chan struct{})
 
-		ctx, cancel := context.WithCancel(context.Background())
-		g, ctx := errgroup.WithContext(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	g := errgroup.Group{}
 
-		defer func() {
-			t.Logf("[*] defer: cancelling %s context", t.Name())
-			cancel()
-			select {
-			case <-time.After(10 * time.Second):
-				t.Fatalf("fail to stop Mir nodes")
-			case <-wait:
-			}
-		}()
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		after := time.NewTimer(10 * time.Second)
+		cancel()
+		select {
+		case <-after.C:
+			t.Fatalf("fail to stop Mir nodes")
+		case <-wait:
+		}
+		after.Stop()
+	}()
 
-		go func() {
-			// This goroutine is leaking after time.After(x) seconds with panicking.
-			select {
-			case <-time.After(200 * time.Second):
-				panic("test time exceeded")
-			case <-ctx.Done():
-				return
-			}
-		}()
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		select {
+		case <-time.After(20 * time.Second):
+			panic("test time exceeded")
+		case <-ctx.Done():
+			return
+		}
+	}()
 
-		go func() {
-			// This goroutine is leaking after time.After(x) seconds with panicking.
-			err := g.Wait()
-			require.NoError(t, err)
-			close(wait)
-		}()
-
-		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-		ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
-
-		err := kit.AdvanceChain(ctx, 20, nodes...)
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		err := g.Wait()
 		require.NoError(t, err)
-	})
+		close(wait)
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, &g, miners...)
+
+	err := kit.AdvanceChain(ctx, 10, nodes...)
+	require.NoError(t, err)
+}
+
+// TestMirSmoke_StopWithError tests that the tests can be stopped if an error occurred during mining.
+func TestMirSmoke_StopWithError(t *testing.T) {
+	wait := make(chan struct{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		after := time.NewTimer(10 * time.Second)
+		cancel()
+		select {
+		case <-after.C:
+			t.Fatalf("fail to stop Mir nodes")
+		case <-wait:
+		}
+		after.Stop()
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		select {
+		case <-time.After(200 * time.Second):
+			panic("test time exceeded")
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		err := g.Wait()
+		require.NoError(t, err)
+		close(wait)
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+	ens.InterconnectFullNodes().BeginMirMiningWithError(ctx, g, miners...)
+
+	err := kit.AdvanceChain(ctx, 10, nodes...)
+	require.Error(t, err)
 }
 
 // TestMirBasic_WithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,

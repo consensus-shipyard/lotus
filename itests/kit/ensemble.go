@@ -1102,6 +1102,24 @@ func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners
 	n.Bootstrapped()
 }
 
+// BeginMirMiningWithError simulates an error in Mine function.
+func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
+	for _, m := range append(miners) {
+		m := m
+
+		ctx, cancel := context.WithCancel(ctx)
+		m.stopMir = cancel
+
+		g.Go(func() error {
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, nil, fakeMembership{}, nil)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return nil
+			}
+			return err
+		})
+	}
+}
+
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
 func (n *Ensemble) Bootstrapped() {
 	n.bootstrapped = true
