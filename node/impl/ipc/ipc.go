@@ -8,7 +8,6 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
-	cbor "github.com/ipfs/go-ipld-cbor"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -100,7 +99,7 @@ func (a *IpcAPI) IpcAddSubnetActor(ctx context.Context, wallet address.Address, 
 
 func (a *IpcAPI) IpcReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
 	st := &gateway.State{}
-	if err := a.readActorState(ctx, actor, tsk, &gateway.State{}); err != nil {
+	if err := a.readActorState(ctx, actor, tsk, st); err != nil {
 		return nil, xerrors.Errorf("error getting gateway actor from StateStore: %w")
 	}
 	return st, nil
@@ -129,7 +128,11 @@ func (a *IpcAPI) readActorState(ctx context.Context, actor address.Address, tsk 
 	if err != nil {
 		return xerrors.Errorf("getting actor: %w", err)
 	}
+	blk, err := a.Chain.StateBlockstore().Get(ctx, act.Head)
+	if err != nil {
+		return xerrors.Errorf("getting actor head: %w", err)
+	}
 
-	cst := cbor.NewCborStore(a.Chain.StateBlockstore())
-	return cst.Get(ctx, act.Head, &stateType)
+	return stateType.UnmarshalCBOR(bytes.NewReader(blk.RawData()))
+
 }
