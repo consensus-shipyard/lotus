@@ -323,12 +323,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 }
 
 func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
-	// If we get the configuration message we have sent then we remove it from the configuration request storage.
-	if msg.ClientId == sm.MirManager.mirID {
-		sm.confManager.StoreAppliedConfigurationNumber(msg.ReqNo)
-		sm.confManager.RemoveConfigurationRequest(msg.ReqNo)
-	}
-
 	var valSet validator.Set
 	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
 		return err
@@ -338,6 +332,11 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	if err != nil {
 		log.With("validator", sm.ValidatorID).Errorf("failed to apply config message: %v", err)
 		return nil
+	}
+	// If we get the configuration message we have sent then we remove it from the configuration request storage.
+	if msg.ClientId == sm.MirManager.mirID {
+		sm.confManager.StoreAppliedConfigurationNumber(msg.ReqNo)
+		sm.confManager.RemoveConfigurationRequest(msg.ReqNo)
 	}
 	if !enoughVotes {
 		return nil

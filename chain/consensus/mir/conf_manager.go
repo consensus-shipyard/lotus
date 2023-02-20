@@ -45,9 +45,7 @@ func NewConfigurationManager(ctx context.Context, ds db.DB, id string) *Configur
 	}
 }
 
-// GetConfigurationData recovers configuration related data from the persistent database.
-//
-// It recovers configuration number, and configuration requests that may be not applied.
+// GetConfigurationData recovers configuration number, and configuration requests that may be not applied.
 func (c *ConfigurationManager) GetConfigurationData() (reqs []*mirproto.Request, nextReqNo uint64, err error) {
 	// o is the offset to distinguish cases when there are no applied configuration requests and when the
 	// applied reconfiguration request number is 0.
@@ -55,6 +53,7 @@ func (c *ConfigurationManager) GetConfigurationData() (reqs []*mirproto.Request,
 	o := uint64(1)
 
 	nextReqNo = c.GetNextConfigurationNumber()
+
 	appliedNumber, found := c.GetAppliedConfigurationNumber()
 	if !found {
 		o = 0
@@ -67,29 +66,29 @@ func (c *ConfigurationManager) GetConfigurationData() (reqs []*mirproto.Request,
 		return nil, 0, fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", c.id, appliedNumber, nextReqNo)
 	}
 
-	// Check do we need recovering configuration data or not.
-	var configRequests []*mirproto.Request
-
-	for i := appliedNumber + o; i <= nextReqNo; i++ {
-		b, err := c.ds.Get(c.ctx, configurationIndexKey(i))
+	for i := appliedNumber + o; i < nextReqNo; i++ {
+		r, err := c.GetConfigurationRequest(i)
 		if err != nil {
 			return nil, 0, err
 		}
-
-		r := mirproto.Request{}
-		err = proto.Unmarshal(b, &r)
-		if err != nil {
-			log.With("validator", c.id).Errorf("unable to marshall configuration request: %v", err)
-			return nil, 0, err
-		}
-
-		configRequests = append(configRequests, &r)
+		reqs = append(reqs, r)
 	}
 
-	return configRequests, nextReqNo, nil
+	// If a node crashes right after we put a configuration request the actual configuration nonce
+	// can be equal to GetNextConfigurationNumber + 1.
+	r, err := c.GetConfigurationRequest(nextReqNo)
+	switch {
+	case errors.Is(err, datastore.ErrNotFound):
+		return reqs, nextReqNo, nil
+	case err == nil:
+		return append(reqs, r), nextReqNo + 1, nil
+	case err != nil:
+		return nil, 0, err
+	}
+	return
 }
 
-// StoreConfigurationRequest stored a configuration request and the corresponding configuration number in the persistent database.
+// StoreConfigurationRequest stores a configuration request and the corresponding configuration number in the persistent database.
 func (c *ConfigurationManager) StoreConfigurationRequest(r *mirproto.Request, n uint64) error {
 	v, err := proto.Marshal(r)
 	if err != nil {
@@ -128,12 +127,11 @@ func (c *ConfigurationManager) StoreAppliedConfigurationNumber(n uint64) {
 func (c *ConfigurationManager) GetNextConfigurationNumber() uint64 {
 	b, err := c.ds.Get(c.ctx, NextConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
-		log.With("validator", c.id).Info("stored sent configuration number not found")
+		log.With("validator", c.id).Info("stored next configuration number not found")
 		return 0
 	}
 	if err != nil {
-		log.With("validator", c.id).Warnf("failed to get sent configuration number: %v", err)
-		return 0
+		log.With("validator", c.id).Panic("failed to get next configuration number: %v", err)
 	}
 	return binary.LittleEndian.Uint64(b)
 }
@@ -146,8 +144,7 @@ func (c *ConfigurationManager) GetAppliedConfigurationNumber() (n uint64, found 
 		return 0, !found
 	}
 	if err != nil {
-		log.With("validator", c.id).Warnf("failed to get applied configuration number: %v", err)
-		return 0, !found
+		log.With("validator", c.id).Panic("failed to get applied configuration number: %v", err)
 	}
 	return binary.LittleEndian.Uint64(b), found
 }

@@ -71,8 +71,8 @@ type Manager struct {
 	stopped       bool
 
 	// Reconfiguration types.
-	initialValidatorSet  *validator.Set
-	reconfigurationNonce uint64
+	initialValidatorSet *validator.Set
+	configurationNonce  uint64
 
 	// Checkpoint types.
 	segmentLength  int    // Segment length determining the checkpoint period.
@@ -263,7 +263,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("validator %v failed to recover confgiguration requests: %w", m.mirID, err)
 	}
-	m.reconfigurationNonce = configNonce
+	m.configurationNonce = configNonce
 
 	lastValidatorSet := m.initialValidatorSet
 
@@ -442,18 +442,21 @@ func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirpro
 
 	r := mirproto.Request{
 		ClientId: m.mirID,
-		ReqNo:    m.reconfigurationNonce,
+		ReqNo:    m.configurationNonce,
 		Type:     ConfigurationRequest,
 		Data:     b.Bytes(),
 	}
 
-	if err := m.confManager.StoreConfigurationRequest(&r, m.reconfigurationNonce); err != nil {
+	if err := m.confManager.StoreConfigurationRequest(&r, m.configurationNonce); err != nil {
 		log.With("validator", m.mirID).Errorf("unable to store configuration request: %v", err)
 		return nil
 	}
 
-	m.reconfigurationNonce++
-	m.confManager.StoreNextConfigurationNumber(m.reconfigurationNonce)
+	// If a request with number n was stored then the stored configuration nonce can be no more than n+1.
+	// That is possible if a node crashes here.
+
+	m.configurationNonce++
+	m.confManager.StoreNextConfigurationNumber(m.configurationNonce)
 
 	return &r
 }

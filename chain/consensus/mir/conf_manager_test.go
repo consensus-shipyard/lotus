@@ -104,9 +104,9 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	require.EqualValues(t, r.ReqNo, r1.ReqNo)
 }
 
-// TestConfigurationManagerRecoverData tests that if we store two configuration requests then we can get them back.
-func TestConfigurationManagerRecoverData(t *testing.T) {
-	dbFile := "cm_recover_test.db"
+// TestConfigurationManagerRecoverData_NoCrash tests that if we store two configuration requests then we can get them back.
+func TestConfigurationManagerRecoverData_NoCrash(t *testing.T) {
+	dbFile := "cm_recover_test_nocrash.db"
 	t.Cleanup(func() {
 		err := os.RemoveAll(dbFile)
 		require.NoError(t, err)
@@ -129,7 +129,7 @@ func TestConfigurationManagerRecoverData(t *testing.T) {
 	err = cm.StoreConfigurationRequest(&r0, r0.ReqNo)
 	require.NoError(t, err)
 	nonce++
-	cm.StoreNextConfigurationNumber(r0.ReqNo)
+	cm.StoreNextConfigurationNumber(nonce)
 
 	// Store the second request.
 	r1 := requestpb.Request{
@@ -142,13 +142,13 @@ func TestConfigurationManagerRecoverData(t *testing.T) {
 	err = cm.StoreConfigurationRequest(&r1, r1.ReqNo)
 	require.NoError(t, err)
 	nonce++
-	cm.StoreNextConfigurationNumber(r1.ReqNo)
+	cm.StoreNextConfigurationNumber(nonce)
 
 	// Recover the state and check it is correct.
 
 	reqs, nn, err := cm.GetConfigurationData()
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), nn)
+	require.Equal(t, uint64(2), nn)
 	require.Equal(t, 2, len(reqs))
 
 	// Execute the first request.
@@ -159,9 +159,91 @@ func TestConfigurationManagerRecoverData(t *testing.T) {
 	// Recover the state and check it is correct.
 	reqs, nn, err = cm.GetConfigurationData()
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), nn)
+	require.Equal(t, uint64(2), nn)
 	require.Equal(t, 1, len(reqs))
 	n, found := cm.GetAppliedConfigurationNumber()
 	require.True(t, found)
 	require.Equal(t, uint64(0), n)
+}
+
+// TestConfigurationManagerRecoverData_WithCrash tests that if we store two configuration requests then we can get them
+// back even if crash happened.
+func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
+	dbFile := "cm_recover_test_withcrash.db"
+	t.Cleanup(func() {
+		err := os.RemoveAll(dbFile)
+		require.NoError(t, err)
+	})
+	ds, err := mirkv.NewLevelDB(dbFile, false)
+	require.NoError(t, err)
+	cm := NewConfigurationManager(context.Background(), ds, "id1")
+
+	nonce := uint64(0)
+
+	// Store the first request.
+
+	r0 := requestpb.Request{
+		ReqNo:    nonce,
+		ClientId: "1",
+		Data:     []byte{0},
+		Type:     ConfigurationRequest,
+	}
+
+	err = cm.StoreConfigurationRequest(&r0, r0.ReqNo)
+	require.NoError(t, err)
+	nonce++
+	cm.StoreNextConfigurationNumber(nonce)
+
+	// Store the second request.
+	r1 := requestpb.Request{
+		ReqNo:    nonce,
+		ClientId: "1",
+		Data:     []byte{1},
+		Type:     ConfigurationRequest,
+	}
+
+	err = cm.StoreConfigurationRequest(&r1, r1.ReqNo)
+	require.NoError(t, err)
+
+	// Recover the state and check it is correct.
+
+	reqs, nn, err := cm.GetConfigurationData()
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), nn)
+	require.Equal(t, 2, len(reqs))
+
+	// Execute the first request.
+
+	cm.StoreAppliedConfigurationNumber(0)
+	cm.RemoveConfigurationRequest(0)
+
+	// Recover the state and check it is correct.
+	reqs, nn, err = cm.GetConfigurationData()
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), nn)
+	require.Equal(t, 1, len(reqs))
+	n, found := cm.GetAppliedConfigurationNumber()
+	require.True(t, found)
+	require.Equal(t, uint64(0), n)
+}
+
+// TestConfigurationManagerRecoverData_CrashWhenNonce0 tests that if we crash on the first request.
+func TestConfigurationManagerRecoverData_CrashWhenNonce0(t *testing.T) {
+	dbFile := "cm_recover_test_0.db"
+	t.Cleanup(func() {
+		err := os.RemoveAll(dbFile)
+		require.NoError(t, err)
+	})
+	ds, err := mirkv.NewLevelDB(dbFile, false)
+	require.NoError(t, err)
+	cm := NewConfigurationManager(context.Background(), ds, "id1")
+
+	// Store the first request.
+
+	// Recover the state and check it is correct.
+
+	reqs, nn, err := cm.GetConfigurationData()
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), nn)
+	require.Equal(t, 0, len(reqs))
 }
