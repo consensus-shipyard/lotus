@@ -10,6 +10,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	gateway "github.com/consensus-shipyard/go-ipc-types/gateway"
 	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
@@ -1522,6 +1523,36 @@ func (m *MockFullNode) IpcAddSubnetActor(arg0 context.Context, arg1 address.Addr
 func (mr *MockFullNodeMockRecorder) IpcAddSubnetActor(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IpcAddSubnetActor), arg0, arg1, arg2)
+}
+
+// IpcReadGatewayState mocks base method.
+func (m *MockFullNode) IpcReadGatewayState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*gateway.State, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IpcReadGatewayState", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*gateway.State)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IpcReadGatewayState indicates an expected call of IpcReadGatewayState.
+func (mr *MockFullNodeMockRecorder) IpcReadGatewayState(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcReadGatewayState", reflect.TypeOf((*MockFullNode)(nil).IpcReadGatewayState), arg0, arg1, arg2)
+}
+
+// IpcReadSubnetActorState mocks base method.
+func (m *MockFullNode) IpcReadSubnetActorState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*subnetactor.State, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IpcReadSubnetActorState", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*subnetactor.State)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IpcReadSubnetActorState indicates an expected call of IpcReadSubnetActorState.
+func (mr *MockFullNodeMockRecorder) IpcReadSubnetActorState(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcReadSubnetActorState", reflect.TypeOf((*MockFullNode)(nil).IpcReadSubnetActorState), arg0, arg1, arg2)
 }
 
 // LogAlerts mocks base method.

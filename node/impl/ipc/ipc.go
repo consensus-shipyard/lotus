@@ -5,9 +5,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
+	cbor "github.com/ipfs/go-ipld-cbor"
+	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/fx"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -92,4 +96,40 @@ func (a *IpcAPI) IpcAddSubnetActor(ctx context.Context, wallet address.Address, 
 		return address.Undef, err
 	}
 	return r.IDAddress, nil
+}
+
+func (a *IpcAPI) IpcReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
+	st := &gateway.State{}
+	if err := a.readActorState(ctx, actor, tsk, &gateway.State{}); err != nil {
+		return nil, xerrors.Errorf("error getting gateway actor from StateStore: %w")
+	}
+	return st, nil
+}
+
+func (a *IpcAPI) IpcReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
+	st := &subnetactor.State{}
+	if err := a.readActorState(ctx, actor, tsk, st); err != nil {
+		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w")
+	}
+	return st, nil
+}
+
+// readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
+//
+// The function accepts the address actor and the tipSetKet from which to read the state as an input, along
+// with type variable where the state should be deserialized and stored. By passing the state object as an argument
+// we signal the deserializer the type of the state. Passing the wrong state type for the actor
+// being inspected leads to a deserialization error.
+func (a *IpcAPI) readActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey, stateType cbg.CBORUnmarshaler) error {
+	ts, err := a.Chain.GetTipSetFromKey(ctx, tsk)
+	if err != nil {
+		return xerrors.Errorf("loading tipset %s: %w", tsk, err)
+	}
+	act, err := a.StateManager.LoadActor(ctx, actor, ts)
+	if err != nil {
+		return xerrors.Errorf("getting actor: %w", err)
+	}
+
+	cst := cbor.NewCborStore(a.Chain.StateBlockstore())
+	return cst.Get(ctx, act.Head, &stateType)
 }

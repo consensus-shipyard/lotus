@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -860,8 +861,12 @@ type FullNode interface {
 	RaftState(ctx context.Context) (*RaftStateData, error) //perm:read
 	RaftLeader(ctx context.Context) (peer.ID, error)       //perm:read
 
-	// IPC-specific methods
+	// IPC-specific methods //
+
+	// IPCAddSubnetActor deploys a new subnet actor.
 	IpcAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) //perm:write
+	IpcReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)                //perm:read
+	IpcReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error)        //perm:read
 }
 
 // reverse interface to the client, called after EthSubscribe
