@@ -72,7 +72,6 @@ type Manager struct {
 
 	// Reconfiguration types.
 	initialValidatorSet *validator.Set
-	configurationNonce  uint64
 
 	// Checkpoint types.
 	segmentLength  int    // Segment length determining the checkpoint period.
@@ -92,6 +91,10 @@ func NewManager(ctx context.Context,
 		return nil, err
 	}
 	mirID := addr.String()
+
+	if cfg.SegmentLength < 0 {
+		return nil, fmt.Errorf("validator %v segment length must not be negative", mirID)
+	}
 
 	initialValidatorSet, err := membership.GetValidatorSet()
 	if err != nil {
@@ -121,11 +124,12 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", addr, err)
 	}
 
-	var interceptor *eventlog.Recorder
-
-	if cfg.SegmentLength < 0 {
-		return nil, fmt.Errorf("validator %v segment length must not be negative", mirID)
+	confManager, err := NewConfigurationManager(ctx, ds, mirID)
+	if err != nil {
+		return nil, fmt.Errorf("validator %v failed to create configuration manager: %w", addr, err)
 	}
+
+	var interceptor *eventlog.Recorder
 
 	m := Manager{
 		ctx:                 ctx,
@@ -138,7 +142,7 @@ func NewManager(ctx context.Context,
 		mirID:               mirID,
 		interceptor:         interceptor,
 		cryptoManager:       cryptoManager,
-		confManager:         NewConfigurationManager(ctx, ds, mirID),
+		confManager:         confManager,
 		net:                 netTransport,
 		ds:                  ds,
 		initialValidatorSet: initialValidatorSet,
@@ -259,11 +263,10 @@ func (m *Manager) Serve(ctx context.Context) error {
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
 
-	configRequests, configNonce, err := m.confManager.GetConfigurationData()
+	configRequests, err := m.confManager.Pending()
 	if err != nil {
-		return fmt.Errorf("validator %v failed to recover confgiguration requests: %w", m.mirID, err)
+		return fmt.Errorf("validator %v failed to get pending confgiguration requests: %w", m.mirID, err)
 	}
-	m.configurationNonce = configNonce
 
 	lastValidatorSet := m.initialValidatorSet
 
@@ -440,23 +443,11 @@ func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirpro
 		return nil
 	}
 
-	r := mirproto.Request{
-		ClientId: m.mirID,
-		ReqNo:    m.configurationNonce,
-		Type:     ConfigurationRequest,
-		Data:     b.Bytes(),
-	}
-
-	if err := m.confManager.StoreConfigurationRequest(&r, m.configurationNonce); err != nil {
-		log.With("validator", m.mirID).Errorf("unable to store configuration request: %v", err)
+	r, err := m.confManager.NewTX(ConfigurationRequest, b.Bytes())
+	if err != nil {
+		log.With("validator", m.mirID).Errorf("unable to create configuration tx: %v", err)
 		return nil
 	}
 
-	// If a request with number n was stored then the stored configuration nonce can be no more than n+1.
-	// That is possible if a node crashes here.
-
-	m.configurationNonce++
-	m.confManager.StoreNextConfigurationNumber(m.configurationNonce)
-
-	return &r
+	return r
 }

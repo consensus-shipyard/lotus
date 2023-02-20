@@ -108,7 +108,7 @@ func NewStateManager(
 		nextConfigurationNumber: 1,
 	}
 
-	sm.reconfigurationVotes = sm.confManager.GetReconfigurationVotes()
+	sm.reconfigurationVotes = sm.confManager.GetConfigurationVotes()
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
@@ -335,8 +335,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	}
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.MirManager.mirID {
-		sm.confManager.StoreAppliedConfigurationNumber(msg.ReqNo)
-		sm.confManager.RemoveConfigurationRequest(msg.ReqNo)
+		_ = sm.confManager.Done(t.ReqNo(msg.ReqNo)) // nolint
 	}
 	if !enoughVotes {
 		return nil
@@ -397,7 +396,7 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 	}
 
 	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = append(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)], votingValidator)
-	if err := sm.confManager.StoreReconfigurationVotes(sm.reconfigurationVotes); err != nil {
+	if err := sm.confManager.StoreConfigurationVotes(sm.reconfigurationVotes); err != nil {
 		log.With("validator", sm.ValidatorID).
 			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
 	}

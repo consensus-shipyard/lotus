@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/mir/pkg/client"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	t "github.com/filecoin-project/mir/pkg/types"
 )
@@ -31,75 +32,116 @@ var (
 	ReconfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
 )
 
+var _ client.Client = &ConfigurationManager{}
+
 type ConfigurationManager struct {
-	ctx context.Context // Parent context
-	ds  db.DB           // Persistent storage.
-	id  string          // Parent ID.
+	ctx           context.Context // Parent context
+	ds            db.DB           // Persistent storage.
+	id            string          // Parent ID.
+	nextReqNo     uint64          // Configuration number.
+	nextAppliedNo uint64          // Last applied number.
 }
 
-func NewConfigurationManager(ctx context.Context, ds db.DB, id string) *ConfigurationManager {
-	return &ConfigurationManager{
-		ctx: ctx,
-		ds:  ds,
-		id:  id,
+func NewConfigurationManager(ctx context.Context, ds db.DB, id string) (*ConfigurationManager, error) {
+	cm := &ConfigurationManager{
+		ctx:           ctx,
+		ds:            ds,
+		id:            id,
+		nextReqNo:     0,
+		nextAppliedNo: 0,
 	}
+	err := cm.recover()
+	if err != nil {
+		return nil, err
+	}
+	return cm, nil
 }
 
-// GetConfigurationData recovers configuration number, and configuration requests that may be not applied.
-func (c *ConfigurationManager) GetConfigurationData() (reqs []*mirproto.Request, nextReqNo uint64, err error) {
-	// o is the offset to distinguish cases when there are no applied configuration requests and when the
-	// applied reconfiguration request number is 0.
-	// Since we use uint64 we cannot return -1 when there are no applied configurations.
-	o := uint64(1)
-
-	nextReqNo = c.GetNextConfigurationNumber()
-
-	appliedNumber, found := c.GetAppliedConfigurationNumber()
-	if !found {
-		o = 0
+func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request, error) {
+	r := mirproto.Request{
+		ClientId: cm.id,
+		ReqNo:    cm.nextReqNo,
+		Type:     ConfigurationRequest,
+		Data:     data,
 	}
 
-	if nextReqNo == appliedNumber && nextReqNo == 0 {
-		return nil, 0, nil
-	}
-	if appliedNumber > nextReqNo {
-		return nil, 0, fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", c.id, appliedNumber, nextReqNo)
+	if err := cm.storeRequest(&r, cm.nextReqNo); err != nil {
+		log.With("validator", cm.id).Errorf("unable to store configuration request: %v", err)
+		return nil, err
 	}
 
-	for i := appliedNumber + o; i < nextReqNo; i++ {
-		r, err := c.GetConfigurationRequest(i)
+	// If a request with number n was stored then the stored configuration nonce can be no more than n+1.
+	// That is possible if a node crashes here.
+
+	cm.nextReqNo++
+	cm.storeNextConfigurationNumber(cm.nextReqNo)
+
+	return &r, nil
+}
+func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
+	cm.nextAppliedNo = uint64(txNo) + 1
+	cm.storeAppliedConfigurationNumber(cm.nextAppliedNo)
+	cm.removeRequest(uint64(txNo))
+	return nil
+}
+
+func (cm *ConfigurationManager) Pending() (reqs []*mirproto.Request, err error) {
+	for i := cm.nextAppliedNo; i < cm.nextReqNo; i++ {
+		r, err := cm.getRequest(i)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		reqs = append(reqs, r)
-	}
-
-	// If a node crashes right after we put a configuration request the actual configuration nonce
-	// can be equal to GetNextConfigurationNumber + 1.
-	r, err := c.GetConfigurationRequest(nextReqNo)
-	switch {
-	case errors.Is(err, datastore.ErrNotFound):
-		return reqs, nextReqNo, nil
-	case err == nil:
-		return append(reqs, r), nextReqNo + 1, nil
-	case err != nil:
-		return nil, 0, err
 	}
 	return
 }
 
-// StoreConfigurationRequest stores a configuration request and the corresponding configuration number in the persistent database.
-func (c *ConfigurationManager) StoreConfigurationRequest(r *mirproto.Request, n uint64) error {
+func (cm *ConfigurationManager) Sync() error {
+	return fmt.Errorf("not implemented")
+}
+
+// recover function recovers configuration number, and configuration requests that may be not applied.
+func (cm *ConfigurationManager) recover() error {
+	nextReqNo := cm.getNextConfigurationNumber()
+	appliedNumber := cm.getAppliedConfigurationNumber()
+
+	if nextReqNo == appliedNumber && nextReqNo == 0 {
+		cm.nextReqNo = 0
+		cm.nextAppliedNo = 0
+		return nil
+	}
+	if appliedNumber > nextReqNo {
+		return fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", cm.id, appliedNumber, nextReqNo)
+	}
+
+	cm.nextAppliedNo = appliedNumber
+	cm.nextReqNo = nextReqNo
+
+	_, err := cm.getRequest(nextReqNo + 1)
+	switch {
+	case errors.Is(err, datastore.ErrNotFound):
+		return nil
+	case err == nil:
+		cm.nextReqNo++
+		return nil
+	case err != nil:
+		return err
+	}
+	return nil
+}
+
+// storeRequest stores a configuration request and the corresponding configuration number in the persistent database.
+func (cm *ConfigurationManager) storeRequest(r *mirproto.Request, n uint64) error {
 	v, err := proto.Marshal(r)
 	if err != nil {
 		return err
 	}
-	return c.ds.Put(c.ctx, configurationIndexKey(n), v)
+	return cm.ds.Put(cm.ctx, configurationIndexKey(n), v)
 }
 
-// GetConfigurationRequest gets a configuration request from the persistent database.
-func (c *ConfigurationManager) GetConfigurationRequest(n uint64) (*mirproto.Request, error) {
-	b, err := c.ds.Get(c.ctx, configurationIndexKey(n))
+// getRequest gets a configuration request from the persistent database.
+func (cm *ConfigurationManager) getRequest(n uint64) (*mirproto.Request, error) {
+	b, err := cm.ds.Get(cm.ctx, configurationIndexKey(n))
 	if err != nil {
 		return nil, err
 	}
@@ -110,60 +152,59 @@ func (c *ConfigurationManager) GetConfigurationRequest(n uint64) (*mirproto.Requ
 	return &r, nil
 }
 
-func (c *ConfigurationManager) RemoveConfigurationRequest(n uint64) {
-	if err := c.ds.Delete(c.ctx, configurationIndexKey(n)); err != nil {
-		log.With("validator", c.id).Warnf("failed to remove applied configuration request %d: %v", n, err)
+func (cm *ConfigurationManager) removeRequest(n uint64) {
+	if err := cm.ds.Delete(cm.ctx, configurationIndexKey(n)); err != nil {
+		log.With("validator", cm.id).Warnf("failed to remove applied configuration request %d: %v", n, err)
 	}
 }
 
-func (c *ConfigurationManager) StoreNextConfigurationNumber(n uint64) {
-	c.storeNumber(NextConfigurationNumberKey, n)
+func (cm *ConfigurationManager) storeNextConfigurationNumber(n uint64) {
+	cm.storeNumber(NextConfigurationNumberKey, n)
 }
 
-func (c *ConfigurationManager) StoreAppliedConfigurationNumber(n uint64) {
-	c.storeNumber(AppliedConfigurationNumberKey, n)
+func (cm *ConfigurationManager) storeAppliedConfigurationNumber(n uint64) {
+	cm.storeNumber(AppliedConfigurationNumberKey, n)
 }
 
-func (c *ConfigurationManager) GetNextConfigurationNumber() uint64 {
-	b, err := c.ds.Get(c.ctx, NextConfigurationNumberKey)
+func (cm *ConfigurationManager) getNextConfigurationNumber() uint64 {
+	b, err := cm.ds.Get(cm.ctx, NextConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
-		log.With("validator", c.id).Info("stored next configuration number not found")
+		log.With("validator", cm.id).Info("stored next configuration number not found")
 		return 0
 	}
 	if err != nil {
-		log.With("validator", c.id).Panic("failed to get next configuration number: %v", err)
+		log.With("validator", cm.id).Panic("failed to get next configuration number: %v", err)
 	}
 	return binary.LittleEndian.Uint64(b)
 }
 
-func (c *ConfigurationManager) GetAppliedConfigurationNumber() (n uint64, found bool) {
-	found = true
-	b, err := c.ds.Get(c.ctx, AppliedConfigurationNumberKey)
+func (cm *ConfigurationManager) getAppliedConfigurationNumber() uint64 {
+	b, err := cm.ds.Get(cm.ctx, AppliedConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
-		log.With("validator", c.id).Info("stored executed configuration number not found")
-		return 0, !found
+		log.With("validator", cm.id).Info("stored executed configuration number not found")
+		return 0
 	}
 	if err != nil {
-		log.With("validator", c.id).Panic("failed to get applied configuration number: %v", err)
+		log.With("validator", cm.id).Panic("failed to get applied configuration number: %v", err)
 	}
-	return binary.LittleEndian.Uint64(b), found
+	return binary.LittleEndian.Uint64(b)
 }
 
-func (c *ConfigurationManager) GetReconfigurationVotes() map[uint64]map[string][]t.NodeID {
+func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string][]t.NodeID {
 	votes := make(map[uint64]map[string][]t.NodeID)
-	b, err := c.ds.Get(c.ctx, ReconfigurationVotesKey)
+	b, err := cm.ds.Get(cm.ctx, ReconfigurationVotesKey)
 	if errors.Is(err, datastore.ErrNotFound) {
-		log.With("validator", c.id).Info("stored reconfiguration votes not found")
+		log.With("validator", cm.id).Info("stored reconfiguration votes not found")
 		return votes
 	}
 	if err != nil {
-		log.With("validator", c.id).Warnf("failed to get reconfiguration votes: %v", err)
+		log.With("validator", cm.id).Warnf("failed to get reconfiguration votes: %v", err)
 		return votes
 	}
 
 	var r VoteRecords
 	if err := r.UnmarshalCBOR(bytes.NewReader(b)); err != nil {
-		log.With("validator", c.id).Warnf("failed to unmarshal reconfiguration votes: %v", err)
+		log.With("validator", cm.id).Warnf("failed to unmarshal reconfiguration votes: %v", err)
 		return votes
 	}
 	votes = GetConfigurationVotes(r.Records)
@@ -171,8 +212,8 @@ func (c *ConfigurationManager) GetReconfigurationVotes() map[uint64]map[string][
 	return votes
 }
 
-func (c *ConfigurationManager) StoreReconfigurationVotes(votes map[uint64]map[string][]t.NodeID) error {
-	recs := StoreConfigurationVotes(votes)
+func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[string][]t.NodeID) error {
+	recs := storeConfigurationVotes(votes)
 	r := VoteRecords{
 		Records: recs,
 	}
@@ -181,18 +222,18 @@ func (c *ConfigurationManager) StoreReconfigurationVotes(votes map[uint64]map[st
 	if err := r.MarshalCBOR(b); err != nil {
 		return err
 	}
-	if err := c.ds.Put(c.ctx, ReconfigurationVotesKey, b.Bytes()); err != nil {
-		log.With("validator", c.id).Warnf("failed to put reconfiguration votes: %v", err)
+	if err := cm.ds.Put(cm.ctx, ReconfigurationVotesKey, b.Bytes()); err != nil {
+		log.With("validator", cm.id).Warnf("failed to put reconfiguration votes: %v", err)
 	}
 
 	return nil
 }
 
-func (c *ConfigurationManager) storeNumber(key datastore.Key, n uint64) {
+func (cm *ConfigurationManager) storeNumber(key datastore.Key, n uint64) {
 	rb := make([]byte, 8)
 	binary.LittleEndian.PutUint64(rb, n)
-	if err := c.ds.Put(c.ctx, key, rb); err != nil {
-		log.With("validator", c.id).Warnf("failed to put configuration number by %s: %v", key, err)
+	if err := cm.ds.Put(cm.ctx, key, rb); err != nil {
+		log.With("validator", cm.id).Warnf("failed to put configuration number by %s: %v", key, err)
 	}
 }
 
@@ -213,7 +254,7 @@ func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string][]t.NodeID {
 	return m
 }
 
-func StoreConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) []VoteRecord {
+func storeConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) []VoteRecord {
 	var vs []VoteRecord
 	for n, hashToValidatorsVotes := range reconfigurationVotes {
 		for h, nodeIDs := range hashToValidatorsVotes {
