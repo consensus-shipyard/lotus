@@ -129,7 +129,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 		db := m.GetDB()
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
 	}
 }
 
@@ -296,7 +296,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 
 		nonce, err = db.Get(ctx, mir.AppliedConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 
 		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
 		require.NoError(t, err)
