@@ -114,7 +114,13 @@ func (a *IpcAPI) IpcReadSubnetActorState(ctx context.Context, actor address.Addr
 	return st, nil
 }
 
-func (a *IpcAPI) readActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey, stateType cbg.CBORMarshaler) error {
+// readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
+//
+// The function accepts the address actor and the tipSetKet from which to read the state as an input, along
+// with type variable where the state should be deserialized and stored. By passing the state object as an argument
+// we signal the deserializer the type of the state. Passing the wrong state type for the actor
+// being inspected leads to a deserialization error.
+func (a *IpcAPI) readActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey, stateType cbg.CBORUnmarshaler) error {
 	ts, err := a.Chain.GetTipSetFromKey(ctx, tsk)
 	if err != nil {
 		return xerrors.Errorf("loading tipset %s: %w", tsk, err)
