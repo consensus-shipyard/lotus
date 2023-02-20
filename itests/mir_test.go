@@ -121,7 +121,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 
 		nonce, err = db.Get(ctx, mir.AppliedConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
 	}
 
 	// Added validators must send 1 message.
@@ -129,7 +129,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 		db := m.GetDB()
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
+		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
 	}
 }
 
