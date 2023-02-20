@@ -1111,7 +1111,10 @@ func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Grou
 		m.stopMir = cancel
 
 		g.Go(func() error {
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, nil, fakeMembership{}, nil)
+			cfg := mir.Config{
+				SegmentLength: 1,
+			}
+			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, nil, fakeMembership{}, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
 			}

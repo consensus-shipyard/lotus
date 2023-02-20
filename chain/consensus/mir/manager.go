@@ -92,6 +92,10 @@ func NewManager(ctx context.Context,
 	}
 	mirID := addr.String()
 
+	if cfg == nil {
+		return nil, fmt.Errorf("nil config")
+	}
+
 	if cfg.SegmentLength < 0 {
 		return nil, fmt.Errorf("validator %v segment length must not be negative", mirID)
 	}
