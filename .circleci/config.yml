@@ -236,7 +236,7 @@ jobs:
   test-consensus-unit:
     <<: *basic_test
 
-  test-mir:
+  test-mir-basic:
     <<: *basic_test
 
   test-mir-with-mangler:
@@ -573,17 +573,17 @@ workflows:
           target: "./itests/mir_test.go"
           requires:
             - consensus-unit-tests
-      - test-mir:
-          name: mir-tests
+      - test-mir-basic:
+          name: mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
           requires:
             - mir-smoke-tests
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
           requires:
             - mir-smoke-tests
@@ -621,13 +621,13 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
-      - test-mir:
-          name: mir-consensus-tests
+      - test-mir-basic:
+          name: mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
