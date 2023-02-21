@@ -88,7 +88,7 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	n := cm.getNextConfigurationNumber()
 	require.Equal(t, uint64(100), n)
 
-	cm.storeAppliedConfigurationNumber(200)
+	cm.storeNextAppliedConfigurationNumber(200)
 	n = cm.getAppliedConfigurationNumber()
 	require.Equal(t, uint64(200), n)
 

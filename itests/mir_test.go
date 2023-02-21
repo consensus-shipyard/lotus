@@ -112,14 +112,15 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
-	// Core validators must send 2 messages.
+	// Check the configuration client persistent DB state.
+	// Core validators have sent 2 messages.
 	for _, m := range miners[:MirTotalValidatorNumber] {
 		db := m.GetDB()
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
 
-		nonce, err = db.Get(ctx, mir.AppliedConfigurationNumberKey)
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
 	}
@@ -216,7 +217,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		db := kit.NewTestDB()
 		err := db.Put(ctx, mir.NextConfigurationNumberKey, bn)
 		require.NoError(t, err)
-		err = db.Put(ctx, mir.AppliedConfigurationNumberKey, bn)
+		err = db.Put(ctx, mir.NextAppliedConfigurationNumberKey, bn)
 		require.NoError(t, err)
 
 		// -- store fake votes
@@ -294,7 +295,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		require.NoError(t, err)
 		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 
-		nonce, err = db.Get(ctx, mir.AppliedConfigurationNumberKey)
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 

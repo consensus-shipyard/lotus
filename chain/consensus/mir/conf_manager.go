@@ -25,9 +25,9 @@ var (
 	// NextConfigurationNumberKey is used to store SentConfigurationNumber
 	// that is the maximum configuration request number (nonce) that has been sent.
 	NextConfigurationNumberKey = datastore.NewKey("mir/next-config-number")
-	// AppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
+	// NextAppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
 	// that is the maximum configuration request number that has been applied.
-	AppliedConfigurationNumberKey = datastore.NewKey("mir/applied-config-number")
+	NextAppliedConfigurationNumberKey = datastore.NewKey("mir/next-applied-config-number")
 	// ReconfigurationVotesKey is used to store configuration votes.
 	ReconfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
 )
@@ -80,7 +80,7 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request,
 }
 func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
 	cm.nextAppliedNo = uint64(txNo) + 1
-	cm.storeAppliedConfigurationNumber(cm.nextAppliedNo)
+	cm.storeNextAppliedConfigurationNumber(cm.nextAppliedNo)
 	cm.removeRequest(uint64(txNo))
 	return nil
 }
@@ -162,8 +162,8 @@ func (cm *ConfigurationManager) storeNextConfigurationNumber(n uint64) {
 	cm.storeNumber(NextConfigurationNumberKey, n)
 }
 
-func (cm *ConfigurationManager) storeAppliedConfigurationNumber(n uint64) {
-	cm.storeNumber(AppliedConfigurationNumberKey, n)
+func (cm *ConfigurationManager) storeNextAppliedConfigurationNumber(n uint64) {
+	cm.storeNumber(NextAppliedConfigurationNumberKey, n)
 }
 
 func (cm *ConfigurationManager) getNextConfigurationNumber() uint64 {
@@ -179,7 +179,7 @@ func (cm *ConfigurationManager) getNextConfigurationNumber() uint64 {
 }
 
 func (cm *ConfigurationManager) getAppliedConfigurationNumber() uint64 {
-	b, err := cm.ds.Get(cm.ctx, AppliedConfigurationNumberKey)
+	b, err := cm.ds.Get(cm.ctx, NextAppliedConfigurationNumberKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", cm.id).Info("stored executed configuration number not found")
 		return 0
