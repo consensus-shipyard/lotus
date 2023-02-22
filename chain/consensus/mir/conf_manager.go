@@ -57,6 +57,10 @@ func NewConfigurationManager(ctx context.Context, ds db.DB, id string) (*Configu
 	return cm, nil
 }
 
+// NewTX creates and returns a new configuration request with the next request number,
+// corresponding to the number of transactions previously created by this client.
+// Until Done is called with the returned request's number,
+// the request will be pending, i.e., among the requests returned by Pending.
 func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request, error) {
 	r := mirproto.Request{
 		ClientId: cm.id,
@@ -78,6 +82,8 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request,
 
 	return &r, nil
 }
+
+// Done marks a configuration request as done. It will no longer be among the request returned by Pending.
 func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
 	cm.nextAppliedNo = uint64(txNo) + 1
 	cm.storeNextAppliedConfigurationNumber(cm.nextAppliedNo)
@@ -85,6 +91,7 @@ func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
 	return nil
 }
 
+// Pending returns all requests previously returned by NewTX that have not been marked as done.
 func (cm *ConfigurationManager) Pending() (reqs []*mirproto.Request, err error) {
 	for i := cm.nextAppliedNo; i < cm.nextReqNo; i++ {
 		r, err := cm.getRequest(i)
@@ -96,8 +103,10 @@ func (cm *ConfigurationManager) Pending() (reqs []*mirproto.Request, err error) 
 	return
 }
 
+// Sync ensures that the effects of all previous calls to NewTX and Done have been written to persistent storage.
+// We do not use this according to the used DB interface.
 func (cm *ConfigurationManager) Sync() error {
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 // recover function recovers configuration number, and configuration requests that may not be applied.
