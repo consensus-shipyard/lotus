@@ -186,6 +186,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 
 // TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
 // if a new validator join the network and after recovery.
+// TODO: refactor this test by separating DB test primitives.
 func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.T) {
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
@@ -258,6 +259,15 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	t.Log(">>> check that persisted votes restored")
 	for _, m := range miners[:MirTotalValidatorNumber] {
 		db := m.GetDB()
+
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
 		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
 		require.NoError(t, err)
 		var r mir.VoteRecords
@@ -281,10 +291,12 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	require.Equal(t, cn, membership.GetConfigurationNumber())
 	// Start new miners.
 	ens.InterconnectFullNodes()
+
 	ens.BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, g, dbs[MirTotalValidatorNumber:], miners[MirTotalValidatorNumber:])
 
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
+
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
 	require.NoError(t, err)
 
@@ -1212,7 +1224,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 
 	t.Log(">>> restoring network connections")
 	restoreConnections()
-	
+
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)

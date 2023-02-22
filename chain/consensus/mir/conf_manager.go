@@ -78,6 +78,7 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request,
 		// If a request with number n has been persisted and the node had crashed here
 		// then when recovering the next configuration nonce can be n+1.
 	}
+
 	cm.nextReqNo++
 	cm.storeNextConfigurationNumber(cm.nextReqNo)
 
@@ -116,13 +117,14 @@ func (cm *ConfigurationManager) recover() error {
 	appliedNumber := cm.getAppliedConfigurationNumber()
 
 	if nextReqNo == appliedNumber && appliedNumber == 0 {
-		cm.nextReqNo = 0
-		cm.nextAppliedNo = 0
 		return nil
 	}
 	if appliedNumber > nextReqNo {
 		return fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", cm.id, appliedNumber, nextReqNo)
 	}
+
+	cm.nextAppliedNo = appliedNumber
+	cm.nextReqNo = nextReqNo
 
 	// If the node crashes immediately after the request with number n was persisted then the next configuration nonce can be
 	// n+1. To distinguish that scenario we have to check the existence of n+1 request.

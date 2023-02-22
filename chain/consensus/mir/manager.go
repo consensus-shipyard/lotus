@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -223,13 +224,12 @@ func NewManager(ctx context.Context,
 
 	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
 
-	interceptorOutput := os.Getenv(InterceptorOutputEnv)
-	if interceptorOutput != "" {
+	if interceptorPath := os.Getenv(InterceptorOutputEnv); interceptorPath != "" {
 		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized")
+		log.Infof("Interceptor initialized on %s", interceptorPath)
 		m.interceptor, err = eventlog.NewRecorder(
 			t.NodeID(mirID),
-			interceptorOutput+"/"+mirID,
+			path.Join(interceptorPath, cfg.GroupName, mirID),
 			logging.Decorate(logger, "Interceptor: "),
 		)
 		if err != nil {

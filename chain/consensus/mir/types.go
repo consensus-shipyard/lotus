@@ -51,6 +51,8 @@ type Config struct {
 	CheckpointRepo string
 	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
 	SegmentLength int
+	// The name of the group of validators.
+	GroupName string
 }
 
 func NewConfig(

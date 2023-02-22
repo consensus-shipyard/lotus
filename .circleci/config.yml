@@ -198,6 +198,7 @@ jobs:
           environment:
             TEST_RUSTPROOFS_LOGS: << parameters.proofs-log-test >>
             SKIP_CONFORMANCE: "1"
+            MIR_INTERCEPTOR_OUTPUT: "mir-interceptor"
           command: |
             mkdir -p /tmp/test-reports/<< parameters.suite >>
             mkdir -p /tmp/test-artifacts
@@ -213,15 +214,15 @@ jobs:
       - run:
           command: |
             dates="$(date +%s)"
-            mkdir -p /tmp/test-mir-eventlogs/"$dates"
-            cp -R ./itests/eudico-recorder* /tmp/test-mir-eventlogs/"$dates"/
+            mkdir -p /tmp/test-mir-interceptor/"$dates"
+            cp -R ./itests/mir-interceptor/* /tmp/test-mir-interceptor/"$dates"/
           when: on_fail
       - store_test_results:
           path: /tmp/test-reports
       - store_artifacts:
           path: /tmp/test-artifacts/<< parameters.suite >>.json
       - store_artifacts:
-          path: /tmp/test-mir-eventlogs
+          path: /tmp/test-mir-interceptor
       - when:
           condition: << parameters.codecov-upload >>
           steps:

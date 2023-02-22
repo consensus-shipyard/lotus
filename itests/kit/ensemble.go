@@ -1113,6 +1113,7 @@ func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Grou
 		g.Go(func() error {
 			cfg := mir.Config{
 				SegmentLength: 1,
+				GroupName:     n.t.Name(),
 			}
 			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, nil, fakeMembership{}, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
@@ -1149,6 +1150,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 			m.mirDB = NewTestDB()
 			cfg := mir.Config{
 				SegmentLength: 1,
+				GroupName:     n.t.Name(),
 			}
 			membership := validator.StringMembership(membershipString)
 			if i > len(miners) && delay > 0 {
@@ -1185,6 +1187,7 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
 			}
 			cfg := mir.Config{
 				SegmentLength: 1,
+				GroupName:     n.t.Name(),
 			}
 			membership := validator.FileMembership{FileName: configFileName}
 
@@ -1214,6 +1217,7 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(
 			m.mirDB = NewTestDB()
 			cfg := mir.Config{
 				SegmentLength: 1,
+				GroupName:     n.t.Name(),
 			}
 			membership := validator.FileMembership{FileName: configFileName}
 
@@ -1249,6 +1253,7 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 			}
 			cfg := mir.Config{
 				SegmentLength: 1,
+				GroupName:     n.t.Name(),
 			}
 			membership := validator.StringMembership(m.mirMembership)
 
