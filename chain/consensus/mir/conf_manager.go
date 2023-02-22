@@ -100,7 +100,7 @@ func (cm *ConfigurationManager) Sync() error {
 	return fmt.Errorf("not implemented")
 }
 
-// recover function recovers configuration number, and configuration requests that may be not applied.
+// recover function recovers configuration number, and configuration requests that may not be applied.
 func (cm *ConfigurationManager) recover() error {
 	nextReqNo := cm.getNextConfigurationNumber()
 	appliedNumber := cm.getAppliedConfigurationNumber()
