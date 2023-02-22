@@ -74,9 +74,10 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request,
 		return nil, err
 	}
 
-	// If a request with number n was stored then the stored configuration nonce can be no more than n+1.
-	// That is possible if a node crashes here.
-
+	{
+		// If a request with number n has been persisted and the node had crashed here
+		// then when recovering the next configuration nonce can be n+1.
+	}
 	cm.nextReqNo++
 	cm.storeNextConfigurationNumber(cm.nextReqNo)
 
@@ -91,7 +92,7 @@ func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
 	return nil
 }
 
-// Pending returns all requests previously returned by NewTX that have not been marked as done.
+// Pending returns from the persistent storage all requests previously returned by NewTX that have not been applied yet.
 func (cm *ConfigurationManager) Pending() (reqs []*mirproto.Request, err error) {
 	for i := cm.nextAppliedNo; i < cm.nextReqNo; i++ {
 		r, err := cm.getRequest(i)
@@ -114,7 +115,7 @@ func (cm *ConfigurationManager) recover() error {
 	nextReqNo := cm.getNextConfigurationNumber()
 	appliedNumber := cm.getAppliedConfigurationNumber()
 
-	if nextReqNo == appliedNumber && nextReqNo == 0 {
+	if nextReqNo == appliedNumber && appliedNumber == 0 {
 		cm.nextReqNo = 0
 		cm.nextAppliedNo = 0
 		return nil
@@ -123,9 +124,8 @@ func (cm *ConfigurationManager) recover() error {
 		return fmt.Errorf("validator %v has incorrect configuration numbers: %d, %d", cm.id, appliedNumber, nextReqNo)
 	}
 
-	cm.nextAppliedNo = appliedNumber
-	cm.nextReqNo = nextReqNo
-
+	// If the node crashes immediately after the request with number n was persisted then the next configuration nonce can be
+	// n+1. To distinguish that scenario we have to check the existence of n+1 request.
 	_, err := cm.getRequest(nextReqNo + 1)
 	switch {
 	case errors.Is(err, datastore.ErrNotFound):

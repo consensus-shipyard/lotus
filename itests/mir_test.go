@@ -965,7 +965,6 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
 	restoreConnections()
 
-	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
@@ -1005,9 +1004,6 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
@@ -1216,10 +1212,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 
 	t.Log(">>> restoring network connections")
 	restoreConnections()
-
-	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
+	
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
 		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)

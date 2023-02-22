@@ -15,13 +15,15 @@ import (
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/types"
-	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	mir "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/types"
+	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
@@ -31,6 +33,14 @@ const (
 	TransportRequest     = 1
 	ConfigurationRequest = 0
 )
+
+type CtxCanceledWhileWaitingForBlockError struct {
+	Addr address.Address
+}
+
+func (e CtxCanceledWhileWaitingForBlockError) Error() string {
+	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
+}
 
 type Config struct {
 	DatastorePath string

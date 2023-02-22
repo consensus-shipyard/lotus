@@ -37,14 +37,6 @@ type Batch struct {
 	Messages []Message
 }
 
-type CtxCanceledWhileWaitingForBlockError struct {
-	Addr address.Address
-}
-
-func (e CtxCanceledWhileWaitingForBlockError) Error() string {
-	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
-}
-
 var _ trantor.AppLogic = &StateManager{}
 
 type StateManager struct {
@@ -391,7 +383,7 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 	// Prevent double voting.
 	for _, voted := range sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] {
 		if voted == votingValidator {
-			return false, xerrors.Errorf("validator %s has been voted for configuration %d", votingValidator, set.ConfigurationNumber)
+			return false, xerrors.Errorf("validator %s has already voted for configuration %d", votingValidator, set.ConfigurationNumber)
 		}
 	}
 
@@ -437,7 +429,7 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 	delete(sm.memberships, sm.currentEpoch-1)
 
 	log.With("validator", sm.ValidatorID).
-		Infof(">>> New epoch result: current epoch %d, current membership size %d, next membership size: %d, height: %d",
+		Debugf("New epoch result: current epoch %d, current membership size %d, next membership size: %d, height: %d",
 			sm.currentEpoch, len(sm.memberships[sm.currentEpoch]), len(sm.nextNewMembership), sm.height)
 
 	return sm.nextNewMembership, nil
