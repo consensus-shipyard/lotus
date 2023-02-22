@@ -37,9 +37,9 @@ var _ client.Client = &ConfigurationManager{}
 type ConfigurationManager struct {
 	ctx           context.Context // Parent context
 	ds            db.DB           // Persistent storage.
-	id            string          // Parent ID.
-	nextReqNo     uint64          // Configuration number.
-	nextAppliedNo uint64          // Last applied number.
+	id            string          // Manager ID.
+	nextReqNo     uint64          // The number that will be used in the next configuration Mir request.
+	nextAppliedNo uint64          // The number of the next configuration Mir request that will be applied.
 }
 
 func NewConfigurationManager(ctx context.Context, ds db.DB, id string) (*ConfigurationManager, error) {
