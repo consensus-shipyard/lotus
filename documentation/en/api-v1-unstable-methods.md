@@ -107,8 +107,11 @@
   * [GasEstimateMessageGas](#GasEstimateMessageGas)
 * [I](#I)
   * [ID](#ID)
-* [Ipc](#Ipc)
-  * [IpcAddSubnetActor](#IpcAddSubnetActor)
+  * [IPCAddSubnetActor](#IPCAddSubnetActor)
+  * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
+  * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
+  * [IPCReadGatewayState](#IPCReadGatewayState)
+  * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
 * [Log](#Log)
   * [LogAlerts](#LogAlerts)
   * [LogList](#LogList)
@@ -3107,11 +3110,8 @@ Inputs: `null`
 
 Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
 
-## Ipc
-
-
-### IpcAddSubnetActor
-IPC-specific methods
+### IPCAddSubnetActor
+IPCAddSubnetActor deploys a new subnet actor.
 
 
 Perms: write
@@ -3126,7 +3126,7 @@ Inputs:
       "Actor": "f01234"
     },
     "Name": "string value",
-    "IpcGatewayAddr": 42,
+    "IPCGatewayAddr": 42,
     "Consensus": 0,
     "MinValidatorStake": "0",
     "MinValidators": 42,
@@ -3138,6 +3138,195 @@ Inputs:
 ```
 
 Response: `"f01234"`
+
+### IPCGetCheckpointTemplate
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  10101
+]
+```
+
+Response:
+```json
+{
+  "Data": {
+    "Source": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
+    "TipSet": "Ynl0ZSBhcnJheQ==",
+    "Epoch": 10101,
+    "PrevCheck": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Children": [
+      {
+        "Source": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "Checks": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        }
+      }
+    ],
+    "CrossMsgs": [
+      {
+        "From": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "To": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "MsgsCID": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "Nonce": 42,
+        "Value": "0"
+      }
+    ]
+  },
+  "Sig": "Ynl0ZSBhcnJheQ=="
+}
+```
+
+### IPCGetPrevCheckpointForChild
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
+
+### IPCReadGatewayState
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ]
+]
+```
+
+Response:
+```json
+{
+  "NetworkName": {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  "TotalSubnets": 42,
+  "MinStake": "0",
+  "Subnets": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "CheckPeriod": 10101,
+  "Checkpoints": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "CheckMsgRegistry": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "Postbox": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "Nonce": 42,
+  "BottomupNonce": 42,
+  "BottomupMsgMeta": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "AppliedBottomupNonce": 42,
+  "AppliedTopdownNonce": 42
+}
+```
+
+### IPCReadSubnetActorState
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ]
+]
+```
+
+Response:
+```json
+{
+  "Name": "string value",
+  "ParentID": {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  "IPCGatewayAddr": "f01234",
+  "Consensus": 0,
+  "MinValidatorStake": "0",
+  "TotalStake": "0",
+  "Stake": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "Status": 0,
+  "Genesis": "Ynl0ZSBhcnJheQ==",
+  "FinalityThreshold": 10101,
+  "CheckPeriod": 10101,
+  "Checkpoints": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "WindowChecks": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "ValidatorSet": [
+    {
+      "Addr": "f01234",
+      "NetAddr": "string value"
+    }
+  ],
+  "MinValidators": 42
+}
+```
 
 ## Log
 

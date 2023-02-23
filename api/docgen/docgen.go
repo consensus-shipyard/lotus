@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
@@ -404,6 +405,7 @@ func init() {
 	})
 
 	addExample(subnetactor.ConsensusType(0))
+	addExample(sdk.Status(0))
 }
 
 func GetAPIType(name, pkg string) (i interface{}, t reflect.Type, permStruct []reflect.Type) {

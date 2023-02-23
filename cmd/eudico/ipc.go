@@ -104,14 +104,14 @@ var addCmd = &cli.Command{
 		params := subnetactor.ConstructParams{
 			Parent:            parent,
 			Name:              subnetName,
-			IpcGatewayAddr:    gwAddr,
+			IPCGatewayAddr:    gwAddr,
 			CheckPeriod:       chp,
 			FinalityThreshold: finalityThreshold,
 			MinValidators:     minVals,
 			MinValidatorStake: abi.TokenAmount(types.MustParseFIL("1FIL")),
 			Consensus:         subnetactor.Mir,
 		}
-		actorAddr, err := api.IpcAddSubnetActor(ctx, addr, params)
+		actorAddr, err := api.IPCAddSubnetActor(ctx, addr, params)
 		if err != nil {
 			return err
 		}
