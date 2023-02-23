@@ -319,17 +319,15 @@ type FullNodeMethods struct {
 
 	GasEstimateMessageGas func(p0 context.Context, p1 *types.Message, p2 *MessageSendSpec, p3 types.TipSetKey) (*types.Message, error) `perm:"read"`
 
-	IPCCreateSubnetGenesis func(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) `perm:"read"`
+	IPCAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
 
-	IpcAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
+	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
-	IpcGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
+	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
-	IpcGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
+	IPCReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) `perm:"read"`
 
-	IpcReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) `perm:"read"`
-
-	IpcReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
+	IPCReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
 
 	MarketAddBalance func(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) `perm:"sign"`
 
@@ -2422,69 +2420,58 @@ func (s *FullNodeStub) GasEstimateMessageGas(p0 context.Context, p1 *types.Messa
 	return nil, ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCCreateSubnetGenesis(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
-	if s.Internal.IPCCreateSubnetGenesis == nil {
-		return *new([]byte), ErrNotSupported
-	}
-	return s.Internal.IPCCreateSubnetGenesis(p0, p1)
-}
-
-func (s *FullNodeStub) IPCCreateSubnetGenesis(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
-	return *new([]byte), ErrNotSupported
-}
-
-func (s *FullNodeStruct) IpcAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
-	if s.Internal.IpcAddSubnetActor == nil {
+func (s *FullNodeStruct) IPCAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
+	if s.Internal.IPCAddSubnetActor == nil {
 		return *new(address.Address), ErrNotSupported
 	}
-	return s.Internal.IpcAddSubnetActor(p0, p1, p2)
+	return s.Internal.IPCAddSubnetActor(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IpcAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
+func (s *FullNodeStub) IPCAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
 	return *new(address.Address), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IpcGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
-	if s.Internal.IpcGetCheckpointTemplate == nil {
+func (s *FullNodeStruct) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	if s.Internal.IPCGetCheckpointTemplate == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.IpcGetCheckpointTemplate(p0, p1, p2)
+	return s.Internal.IPCGetCheckpointTemplate(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IpcGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (s *FullNodeStub) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	return nil, ErrNotSupported
 }
 
-func (s *FullNodeStruct) IpcGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
-	if s.Internal.IpcGetPrevCheckpointForChild == nil {
+func (s *FullNodeStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
+	if s.Internal.IPCGetPrevCheckpointForChild == nil {
 		return *new(cid.Cid), ErrNotSupported
 	}
-	return s.Internal.IpcGetPrevCheckpointForChild(p0, p1, p2)
+	return s.Internal.IPCGetPrevCheckpointForChild(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IpcGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
+func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
 	return *new(cid.Cid), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IpcReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
-	if s.Internal.IpcReadGatewayState == nil {
+func (s *FullNodeStruct) IPCReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
+	if s.Internal.IPCReadGatewayState == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.IpcReadGatewayState(p0, p1, p2)
+	return s.Internal.IPCReadGatewayState(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IpcReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
+func (s *FullNodeStub) IPCReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
 	return nil, ErrNotSupported
 }
 
-func (s *FullNodeStruct) IpcReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
-	if s.Internal.IpcReadSubnetActorState == nil {
+func (s *FullNodeStruct) IPCReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
+	if s.Internal.IPCReadSubnetActorState == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.IpcReadSubnetActorState(p0, p1, p2)
+	return s.Internal.IPCReadSubnetActorState(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IpcReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
+func (s *FullNodeStub) IPCReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
 	return nil, ErrNotSupported
 }
 

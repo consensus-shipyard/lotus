@@ -107,13 +107,11 @@
   * [GasEstimateMessageGas](#GasEstimateMessageGas)
 * [I](#I)
   * [ID](#ID)
-  * [IPCCreateSubnetGenesis](#IPCCreateSubnetGenesis)
-* [Ipc](#Ipc)
-  * [IpcAddSubnetActor](#IpcAddSubnetActor)
-  * [IpcGetCheckpointTemplate](#IpcGetCheckpointTemplate)
-  * [IpcGetPrevCheckpointForChild](#IpcGetPrevCheckpointForChild)
-  * [IpcReadGatewayState](#IpcReadGatewayState)
-  * [IpcReadSubnetActorState](#IpcReadSubnetActorState)
+  * [IPCAddSubnetActor](#IPCAddSubnetActor)
+  * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
+  * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
+  * [IPCReadGatewayState](#IPCReadGatewayState)
+  * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
 * [Log](#Log)
   * [LogAlerts](#LogAlerts)
   * [LogList](#LogList)
@@ -3112,27 +3110,7 @@ Inputs: `null`
 
 Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
 
-### IPCCreateSubnetGenesis
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  {
-    "Parent": "string value",
-    "Actor": "f01234"
-  }
-]
-```
-
-Response: `"Ynl0ZSBhcnJheQ=="`
-
-## Ipc
-
-
-### IpcAddSubnetActor
+### IPCAddSubnetActor
 IPCAddSubnetActor deploys a new subnet actor.
 
 
@@ -3148,7 +3126,7 @@ Inputs:
       "Actor": "f01234"
     },
     "Name": "string value",
-    "IpcGatewayAddr": 42,
+    "IPCGatewayAddr": 42,
     "Consensus": 0,
     "MinValidatorStake": "0",
     "MinValidators": 42,
@@ -3161,7 +3139,7 @@ Inputs:
 
 Response: `"f01234"`
 
-### IpcGetCheckpointTemplate
+### IPCGetCheckpointTemplate
 
 
 Perms: read
@@ -3220,7 +3198,7 @@ Response:
 }
 ```
 
-### IpcGetPrevCheckpointForChild
+### IPCGetPrevCheckpointForChild
 
 
 Perms: read
@@ -3243,7 +3221,7 @@ Response:
 }
 ```
 
-### IpcReadGatewayState
+### IPCReadGatewayState
 
 
 Perms: read
@@ -3295,7 +3273,7 @@ Response:
 }
 ```
 
-### IpcReadSubnetActorState
+### IPCReadSubnetActorState
 
 
 Perms: read
