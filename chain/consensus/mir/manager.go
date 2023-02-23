@@ -134,8 +134,6 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create configuration manager: %w", addr, err)
 	}
 
-	var interceptor *eventlog.Recorder
-
 	m := Manager{
 		ctx:                 ctx,
 		stopCh:              make(chan struct{}),
@@ -145,7 +143,6 @@ func NewManager(ctx context.Context,
 		netName:             netName,
 		Pool:                fifo.New(),
 		mirID:               mirID,
-		interceptor:         interceptor,
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
 		net:                 netTransport,
