@@ -201,8 +201,8 @@ func (cm *ConfigurationManager) getAppliedConfigurationNumber() uint64 {
 	return binary.LittleEndian.Uint64(b)
 }
 
-func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string][]t.NodeID {
-	votes := make(map[uint64]map[string][]t.NodeID)
+func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string]map[t.NodeID]struct{} {
+	votes := make(map[uint64]map[string]map[t.NodeID]struct{})
 	b, err := cm.ds.Get(cm.ctx, ReconfigurationVotesKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", cm.id).Info("stored reconfiguration votes not found")
@@ -223,7 +223,7 @@ func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string][]
 	return votes
 }
 
-func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[string][]t.NodeID) error {
+func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) error {
 	recs := storeConfigurationVotes(votes)
 	r := VoteRecords{
 		Records: recs,
@@ -252,27 +252,32 @@ func configurationIndexKey(n uint64) datastore.Key {
 	return datastore.NewKey(ConfigurationRequestsDBPrefix + strconv.FormatUint(n, 10))
 }
 
-func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string][]t.NodeID {
-	m := make(map[uint64]map[string][]t.NodeID)
+func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string]map[t.NodeID]struct{} {
+	m := make(map[uint64]map[string]map[t.NodeID]struct{})
 	for _, v := range vr {
 		if _, exist := m[v.ConfigurationNumber]; !exist {
-			m[v.ConfigurationNumber] = make(map[string][]t.NodeID)
+			m[v.ConfigurationNumber] = make(map[string]map[t.NodeID]struct{})
 		}
 		for _, id := range v.VotedValidators {
-			m[v.ConfigurationNumber][v.ValSetHash] = append(m[v.ConfigurationNumber][v.ValSetHash], id.NodeID())
+			if _, exist := m[v.ConfigurationNumber][v.ValSetHash]; !exist {
+				m[v.ConfigurationNumber][v.ValSetHash] = make(map[t.NodeID]struct{})
+			}
+			m[v.ConfigurationNumber][v.ValSetHash][t.NodeID(id.ID)] = struct{}{}
 		}
 	}
 	return m
 }
 
-func storeConfigurationVotes(reconfigurationVotes map[uint64]map[string][]t.NodeID) []VoteRecord {
+func storeConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) []VoteRecord {
 	var vs []VoteRecord
-	for n, hashToValidatorsVotes := range reconfigurationVotes {
+	for n, hashToValidatorsVotes := range votes {
 		for h, nodeIDs := range hashToValidatorsVotes {
 			e := VoteRecord{
 				ConfigurationNumber: n,
 				ValSetHash:          h,
-				VotedValidators:     NewVotedValidators(nodeIDs...),
+			}
+			for n, _ := range nodeIDs {
+				e.VotedValidators = append(e.VotedValidators, VotedValidator{n.Pb()})
 			}
 			vs = append(vs, e)
 		}

@@ -64,7 +64,7 @@ type StateManager struct {
 	confManager *ConfigurationManager
 
 	// reconfigurationVotes implements ConfigurationNumber->ValSetHash->[]NodeID mapping.
-	reconfigurationVotes map[uint64]map[string][]t.NodeID
+	reconfigurationVotes map[uint64]map[string]map[t.NodeID]struct{}
 
 	// nextConfigurationNumber is the acceptable configuration number.
 	// The initial nextConfigurationNumber is 1.
@@ -377,17 +377,19 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 	}
 
 	if _, exist := sm.reconfigurationVotes[set.ConfigurationNumber]; !exist {
-		sm.reconfigurationVotes[set.ConfigurationNumber] = make(map[string][]t.NodeID)
+		sm.reconfigurationVotes[set.ConfigurationNumber] = make(map[string]map[t.NodeID]struct{})
+	}
+
+	if _, exist := sm.reconfigurationVotes[set.ConfigurationNumber][string(h)]; !exist {
+		sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = make(map[t.NodeID]struct{})
 	}
 
 	// Prevent double voting.
-	for _, voted := range sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] {
-		if voted == votingValidator {
-			return false, xerrors.Errorf("validator %s has already voted for configuration %d", votingValidator, set.ConfigurationNumber)
-		}
+	if _, voted := sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator]; voted {
+		return false, xerrors.Errorf("validator %s has already voted for configuration %d", votingValidator, set.ConfigurationNumber)
 	}
 
-	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = append(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)], votingValidator)
+	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator] = struct{}{}
 	if err := sm.confManager.StoreConfigurationVotes(sm.reconfigurationVotes); err != nil {
 		log.With("validator", sm.ValidatorID).
 			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
