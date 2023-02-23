@@ -33,7 +33,7 @@ type IpcAPI struct {
 	full.StateAPI
 }
 
-func (a *IpcAPI) IpcAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
+func (a *IpcAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
 	// override parent net to reflect the current network version
 	// TODO: Instead of accept the ConstructorParams directly, we could receive
 	// the individual arguments or a subset of the params struct to avoid having
@@ -99,27 +99,27 @@ func (a *IpcAPI) IpcAddSubnetActor(ctx context.Context, wallet address.Address, 
 	return r.IDAddress, nil
 }
 
-func (a *IpcAPI) IpcReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
-	st := &gateway.State{}
-	if err := a.readActorState(ctx, actor, tsk, st); err != nil {
+func (a *IpcAPI) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
+	st := gateway.State{}
+	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting gateway actor from StateStore: %w", err)
 	}
-	return st, nil
+	return &st, nil
 }
 
-func (a *IpcAPI) IpcReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
-	st := &subnetactor.State{}
-	if err := a.readActorState(ctx, actor, tsk, st); err != nil {
+func (a *IpcAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
+	st := subnetactor.State{}
+	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
-	return st, nil
+	return &st, nil
 }
 
-// IpcGetPrevCheckpointForChild gets the latest checkpoint committed for a child subnet.
+// IPCGetPrevCheckpointForChild gets the latest checkpoint committed for a child subnet.
 // This function is expected to be called in the parent of the checkpoint being populated.
 // It inspects the state in the heaviest block (i.e. latest state available)
-func (a *IpcAPI) IpcGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
-	st, err := a.IpcReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+func (a *IpcAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return cid.Undef, err
 	}
@@ -136,8 +136,8 @@ func (a *IpcAPI) IpcGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 // IpcGetCheckpointTemplate to be populated and signed for the epoch given as input.
 // If the template for the epoch is empty (either because it has no data or an epoch from the
 // future was provided) an empty template is returned.
-func (a *IpcAPI) IpcGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
-	st, err := a.IpcReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
