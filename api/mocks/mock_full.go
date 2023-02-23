@@ -11,6 +11,7 @@ import (
 	time "time"
 
 	gateway "github.com/consensus-shipyard/go-ipc-types/gateway"
+	sdk "github.com/consensus-shipyard/go-ipc-types/sdk"
 	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
@@ -1523,6 +1524,36 @@ func (m *MockFullNode) IpcAddSubnetActor(arg0 context.Context, arg1 address.Addr
 func (mr *MockFullNodeMockRecorder) IpcAddSubnetActor(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IpcAddSubnetActor), arg0, arg1, arg2)
+}
+
+// IpcGetCheckpointTemplate mocks base method.
+func (m *MockFullNode) IpcGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IpcGetCheckpointTemplate", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IpcGetCheckpointTemplate indicates an expected call of IpcGetCheckpointTemplate.
+func (mr *MockFullNodeMockRecorder) IpcGetCheckpointTemplate(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcGetCheckpointTemplate", reflect.TypeOf((*MockFullNode)(nil).IpcGetCheckpointTemplate), arg0, arg1, arg2)
+}
+
+// IpcGetPrevCheckpointForChild mocks base method.
+func (m *MockFullNode) IpcGetPrevCheckpointForChild(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID) (cid.Cid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IpcGetPrevCheckpointForChild", arg0, arg1, arg2)
+	ret0, _ := ret[0].(cid.Cid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IpcGetPrevCheckpointForChild indicates an expected call of IpcGetPrevCheckpointForChild.
+func (mr *MockFullNodeMockRecorder) IpcGetPrevCheckpointForChild(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcGetPrevCheckpointForChild", reflect.TypeOf((*MockFullNode)(nil).IpcGetPrevCheckpointForChild), arg0, arg1, arg2)
 }
 
 // IpcReadGatewayState mocks base method.

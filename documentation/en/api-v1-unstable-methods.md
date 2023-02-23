@@ -109,6 +109,8 @@
   * [ID](#ID)
 * [Ipc](#Ipc)
   * [IpcAddSubnetActor](#IpcAddSubnetActor)
+  * [IpcGetCheckpointTemplate](#IpcGetCheckpointTemplate)
+  * [IpcGetPrevCheckpointForChild](#IpcGetPrevCheckpointForChild)
   * [IpcReadGatewayState](#IpcReadGatewayState)
   * [IpcReadSubnetActorState](#IpcReadSubnetActorState)
 * [Log](#Log)
@@ -3140,6 +3142,88 @@ Inputs:
 ```
 
 Response: `"f01234"`
+
+### IpcGetCheckpointTemplate
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  10101
+]
+```
+
+Response:
+```json
+{
+  "Data": {
+    "Source": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
+    "TipSet": "Ynl0ZSBhcnJheQ==",
+    "Epoch": 10101,
+    "PrevCheck": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Children": [
+      {
+        "Source": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "Checks": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        }
+      }
+    ],
+    "CrossMsgs": [
+      {
+        "From": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "To": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "MsgsCID": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "Nonce": 42,
+        "Value": "0"
+      }
+    ]
+  },
+  "Sig": "Ynl0ZSBhcnJheQ=="
+}
+```
+
+### IpcGetPrevCheckpointForChild
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
 
 ### IpcReadGatewayState
 
