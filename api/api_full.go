@@ -870,6 +870,7 @@ type FullNode interface {
 	IpcReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error)          //perm:read
 	IpcGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)          //perm:read
 	IpcGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) //perm:read
+	IPCCreateSubnetGenesis(ctx context.Context, subnet sdk.SubnetID) ([]byte, error)                                              //perm:read
 }
 
 // reverse interface to the client, called after EthSubscribe

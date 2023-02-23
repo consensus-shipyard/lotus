@@ -23,6 +23,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/eudico-core/genesis"
 	"github.com/filecoin-project/lotus/node/impl/full"
 )
 
@@ -142,6 +143,11 @@ func (a *IpcAPI) IpcGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 		return nil, err
 	}
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
+}
+
+// IPCCreateSubnetGenesis creates a new genesis for a subnet given a subnet id.OB
+func (a *IpcAPI) IPCCreateSubnetGenesis(ctx context.Context, subnet sdk.SubnetID) ([]byte, error) {
+	return genesis.MakeGenesisBytes(ctx, subnet.String())
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.

@@ -319,6 +319,8 @@ type FullNodeMethods struct {
 
 	GasEstimateMessageGas func(p0 context.Context, p1 *types.Message, p2 *MessageSendSpec, p3 types.TipSetKey) (*types.Message, error) `perm:"read"`
 
+	IPCCreateSubnetGenesis func(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) `perm:"read"`
+
 	IpcAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
 
 	IpcGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
@@ -2418,6 +2420,17 @@ func (s *FullNodeStruct) GasEstimateMessageGas(p0 context.Context, p1 *types.Mes
 
 func (s *FullNodeStub) GasEstimateMessageGas(p0 context.Context, p1 *types.Message, p2 *MessageSendSpec, p3 types.TipSetKey) (*types.Message, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCCreateSubnetGenesis(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
+	if s.Internal.IPCCreateSubnetGenesis == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.IPCCreateSubnetGenesis(p0, p1)
+}
+
+func (s *FullNodeStub) IPCCreateSubnetGenesis(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IpcAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {

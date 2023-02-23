@@ -1,8 +1,10 @@
 package genesis
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -27,7 +29,30 @@ const (
 	genesisTemplateFilePath = "eudico-core/genesis/genesis.json"
 )
 
-func MakeGenesis(ctx context.Context, outFilePath string, subnetID string) error {
+func MakeGenesisCar(ctx context.Context, outFilePath string, subnetID string) error {
+	f, err := os.OpenFile(outFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	if err := makeGenesis(ctx, f, subnetID); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func MakeGenesisBytes(ctx context.Context, subnetID string) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := makeGenesis(ctx, buf, subnetID); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+
+}
+
+func makeGenesis(ctx context.Context, w io.Writer, subnetID string) error {
 	e, err := os.Executable()
 	if err != nil {
 		return err
@@ -54,21 +79,13 @@ func MakeGenesis(ctx context.Context, outFilePath string, subnetID string) error
 		return xerrors.Errorf("failed to make genesis block: %w", err)
 	}
 
-	f, err := os.OpenFile(outFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-
 	offl := offline.Exchange(bs)
 	blkserv := blockservice.New(bs, offl)
 	dserv := merkledag.NewDAGService(blkserv)
 
-	if err := car.WriteCarWithWalker(ctx, dserv, []cid.Cid{b.Genesis.Cid()}, f, gen.CarWalkFunc); err != nil {
+	if err := car.WriteCarWithWalker(ctx, dserv, []cid.Cid{b.Genesis.Cid()}, w, gen.CarWalkFunc); err != nil {
 		return err
 	}
 
-	if err := f.Close(); err != nil {
-		return err
-	}
 	return nil
 }

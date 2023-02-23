@@ -1511,6 +1511,21 @@ func (mr *MockFullNodeMockRecorder) ID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockFullNode)(nil).ID), arg0)
 }
 
+// IPCCreateSubnetGenesis mocks base method.
+func (m *MockFullNode) IPCCreateSubnetGenesis(arg0 context.Context, arg1 sdk.SubnetID) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCCreateSubnetGenesis", arg0, arg1)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCCreateSubnetGenesis indicates an expected call of IPCCreateSubnetGenesis.
+func (mr *MockFullNodeMockRecorder) IPCCreateSubnetGenesis(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCCreateSubnetGenesis", reflect.TypeOf((*MockFullNode)(nil).IPCCreateSubnetGenesis), arg0, arg1)
+}
+
 // IpcAddSubnetActor mocks base method.
 func (m *MockFullNode) IpcAddSubnetActor(arg0 context.Context, arg1 address.Address, arg2 subnetactor.ConstructParams) (address.Address, error) {
 	m.ctrl.T.Helper()

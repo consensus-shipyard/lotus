@@ -107,6 +107,7 @@
   * [GasEstimateMessageGas](#GasEstimateMessageGas)
 * [I](#I)
   * [ID](#ID)
+  * [IPCCreateSubnetGenesis](#IPCCreateSubnetGenesis)
 * [Ipc](#Ipc)
   * [IpcAddSubnetActor](#IpcAddSubnetActor)
   * [IpcGetCheckpointTemplate](#IpcGetCheckpointTemplate)
@@ -3110,6 +3111,23 @@ Perms: read
 Inputs: `null`
 
 Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
+
+### IPCCreateSubnetGenesis
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response: `"Ynl0ZSBhcnJheQ=="`
 
 ## Ipc
 
