@@ -8,6 +8,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
+	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -16,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	init_ "github.com/filecoin-project/go-state-types/builtin/v10/init"
+	"github.com/filecoin-project/specs-actors/v2/actors/util/adt"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -31,7 +33,7 @@ type IpcAPI struct {
 	full.StateAPI
 }
 
-func (a *IpcAPI) IpcAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
+func (a *IpcAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
 	// override parent net to reflect the current network version
 	// TODO: Instead of accept the ConstructorParams directly, we could receive
 	// the individual arguments or a subset of the params struct to avoid having
@@ -97,20 +99,49 @@ func (a *IpcAPI) IpcAddSubnetActor(ctx context.Context, wallet address.Address, 
 	return r.IDAddress, nil
 }
 
-func (a *IpcAPI) IpcReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
-	st := &gateway.State{}
-	if err := a.readActorState(ctx, actor, tsk, st); err != nil {
-		return nil, xerrors.Errorf("error getting gateway actor from StateStore: %w")
+func (a *IpcAPI) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
+	st := gateway.State{}
+	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
+		return nil, xerrors.Errorf("error getting gateway actor from StateStore: %w", err)
 	}
-	return st, nil
+	return &st, nil
 }
 
-func (a *IpcAPI) IpcReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
-	st := &subnetactor.State{}
-	if err := a.readActorState(ctx, actor, tsk, st); err != nil {
-		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w")
+func (a *IpcAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
+	st := subnetactor.State{}
+	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
+		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
-	return st, nil
+	return &st, nil
+}
+
+// IPCGetPrevCheckpointForChild gets the latest checkpoint committed for a child subnet.
+// This function is expected to be called in the parent of the checkpoint being populated.
+// It inspects the state in the heaviest block (i.e. latest state available)
+func (a *IpcAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return cid.Undef, err
+	}
+	sn, found, err := st.GetSubnet(adt.WrapStore(ctx, a.Chain.ActorStore(ctx)), subnet)
+	if err != nil {
+		return cid.Undef, xerrors.Errorf("error getting subnet from actor store: %w", err)
+	}
+	if !found {
+		return cid.Undef, xerrors.Errorf("no subnet registered with id %s", subnet)
+	}
+	return sn.PrevCheckpoint.Cid()
+}
+
+// IpcGetCheckpointTemplate to be populated and signed for the epoch given as input.
+// If the template for the epoch is empty (either because it has no data or an epoch from the
+// future was provided) an empty template is returned.
+func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.

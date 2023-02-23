@@ -11,6 +11,7 @@ import (
 	time "time"
 
 	gateway "github.com/consensus-shipyard/go-ipc-types/gateway"
+	sdk "github.com/consensus-shipyard/go-ipc-types/sdk"
 	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
@@ -1510,49 +1511,79 @@ func (mr *MockFullNodeMockRecorder) ID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockFullNode)(nil).ID), arg0)
 }
 
-// IpcAddSubnetActor mocks base method.
-func (m *MockFullNode) IpcAddSubnetActor(arg0 context.Context, arg1 address.Address, arg2 subnetactor.ConstructParams) (address.Address, error) {
+// IPCAddSubnetActor mocks base method.
+func (m *MockFullNode) IPCAddSubnetActor(arg0 context.Context, arg1 address.Address, arg2 subnetactor.ConstructParams) (address.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IpcAddSubnetActor", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "IPCAddSubnetActor", arg0, arg1, arg2)
 	ret0, _ := ret[0].(address.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IpcAddSubnetActor indicates an expected call of IpcAddSubnetActor.
-func (mr *MockFullNodeMockRecorder) IpcAddSubnetActor(arg0, arg1, arg2 interface{}) *gomock.Call {
+// IPCAddSubnetActor indicates an expected call of IPCAddSubnetActor.
+func (mr *MockFullNodeMockRecorder) IPCAddSubnetActor(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IpcAddSubnetActor), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IPCAddSubnetActor), arg0, arg1, arg2)
 }
 
-// IpcReadGatewayState mocks base method.
-func (m *MockFullNode) IpcReadGatewayState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*gateway.State, error) {
+// IPCGetCheckpointTemplate mocks base method.
+func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IpcReadGatewayState", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "IPCGetCheckpointTemplate", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetCheckpointTemplate indicates an expected call of IPCGetCheckpointTemplate.
+func (mr *MockFullNodeMockRecorder) IPCGetCheckpointTemplate(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpointTemplate", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpointTemplate), arg0, arg1, arg2)
+}
+
+// IPCGetPrevCheckpointForChild mocks base method.
+func (m *MockFullNode) IPCGetPrevCheckpointForChild(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID) (cid.Cid, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetPrevCheckpointForChild", arg0, arg1, arg2)
+	ret0, _ := ret[0].(cid.Cid)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetPrevCheckpointForChild indicates an expected call of IPCGetPrevCheckpointForChild.
+func (mr *MockFullNodeMockRecorder) IPCGetPrevCheckpointForChild(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetPrevCheckpointForChild", reflect.TypeOf((*MockFullNode)(nil).IPCGetPrevCheckpointForChild), arg0, arg1, arg2)
+}
+
+// IPCReadGatewayState mocks base method.
+func (m *MockFullNode) IPCReadGatewayState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*gateway.State, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCReadGatewayState", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*gateway.State)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IpcReadGatewayState indicates an expected call of IpcReadGatewayState.
-func (mr *MockFullNodeMockRecorder) IpcReadGatewayState(arg0, arg1, arg2 interface{}) *gomock.Call {
+// IPCReadGatewayState indicates an expected call of IPCReadGatewayState.
+func (mr *MockFullNodeMockRecorder) IPCReadGatewayState(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcReadGatewayState", reflect.TypeOf((*MockFullNode)(nil).IpcReadGatewayState), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCReadGatewayState", reflect.TypeOf((*MockFullNode)(nil).IPCReadGatewayState), arg0, arg1, arg2)
 }
 
-// IpcReadSubnetActorState mocks base method.
-func (m *MockFullNode) IpcReadSubnetActorState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*subnetactor.State, error) {
+// IPCReadSubnetActorState mocks base method.
+func (m *MockFullNode) IPCReadSubnetActorState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*subnetactor.State, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IpcReadSubnetActorState", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "IPCReadSubnetActorState", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*subnetactor.State)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IpcReadSubnetActorState indicates an expected call of IpcReadSubnetActorState.
-func (mr *MockFullNodeMockRecorder) IpcReadSubnetActorState(arg0, arg1, arg2 interface{}) *gomock.Call {
+// IPCReadSubnetActorState indicates an expected call of IPCReadSubnetActorState.
+func (mr *MockFullNodeMockRecorder) IPCReadSubnetActorState(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IpcReadSubnetActorState", reflect.TypeOf((*MockFullNode)(nil).IpcReadSubnetActorState), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCReadSubnetActorState", reflect.TypeOf((*MockFullNode)(nil).IPCReadSubnetActorState), arg0, arg1, arg2)
 }
 
 // LogAlerts mocks base method.

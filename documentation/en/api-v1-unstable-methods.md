@@ -107,10 +107,11 @@
   * [GasEstimateMessageGas](#GasEstimateMessageGas)
 * [I](#I)
   * [ID](#ID)
-* [Ipc](#Ipc)
-  * [IpcAddSubnetActor](#IpcAddSubnetActor)
-  * [IpcReadGatewayState](#IpcReadGatewayState)
-  * [IpcReadSubnetActorState](#IpcReadSubnetActorState)
+  * [IPCAddSubnetActor](#IPCAddSubnetActor)
+  * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
+  * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
+  * [IPCReadGatewayState](#IPCReadGatewayState)
+  * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
 * [Log](#Log)
   * [LogAlerts](#LogAlerts)
   * [LogList](#LogList)
@@ -3109,10 +3110,7 @@ Inputs: `null`
 
 Response: `"12D3KooWGzxzKZYveHXtpG6AsrUJBcWxHBFS2HsEoGTxrMLvKXtf"`
 
-## Ipc
-
-
-### IpcAddSubnetActor
+### IPCAddSubnetActor
 IPCAddSubnetActor deploys a new subnet actor.
 
 
@@ -3128,7 +3126,7 @@ Inputs:
       "Actor": "f01234"
     },
     "Name": "string value",
-    "IpcGatewayAddr": 42,
+    "IPCGatewayAddr": 42,
     "Consensus": 0,
     "MinValidatorStake": "0",
     "MinValidators": 42,
@@ -3141,7 +3139,89 @@ Inputs:
 
 Response: `"f01234"`
 
-### IpcReadGatewayState
+### IPCGetCheckpointTemplate
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  10101
+]
+```
+
+Response:
+```json
+{
+  "Data": {
+    "Source": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
+    "TipSet": "Ynl0ZSBhcnJheQ==",
+    "Epoch": 10101,
+    "PrevCheck": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Children": [
+      {
+        "Source": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "Checks": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        }
+      }
+    ],
+    "CrossMsgs": [
+      {
+        "From": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "To": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "MsgsCID": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "Nonce": 42,
+        "Value": "0"
+      }
+    ]
+  },
+  "Sig": "Ynl0ZSBhcnJheQ=="
+}
+```
+
+### IPCGetPrevCheckpointForChild
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response:
+```json
+{
+  "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+}
+```
+
+### IPCReadGatewayState
 
 
 Perms: read
@@ -3193,7 +3273,7 @@ Response:
 }
 ```
 
-### IpcReadSubnetActorState
+### IPCReadSubnetActorState
 
 
 Perms: read
