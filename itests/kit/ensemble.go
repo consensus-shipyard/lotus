@@ -969,13 +969,16 @@ func (n *Ensemble) DisconnectNodes(from api.Net, to ...*TestFullNode) *Ensemble 
 }
 
 // DisconnectMirMiners disconnects Mir miners.
-func (n *Ensemble) DisconnectMirMiners(faultyMiners []*TestMiner) context.CancelFunc {
-	ctx, cancel := context.WithCancel(context.Background())
-	for _, faultyMiner := range faultyMiners {
-		go func(ctx context.Context, m *TestMiner) {
+func (n *Ensemble) DisconnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) context.CancelFunc {
+	rctx, cancel := context.WithCancel(context.Background())
+
+	for _, m := range faultyMiners {
+		go func(rctx context.Context, m *TestMiner) {
 			for {
 				select {
 				case <-ctx.Done():
+					return
+				case <-rctx.Done():
 					return
 				default:
 
@@ -986,7 +989,7 @@ func (n *Ensemble) DisconnectMirMiners(faultyMiners []*TestMiner) context.Cancel
 					require.NoError(n.t, err)
 				}
 			}
-		}(ctx, faultyMiner)
+		}(rctx, m)
 	}
 
 	return cancel

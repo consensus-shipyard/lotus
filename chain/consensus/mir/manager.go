@@ -272,6 +272,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 	lastValidatorSet := m.initialValidatorSet
 
 	for {
+
 		select {
 		case <-ctx.Done():
 			log.With("validator", m.mirID).Debug("Mir manager: context closed")

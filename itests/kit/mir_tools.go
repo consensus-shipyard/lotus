@@ -196,13 +196,17 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 	return g.Wait()
 }
 
-func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
+// NoProgressForFaultyNodes checks that the heights of the faulty nodes are not changed after advancing the chain.
+func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
 	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
 
 	// Adding an initial buffer for peers to sync their chain head.
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(800 * time.Millisecond)
 
 	for i, fn := range faultyNodes {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		ts, err := fn.FullNode.ChainHead(ctx)
 		if err != nil {
 			return err
@@ -219,16 +223,19 @@ func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*T
 	}
 
 	for i, fn := range faultyNodes {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		ts, err := fn.FullNode.ChainHead(ctx)
 		if err != nil {
 			return err
 		}
 		if ts == nil {
-			return fmt.Errorf("nil tipset for an new block")
+			return fmt.Errorf("nil tipset for a new block")
 		}
 		newHeight := ts.Height()
 		if newHeight != oldHeights[i] {
-			return fmt.Errorf("different heights for miner %d: new - %d, old - %d", i, newHeight, oldHeights[i])
+			return fmt.Errorf("different heights for validator %d: new - %d, old - %d", i, newHeight, oldHeights[i])
 		}
 	}
 
