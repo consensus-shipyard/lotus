@@ -564,7 +564,7 @@ workflows:
       - test-chain-unit:
           name: chain-unit-tests
           suite: consensus
-          target: "./chain/types/... ./chain/consensus/..."
+          target: "./chain/consensus/..."
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
