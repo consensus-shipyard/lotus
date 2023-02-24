@@ -13,6 +13,8 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -59,9 +61,11 @@ type StateManager struct {
 	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
 	nextNewMembership map[t.NodeID]t.NodeAddress
 
-	MirManager *Manager
-
 	confManager *ConfigurationManager
+
+	ds db.DB
+
+	requestPool *fifo.Pool
 
 	// reconfigurationVotes implements ConfigurationNumber->ValSetHash->[]NodeID mapping.
 	reconfigurationVotes map[uint64]map[string]map[t.NodeID]struct{}
@@ -71,6 +75,8 @@ type StateManager struct {
 	nextConfigurationNumber uint64
 
 	prevCheckpoint ParentMeta
+
+	checkpointRepo string // Path where checkpoints are (optionally) persisted
 
 	// Channel to send checkpoints to assemble them in blocks.
 	NextCheckpoint chan *checkpoint.StableCheckpoint
@@ -88,16 +94,21 @@ func NewStateManager(
 	m *Manager,
 	cm *ConfigurationManager,
 	api v1api.FullNode,
+	ds db.DB,
+	pool *fifo.Pool,
+	cfg *Config,
 ) (*StateManager, error) {
 	sm := StateManager{
 		ctx:                     ctx,
 		NextCheckpoint:          make(chan *checkpoint.StableCheckpoint, 1),
-		MirManager:              m,
 		confManager:             cm,
+		ds:                      ds,
+		requestPool:             pool,
 		currentEpoch:            0,
 		api:                     api,
 		ValidatorID:             m.lotusID,
 		nextConfigurationNumber: 1,
+		checkpointRepo:          cfg.CheckpointRepo,
 	}
 
 	sm.reconfigurationVotes = sm.confManager.GetConfigurationVotes()
@@ -262,7 +273,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	nextHeight := base.Height() + 1
 	log.With("validator", sm.ValidatorID).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
 
-	msgs := sm.MirManager.GetSignedMessages(mirMsgs)
+	msgs := sm.getSignedMessages(mirMsgs)
 	log.With("validator", sm.ValidatorID).With("epoch", sm.currentEpoch).
 		With("height", nextHeight).Infof("try to create a block: msgs - %d", len(msgs))
 
@@ -310,7 +321,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("validator %v unable to sync a block: %w", sm.ValidatorID, err)
 	}
 
-	log.With("validator", sm.MirManager.mirID).With("epoch", sm.currentEpoch).Infof("mined a block at height %d", bh.Header.Height)
+	log.With("validator", sm.ValidatorID).With("epoch", sm.currentEpoch).Infof("mined a block at height %d", bh.Header.Height)
 	return nil
 }
 
@@ -326,7 +337,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 		return nil
 	}
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
-	if msg.ClientId == sm.MirManager.mirID {
+	if msg.ClientId == sm.ValidatorID.String() {
 		_ = sm.confManager.Done(t.ReqNo(msg.ReqNo)) // nolint
 	}
 	if !enoughVotes {
@@ -511,9 +522,9 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 		return xerrors.Errorf("validator %v failed to deliver checkpoint: %w", sm.ValidatorID, err)
 	}
 
-	// reset fifo between checkpoints to avoid requests getting stuck
-	// see https://github.com/consensus-shipyard/lotus/issues/28
-	sm.MirManager.Pool.Purge()
+	// Reset fifo between checkpoints to avoid requests getting stuck.
+	// See https://github.com/consensus-shipyard/lotus/issues/28
+	sm.requestPool.Purge()
 	return nil
 }
 
@@ -521,7 +532,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 // it to the mining process to include it in a new block.
 func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoint, snapshot *Checkpoint) error {
 	// if we deserialized it correctly, we can persist it directly in the data store.
-	if err := sm.MirManager.ds.Put(sm.ctx, LatestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
+	if err := sm.ds.Put(sm.ctx, LatestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
 
@@ -531,12 +542,12 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 		return xerrors.Errorf("error marshaling stable checkpoint: %w", err)
 	}
 	// store latest checkpoint.
-	if err := sm.MirManager.ds.Put(sm.ctx, LatestCheckpointPbKey, b); err != nil {
+	if err := sm.ds.Put(sm.ctx, LatestCheckpointPbKey, b); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
 	// index checkpoints by epoch to enable Mir to start from a specific checkpoint if needed
 	// (this is useful to perform catastrophic recoveries of the network).
-	if err := sm.MirManager.ds.Put(sm.ctx, HeightCheckIndexKey(snapshot.Height), b); err != nil {
+	if err := sm.ds.Put(sm.ctx, HeightCheckIndexKey(snapshot.Height), b); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
 
@@ -549,7 +560,7 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 
 	// store metadata for previous snapshot in datastore and manager to
 	// perform additional verifications
-	if err := sm.MirManager.ds.Put(sm.ctx, CidCheckIndexKey(c), checkpoint.Snapshot.AppData); err != nil {
+	if err := sm.ds.Put(sm.ctx, CidCheckIndexKey(c), checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
 	}
 
@@ -557,12 +568,12 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	// (this is a best-effort process, if it fails we shouldn't kill the process)
 	// in the future we could add a flag that makes persistence STRICT to notify
 	// that this process should fail if persisting to file fails.
-	if sm.MirManager.checkpointRepo != "" {
+	if sm.checkpointRepo != "" {
 		// wrapping it in a routine to take it out of the critical path.
 		go func() {
-			path := path.Join(sm.MirManager.checkpointRepo, "checkpoint-"+snapshot.Height.String()+".chkp")
-			if err := serializedCheckToFile(b, path); err != nil {
-				log.Errorf("error persisting checkpoint for height %d in path %s: %s", snapshot.Height, path, err)
+			f := path.Join(sm.checkpointRepo, "checkpoint-"+snapshot.Height.String()+".chkp")
+			if err := serializedCheckToFile(b, f); err != nil {
+				log.Errorf("error persisting checkpoint for height %d in path %s: %s", snapshot.Height, f, err)
 			}
 		}()
 	}
@@ -571,6 +582,37 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 	log.With("validator", sm.ValidatorID).Debug("Sending checkpoint to mining process to include in block")
 	sm.NextCheckpoint <- checkpoint
 	return nil
+}
+
+func (sm *StateManager) getSignedMessages(mirMsgs []Message) (msgs []*types.SignedMessage) {
+	log.With("validator", sm.ValidatorID).Infof("received a block with %d messages", len(msgs))
+	for _, tx := range mirMsgs {
+
+		input, err := parseTx(tx)
+		if err != nil {
+			log.With("validator", sm.ValidatorID).Error("unable to decode a message in Mir block:", err)
+			continue
+		}
+
+		switch msg := input.(type) {
+		case *types.SignedMessage:
+			// batch being processed, remove from mpool
+			found := sm.requestPool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
+			if !found {
+				log.With("validator", sm.ValidatorID).
+					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
+				// TODO: If we try to remove something from the pool, we should remember that
+				// we already tried to remove that to avoid adding as it may lead to a dead-lock.
+				// FIFO should be updated because we don't have the support for in-flight supports.
+				// continue
+			}
+			msgs = append(msgs, msg)
+			log.With("validator", sm.ValidatorID).Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
+		default:
+			log.With("validator", sm.ValidatorID).Error("unknown message type in a block")
+		}
+	}
+	return
 }
 
 func HeightCheckIndexKey(epoch abi.ChainEpoch) datastore.Key {
@@ -651,7 +693,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 		case <-sm.ctx.Done():
 			return nil
 		case <-after.C:
-			return CtxCanceledWhileWaitingForBlockError{sm.MirManager.lotusID}
+			return CtxCanceledWhileWaitingForBlockError{sm.ValidatorID}
 		default:
 			if head == height {
 				return nil
@@ -674,7 +716,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 	// if we are restarting the peer we may have something in the
 	// mir database, if not let's return the genesis one.
-	chb, err := sm.MirManager.ds.Get(sm.ctx, LatestCheckpointKey)
+	chb, err := sm.ds.Get(sm.ctx, LatestCheckpointKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
 			genesis, err := sm.api.ChainGetGenesis(sm.ctx)

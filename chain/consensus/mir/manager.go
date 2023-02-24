@@ -53,13 +53,13 @@ type Manager struct {
 
 	// Lotus types.
 	netName   dtypes.NetworkName
-	Pool      *fifo.Pool
 	lotusNode v1api.FullNode
 	lotusID   address.Address
 
 	// Mir types.
 	mirNode       *mir.Node
 	mirID         string
+	requestPool   *fifo.Pool
 	wal           *simplewal.WAL
 	net           net.Transport
 	cryptoManager *CryptoManager
@@ -75,8 +75,7 @@ type Manager struct {
 	initialValidatorSet *validator.Set
 
 	// Checkpoint types.
-	segmentLength  int    // Segment length determining the checkpoint period.
-	checkpointRepo string // Path where checkpoints are (optionally) persisted
+	segmentLength int // Segment length determining the checkpoint period.
 }
 
 func NewManager(ctx context.Context,
@@ -141,7 +140,7 @@ func NewManager(ctx context.Context,
 		lotusNode:           api,
 		membership:          membership,
 		netName:             netName,
-		Pool:                fifo.New(),
+		requestPool:         fifo.New(),
 		mirID:               mirID,
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
@@ -149,11 +148,10 @@ func NewManager(ctx context.Context,
 		ds:                  ds,
 		initialValidatorSet: initialValidatorSet,
 		toMir:               make(chan chan []*mirproto.Request),
-		checkpointRepo:      cfg.CheckpointRepo,
 		segmentLength:       cfg.SegmentLength,
 	}
 
-	m.stateManager, err = NewStateManager(ctx, initialMembership, &m, m.confManager, api)
+	m.stateManager, err = NewStateManager(ctx, initialMembership, &m, m.confManager, api, ds, m.requestPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", mirID, err)
 	}
@@ -383,7 +381,7 @@ func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMess
 		switch msg := input.(type) {
 		case *types.SignedMessage:
 			// batch being processed, remove from mpool
-			found := m.Pool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
+			found := m.requestPool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
 			if !found {
 				log.With("validator", m.mirID).
 					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
@@ -412,7 +410,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*
 	for _, msg := range msgs {
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
-		if !m.Pool.IsTargetRequest(clientID, nonce) {
+		if !m.requestPool.IsTargetRequest(clientID, nonce) {
 			log.With("validator", m.mirID).Warnf("batchSignedMessage: target request not found for client ID")
 			continue
 		}
@@ -430,7 +428,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*
 			Data:     data,
 		}
 
-		m.Pool.AddRequest(msg.Cid(), r)
+		m.requestPool.AddRequest(msg.Cid(), r)
 
 		requests = append(requests, r)
 	}
