@@ -15,7 +15,6 @@ import (
 	"github.com/filecoin-project/go-state-types/proof"
 
 	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/eudico-core/global"
 )
 
 type Ticket struct {
@@ -70,27 +69,6 @@ func (blk *BlockHeader) ToStorageBlock() (block.Block, error) {
 	data, err := blk.Serialize()
 	if err != nil {
 		return nil, err
-	}
-
-	if global.IsConsensusAlgorithm(global.MirConsensus) {
-		// make a copy
-		bblk := *blk
-		bblk.ElectionProof = &ElectionProof{}
-		cidData, err := bblk.Serialize()
-		if err != nil {
-			return nil, err
-		}
-		// for mir ElectionProof gets out of the
-		// Cid computation because it includes the
-		// checkpoint certificate, and each validator
-		// may have collected the signatures of different
-		// committee participants.
-		c, err := abi.CidBuilder.Sum(cidData)
-		if err != nil {
-			return nil, err
-		}
-
-		return block.NewBlockWithCid(data, c)
 	}
 
 	c, err := abi.CidBuilder.Sum(data)

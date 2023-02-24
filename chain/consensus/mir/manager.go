@@ -59,17 +59,17 @@ type Manager struct {
 	lotusNode v1api.FullNode
 
 	// Mir types.
-	mirNode       *mir.Node
-	requestPool   *fifo.Pool
-	wal           *simplewal.WAL
-	net           net.Transport
-	interceptor   *eventlog.Recorder
-	toMirChan     chan chan []*mirproto.Request
-	stopChan      chan struct{}
-	stopped       bool
-	cryptoManager *CryptoManager
-	confManager   *ConfigurationManager
-	stateManager  *StateManager
+	mirNode         *mir.Node
+	requestPool     *fifo.Pool
+	wal             *simplewal.WAL
+	net             net.Transport
+	interceptor     *eventlog.Recorder
+	readyForTxsChan chan chan []*mirproto.Request
+	stopChan        chan struct{}
+	stopped         bool
+	cryptoManager   *CryptoManager
+	confManager     *ConfigurationManager
+	stateManager    *StateManager
 
 	// Reconfiguration types.
 	initialValidatorSet *validator.Set
@@ -120,6 +120,10 @@ func NewManager(ctx context.Context,
 
 	// Create Mir modules.
 	netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(id), h, logger)
+	if err := netTransport.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start transport: %w", err)
+	}
+	netTransport.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
@@ -138,13 +142,13 @@ func NewManager(ctx context.Context,
 		netName:             netName,
 		lotusNode:           api,
 		stopChan:            make(chan struct{}),
-		membership:          membership,
+		readyForTxsChan:     make(chan chan []*mirproto.Request),
 		requestPool:         fifo.New(),
+		net:                 netTransport,
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
-		net:                 netTransport,
 		initialValidatorSet: initialValidatorSet,
-		toMirChan:           make(chan chan []*mirproto.Request),
+		membership:          membership,
 	}
 
 	m.stateManager, err = NewStateManager(ctx, addr, initialMembership, m.confManager, api, ds, m.requestPool, cfg)
@@ -154,7 +158,7 @@ func NewManager(ctx context.Context,
 
 	// Create SMR modules.
 	mpool := pool.NewModule(
-		m.toMirChan,
+		m.readyForTxsChan,
 		pool.DefaultModuleConfig(),
 		pool.DefaultModuleParams(),
 	)
@@ -245,10 +249,10 @@ func (m *Manager) Serve(ctx context.Context) error {
 		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
 			m.netName, m.id, m.id, m.initialValidatorSet.GetValidators())
 
-	errChan := make(chan error, 1)
+	mirErrChan := make(chan error, 1)
 	go func() {
 		// Run Mir node until it stops.
-		errChan <- m.mirNode.Run(ctx)
+		mirErrChan <- m.mirNode.Run(ctx)
 	}()
 	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
 	defer func() {
@@ -266,27 +270,19 @@ func (m *Manager) Serve(ctx context.Context) error {
 	lastValidatorSet := m.initialValidatorSet
 
 	for {
-		// Here we use `ctx.Err()` in the beginning of the `for` loop instead of using it in the `select` statement,
-		// because if `ctx` has been closed then `api.ChainHead(ctx)` returns an error,
-		// and we will be in the infinite loop due to `continue`.
-		if ctx.Err() != nil {
-			log.With("validator", m).Debug("Mir manager: context closed")
-			return nil
-		}
 
 		select {
+		case <-ctx.Done():
+			log.With("validator", m.id).Debug("Mir manager: context closed")
+			return nil
 
-		// first catch potential errors when mining
-		case err := <-errChan:
+		// First catch potential errors when mining.
+		case err := <-mirErrChan:
 			log.With("validator", m.id).Info("manager received error:", err)
 			if err != nil && !errors.Is(err, mir.ErrStopped) {
 				panic(fmt.Sprintf("validator %s consensus error: %v", m.id, err))
 			}
 			log.With("validator", m.id).Infof("Mir node stopped signal")
-			return nil
-
-		case <-ctx.Done():
-			log.With("validator", m.id).Debug("Mir manager: context closed")
 			return nil
 
 		case <-reconfigure.C:
@@ -311,7 +307,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 				configRequests = append(configRequests, r)
 			}
 
-		case mirChan := <-m.toMirChan:
+		case mirChan := <-m.readyForTxsChan:
 			base, err := m.stateManager.api.ChainHead(ctx)
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)

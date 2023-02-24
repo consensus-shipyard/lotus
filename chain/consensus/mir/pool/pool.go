@@ -33,15 +33,15 @@ func DefaultModuleParams() *ModuleParams {
 }
 
 // NewModule creates a new instance of a request pool module implementation.
-func NewModule(requestChan chan chan []*requestpb.Request, mc *ModuleConfig, params *ModuleParams) modules.Module {
+func NewModule(ch chan chan []*requestpb.Request, mc *ModuleConfig, p *ModuleParams) modules.Module {
 	m := dsl.NewModule(mc.Self)
 
 	state := &types.State{
-		ToMir: requestChan,
+		ReadyForTxsChan: ch,
 	}
 
-	handlers.IncludeComputationOfTransactionAndBatchIDs(m, mc, params)
-	handlers.IncludeBatchCreation(m, mc, params, state)
+	handlers.IncludeComputationOfTransactionAndBatchIDs(m, mc, p)
+	handlers.IncludeBatchCreation(m, mc, p, state)
 
 	return m
 }

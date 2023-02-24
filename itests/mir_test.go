@@ -963,11 +963,11 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
 
-	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
+	restoreConnections := ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
-		err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+		err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 		if err == nil {
 			break
 		}
@@ -1010,7 +1010,7 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
@@ -1136,7 +1136,7 @@ func TestMirBasic_WithFCrashedAndRecoveredNodes(t *testing.T) {
 	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
@@ -1173,7 +1173,7 @@ func TestMirBasic_FNodesCrashLongTimeApart(t *testing.T) {
 	t.Logf(">>> crash %d nodes", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, MaxDelay, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
@@ -1208,14 +1208,14 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
-	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
+	restoreConnections := ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
-		err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+		err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 		if err == nil {
 			break
 		}

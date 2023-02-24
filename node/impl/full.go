@@ -37,7 +37,7 @@ type FullNodeAPI struct {
 	full.SyncAPI
 	full.RaftAPI
 	full.EthAPI
-	ipc.IpcAPI
+	ipc.IPCAPI
 
 	DS          dtypes.MetadataDS
 	NetworkName dtypes.NetworkName

@@ -39,7 +39,7 @@ var genesisNewCmd = &cli.Command{
 			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}
 
-		err = genesis.MakeGenesis(cctx.Context, cctx.String("out"), subnetID.String())
+		err = genesis.MakeGenesisCar(cctx.Context, cctx.String("out"), subnetID.String())
 		if err != nil {
 			return xerrors.Errorf("failed to make genesis: %w", err)
 		}

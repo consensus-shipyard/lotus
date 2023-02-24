@@ -3,12 +3,13 @@ package ipc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
-	subnetactor "github.com/consensus-shipyard/go-ipc-types/subnetactor"
-	cid "github.com/ipfs/go-cid"
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
+	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
@@ -23,17 +24,18 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/eudico-core/genesis"
 	"github.com/filecoin-project/lotus/node/impl/full"
 )
 
-type IpcAPI struct {
+type IPCAPI struct {
 	fx.In
 
 	full.MpoolAPI
 	full.StateAPI
 }
 
-func (a *IpcAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
+func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
 	// override parent net to reflect the current network version
 	// TODO: Instead of accept the ConstructorParams directly, we could receive
 	// the individual arguments or a subset of the params struct to avoid having
@@ -99,7 +101,7 @@ func (a *IpcAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 	return r.IDAddress, nil
 }
 
-func (a *IpcAPI) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
+func (a *IPCAPI) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
 	st := gateway.State{}
 	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting gateway actor from StateStore: %w", err)
@@ -107,7 +109,7 @@ func (a *IpcAPI) IPCReadGatewayState(ctx context.Context, actor address.Address,
 	return &st, nil
 }
 
-func (a *IpcAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
+func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
 	st := subnetactor.State{}
 	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
@@ -118,7 +120,7 @@ func (a *IpcAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Addr
 // IPCGetPrevCheckpointForChild gets the latest checkpoint committed for a child subnet.
 // This function is expected to be called in the parent of the checkpoint being populated.
 // It inspects the state in the heaviest block (i.e. latest state available)
-func (a *IpcAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
+func (a *IPCAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return cid.Undef, err
@@ -133,15 +135,35 @@ func (a *IpcAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 	return sn.PrevCheckpoint.Cid()
 }
 
-// IpcGetCheckpointTemplate to be populated and signed for the epoch given as input.
+// IPCGetCheckpointTemplate to be populated and signed for the epoch given as input.
 // If the template for the epoch is empty (either because it has no data or an epoch from the
 // future was provided) an empty template is returned.
-func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
+}
+
+// IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
+// peers in a subnet can deterministically generate the genesis block for the subnet.
+func (a *IPCAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID) ([]byte, error) {
+	tmpl, err := genesis.MakeGenesisTemplate(subnet.String())
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(&tmpl)
+
+}
+
+// IPCListChildSubnets lists information about all child subnets registered as childs from the current one.
+func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	return st.ListSubnets(a.Chain.ActorStore(ctx))
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
@@ -150,7 +172,7 @@ func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 // with type variable where the state should be deserialized and stored. By passing the state object as an argument
 // we signal the deserializer the type of the state. Passing the wrong state type for the actor
 // being inspected leads to a deserialization error.
-func (a *IpcAPI) readActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey, stateType cbg.CBORUnmarshaler) error {
+func (a *IPCAPI) readActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey, stateType cbg.CBORUnmarshaler) error {
 	ts, err := a.Chain.GetTipSetFromKey(ctx, tsk)
 	if err != nil {
 		return xerrors.Errorf("loading tipset %s: %w", tsk, err)

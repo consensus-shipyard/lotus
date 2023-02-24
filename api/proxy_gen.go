@@ -325,6 +325,8 @@ type FullNodeMethods struct {
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
+	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) `perm:"read"`
+
 	IPCReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) `perm:"read"`
 
 	IPCReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
@@ -2451,6 +2453,17 @@ func (s *FullNodeStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 add
 
 func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
 	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
+	if s.Internal.IPCListChildSubnets == nil {
+		return *new([]gateway.Subnet), ErrNotSupported
+	}
+	return s.Internal.IPCListChildSubnets(p0, p1)
+}
+
+func (s *FullNodeStub) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
+	return *new([]gateway.Subnet), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {

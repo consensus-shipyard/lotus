@@ -19,7 +19,6 @@ type ModuleParams struct {
 
 // State represents the state accessible to all parts of the module implementation.
 type State struct {
-	// A channel is sent on this channel when Mir wants to notify Lotus
-	// that Mir is ready for the next batch of input transactions.
-	ToMirChan chan chan []*requestpb.Request
+	// Mir sends on this channel when it is ready for the next batch of input transactions.
+	ReadyForTxsChan chan chan []*requestpb.Request
 }
