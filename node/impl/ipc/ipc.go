@@ -3,6 +3,7 @@ package ipc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
@@ -23,6 +24,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/eudico-core/genesis"
 	"github.com/filecoin-project/lotus/node/impl/full"
 )
 
@@ -133,7 +135,7 @@ func (a *IpcAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 	return sn.PrevCheckpoint.Cid()
 }
 
-// IpcGetCheckpointTemplate to be populated and signed for the epoch given as input.
+// IPCGetCheckpointTemplate to be populated and signed for the epoch given as input.
 // If the template for the epoch is empty (either because it has no data or an epoch from the
 // future was provided) an empty template is returned.
 func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
@@ -142,6 +144,17 @@ func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 		return nil, err
 	}
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
+}
+
+// IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
+// peers in a subnet can deterministically generate the genesis block for the subnet.
+func (a *IpcAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID) ([]byte, error) {
+	tmpl, err := genesis.MakeGenesisTemplate(subnet.String())
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(&tmpl)
+
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.

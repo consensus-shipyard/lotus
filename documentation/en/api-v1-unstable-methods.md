@@ -112,6 +112,7 @@
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
   * [IPCReadGatewayState](#IPCReadGatewayState)
   * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
+  * [IPCSubnetGenesisTemplate](#IPCSubnetGenesisTemplate)
 * [Log](#Log)
   * [LogAlerts](#LogAlerts)
   * [LogList](#LogList)
@@ -3327,6 +3328,23 @@ Response:
   "MinValidators": 42
 }
 ```
+
+### IPCSubnetGenesisTemplate
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response: `"Ynl0ZSBhcnJheQ=="`
 
 ## Log
 
