@@ -121,7 +121,7 @@ Genesis: {
 
 */
 
-func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template genesis.Template) (*state.StateTree, map[address.Address]address.Address, error) {
+func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template genesis.Template, deterministic bool) (*state.StateTree, map[address.Address]address.Address, error) {
 	// Create empty state tree
 	cst := cbor.NewCborStore(bs)
 
@@ -299,7 +299,9 @@ func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template ge
 	if err != nil {
 		return nil, nil, xerrors.Errorf("creating random verifier secret key: %w", err)
 	}
-
+	if deterministic {
+		skBytes = []byte{130, 48, 67, 244, 178, 202, 173, 87, 6, 230, 197, 51, 252, 111, 232, 18, 35, 154, 0, 38, 67, 199, 206, 189, 102, 183, 110, 133, 191, 232, 123, 90}
+	}
 	verifierPk, err := sigs.ToPublic(crypto.SigTypeBLS, skBytes)
 	if err != nil {
 		return nil, nil, xerrors.Errorf("creating random verifier public key: %w", err)
@@ -561,11 +563,11 @@ func VerifyPreSealedData(ctx context.Context, cs *store.ChainStore, sys vm.Sysca
 	return st, nil
 }
 
-func MakeGenesisBlock(ctx context.Context, j journal.Journal, bs bstore.Blockstore, sys vm.SyscallBuilder, template genesis.Template) (*GenesisBootstrap, error) {
+func MakeGenesisBlock(ctx context.Context, j journal.Journal, bs bstore.Blockstore, sys vm.SyscallBuilder, template genesis.Template, deterministic bool) (*GenesisBootstrap, error) {
 	if j == nil {
 		j = journal.NilJournal()
 	}
-	st, keyIDs, err := MakeInitialStateTree(ctx, bs, template)
+	st, keyIDs, err := MakeInitialStateTree(ctx, bs, template, deterministic)
 	if err != nil {
 		return nil, xerrors.Errorf("make initial state tree failed: %w", err)
 	}
@@ -631,7 +633,9 @@ func MakeGenesisBlock(ctx context.Context, j journal.Journal, bs bstore.Blocksto
 	log.Infof("Empty Genesis root: %s", emptyroot)
 
 	tickBuf := make([]byte, 32)
-	_, _ = rand.Read(tickBuf)
+	if !deterministic {
+		_, _ = rand.Read(tickBuf)
+	}
 	genesisticket := &types.Ticket{
 		VRFProof: tickBuf,
 	}

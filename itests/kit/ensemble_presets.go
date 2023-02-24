@@ -3,6 +3,7 @@ package kit
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"testing"
 	"time"
 
@@ -159,6 +160,71 @@ func EnsembleMirNodes(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode
 	require.Equal(t, n, len(miners))
 
 	return nodes, miners, ens
+}
+
+func AreTwins(t *testing.T, miners []*TestMiner, twins []*TestMiner) {
+	for _, v := range miners {
+		fmt.Println(v.mirAddr)
+	}
+	for _, v := range twins {
+		fmt.Println(v.mirAddr)
+	}
+
+	for i, miner := range miners {
+		require.Equal(t, miner.mirAddr, twins[i].mirAddr)
+		require.Equal(t, miner.mirPrivKey, twins[i].mirPrivKey)
+	}
+}
+
+func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestFullNode, []*TestMiner, []*TestMiner, *Ensemble) {
+	opts = append(opts, WithAllSubsystems())
+
+	eopts, nopts := siftOptions(t, opts)
+
+	var (
+		nodes  []*TestFullNode
+		miners []*TestMiner
+
+		twinNodes  []*TestFullNode
+		twinMiners []*TestMiner
+	)
+
+	ens := NewEnsemble(t, eopts...)
+
+	f := (n - 1) / 3
+
+	for i := 0; i < n; i++ {
+		var node TestFullNode
+		var miner TestMiner
+		ens.FullNode(&node, nopts...).Miner(&miner, &node, nopts...)
+		nodes = append(nodes, &node)
+		miners = append(miners, &miner)
+	}
+
+	ens.active.miners = []*TestMiner{}
+	ens.Start()
+
+	for i := 0; i < n; i++ {
+		adaptForMir(t, nodes[i], miners[i])
+	}
+
+	for i := 0; i < f; i++ {
+		twinNodes = append(twinNodes, nodes[n+i-1])
+		twinMiners = append(twinMiners, miners[n+i-1])
+	}
+
+	require.Equal(t, n, len(nodes))
+	require.Equal(t, n, len(miners))
+
+	require.Equal(t, f, len(twinNodes))
+	require.Equal(t, f, len(twinMiners))
+
+	require.Equal(t, len(miners[n-f:]), len(twinMiners))
+	require.Equal(t, len(nodes[n-f:]), len(twinNodes))
+
+	AreTwins(t, miners[n-f:], twinMiners)
+
+	return nodes, twinNodes, miners, twinMiners, ens
 }
 
 func EnsembleMirNodesWithLearner(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *TestFullNode, *Ensemble) {

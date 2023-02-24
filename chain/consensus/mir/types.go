@@ -15,10 +15,11 @@ import (
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
-	t "github.com/filecoin-project/mir/pkg/types"
+	mir "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -28,35 +29,43 @@ import (
 const (
 	// ConfigOffset is the number of epochs by which to delay configuration changes.
 	// If a configuration is agreed upon in epoch e, it will take effect in epoch e + 1 + configOffset.
-	ConfigOffset        = 2
-	TransportType       = 0
-	ReconfigurationType = 1
+	ConfigOffset         = 2
+	TransportRequest     = 1
+	ConfigurationRequest = 0
 )
 
+type CtxCanceledWhileWaitingForBlockError struct {
+	Addr address.Address
+}
+
+func (e CtxCanceledWhileWaitingForBlockError) Error() string {
+	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
+}
+
 type Config struct {
-	MembershipCfg    interface{}
-	DatastorePath    string
-	CheckpointPeriod int
+	DatastorePath string
 	// InitialCheckpoint from which to start the validator.
 	InitialCheckpoint *checkpoint.StableCheckpoint
 	// CheckpointRepo determines the path where Mir checkpoints
 	// will be (optionally) persisted.
 	CheckpointRepo string
+	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
+	SegmentLength int
+	// The name of the group of validators.
+	GroupName string
 }
 
 func NewConfig(
-	membership interface{},
 	dbPath string,
-	checkpointPeriod int,
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
+	segmentLength int,
 ) *Config {
 	return &Config{
-		MembershipCfg:     membership,
 		DatastorePath:     dbPath,
-		CheckpointPeriod:  checkpointPeriod,
 		InitialCheckpoint: initCheck,
 		CheckpointRepo:    checkpointRepo,
+		SegmentLength:     segmentLength,
 	}
 }
 
@@ -130,21 +139,36 @@ func MessageBytes(msg MirMessage) ([]byte, error) {
 	return append(msgBytes, byte(msgType)), nil
 }
 
-// Mir's checkpoint period is computed as the number of validators times the SegmentLength.
-// In order to configure the initial checkpoint period close to a specific value, we need
-// to set the SegmentLength for the SMR system accordingly. This function does this math
-// for you.
-func segmentForCheckpointPeriod(desiredPeriod int, membership map[t.NodeID]t.NodeAddress) (int, error) {
-	segment := desiredPeriod / len(membership)
-	if segment < 1 {
-		return 0, fmt.Errorf("wrong checkpoint period: the minimum checkpoint allowed for this number of validators is %d", len(membership))
-	}
-	return segment, nil
-}
-
 type ParentMeta struct {
 	Height abi.ChainEpoch
 	Cid    cid.Cid
+}
+
+type VotedValidator struct {
+	ID string
+}
+
+func (v VotedValidator) NodeID() mir.NodeID {
+	return mir.NodeID(v.ID)
+}
+
+func NewVotedValidators(vs ...mir.NodeID) []VotedValidator {
+	var validators []VotedValidator
+	for _, v := range vs {
+		validators = append(validators, VotedValidator{v.Pb()})
+	}
+	return validators
+}
+
+type VoteRecords struct {
+	Records []VoteRecord
+}
+
+// VoteRecord states that VotedValidators voted for the validator set with ValSetHash having number ConfigurationNumber.
+type VoteRecord struct {
+	ConfigurationNumber uint64
+	ValSetHash          string
+	VotedValidators     []VotedValidator
 }
 
 type Checkpoint struct {
@@ -155,6 +179,8 @@ type Checkpoint struct {
 	BlockCids []cid.Cid
 	// Parent checkpoint, i.e. metadata of previous checkpoint committed.
 	Parent ParentMeta
+	// The configuration number that can be accepted.
+	NextConfigNumber uint64
 }
 
 func (ch *Checkpoint) isEmpty() bool {

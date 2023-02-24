@@ -8,18 +8,20 @@ package itests
 //     and nodes[MirFaultyValidatorNumber:] are honest nodes.
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"math/rand"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/go-state-types/big"
-
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
 )
@@ -49,84 +51,528 @@ func setupMangler(t *testing.T) {
 	})
 }
 
-// TestMirConsensusWithMangler tests that Mir operates normally when messaged are dropped or delayed.
-func TestMirConsensusWithMangler(t *testing.T) {
-	TestMirAllNodesMiningWithMangling(t)
-	TestMirAllNodesMiningWithMessagingWithMangler(t)
-	TestMirWhenLearnersJoinWithMangler(t)
-}
-
-func TestMirConsensusSmoke(t *testing.T) {
-	TestMirOneNodeMining(t)
-	TestMirAllNodesMining(t)
-	TestMirStartStop(t)
-	TestGenesisBlocksOfValidatorsAndLearners(t)
-	TestMirFNodesNeverStart(t)
-}
-
-func TestMirAdvancedConsensus(t *testing.T) {
-	TestMirWhenLearnersJoin(t)
-	TestMirNodesStartWithRandomDelay(t)
-	TestMirFNodesNeverStart(t)
-	TestMirFNodesStartWithRandomDelay(t)
-	TestMirAllNodesMiningWithMessaging(t)
-	TestMirWithFOmissionNodes(t)
-	TestMirWithFCrashedNodes(t)
-	TestMirWithFCrashedAndRecoveredNodes(t)
-	TestMirFNodesCrashLongTimeApart(t)
-	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
-	TestMirFNodesSleepAndThenOperate(t)
-}
-
-func TestMirConsensus(t *testing.T) {
-	TestMirOneNodeMining(t)
-	TestMirTwoNodesMining(t)
-	TestMirAllNodesMining(t)
-	TestGenesisBlocksOfValidatorsAndLearners(t)
-	TestMirWhenLearnersJoin(t)
-	TestMirNodesStartWithRandomDelay(t)
-	TestMirFNodesNeverStart(t)
-	TestMirFNodesStartWithRandomDelay(t)
-	TestMirAllNodesMiningWithMessaging(t)
-	TestMirWithFOmissionNodes(t)
-	TestMirWithFCrashedNodes(t)
-	TestMirWithFCrashedAndRecoveredNodes(t)
-	TestMirStartStop(t)
-	TestMirFNodesCrashLongTimeApart(t)
-	TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t)
-	TestMirFNodesSleepAndThenOperate(t)
-}
-
-// TestMirOneNodeMining tests that a Mir node can mine blocks.
-func TestMirOneNodeMining(t *testing.T) {
-	var wg sync.WaitGroup
+// TestMirReconfiguration_AddAndRemoveOneValidator tests that the reconfiguration mechanism operates normally
+// if a new validator joins the network and then leaves it.
+func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[:MirTotalValidatorNumber])
+
+	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> new validators have been added to the membership")
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
+	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
+	// Start new miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[MirTotalValidatorNumber:])
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+
+	t.Log(">>> remove the last added validator from membership")
+	ens.SaveValidatorSetToFile(2, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(2), membership.GetConfigurationNumber())
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	// Check the configuration client persistent DB state.
+	// Core validators have sent 2 messages.
+	for _, m := range miners[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
+
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
+	}
+
+	// Added validators must send 1 message.
+	for _, m := range miners[MirTotalValidatorNumber:] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
+	}
+}
+
+// TestMirReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
+// if a new validator joins the network that have produced 100 blocks.
+func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[:MirTotalValidatorNumber])
+
+	err = kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> new validators have been added to the membership")
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
+	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
+	// Start new miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[MirTotalValidatorNumber:])
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+}
+
+// TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
+// if a new validator join the network and after recovery.
+// TODO: refactor this test by separating DB test primitives.
+func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.T) {
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+
+	bn := make([]byte, 8)
+	recoveredRequestNonce := uint64(4)
+	binary.LittleEndian.PutUint64(bn, recoveredRequestNonce)
+
+	var dbs []*kit.TestDB
+	for i := range miners[:MirTotalValidatorNumber] {
+		_ = i
+		db := kit.NewTestDB()
+		err := db.Put(ctx, mir.NextConfigurationNumberKey, bn)
+		require.NoError(t, err)
+		err = db.Put(ctx, mir.NextAppliedConfigurationNumberKey, bn)
+		require.NoError(t, err)
+
+		// -- store fake votes
+		recs := []mir.VoteRecord{{
+			ConfigurationNumber: 0, ValSetHash: "hash", VotedValidators: []mir.VotedValidator{{ID: "id1"}},
+		}}
+		r := mir.VoteRecords{
+			Records: recs,
+		}
+
+		br := new(bytes.Buffer)
+		err = r.MarshalCBOR(br)
+		require.NoError(t, err)
+		err = db.Put(ctx, mir.ReconfigurationVotesKey, br.Bytes())
+		require.NoError(t, err)
+
+		dbs = append(dbs, db)
+	}
+	for i := range miners[MirTotalValidatorNumber:] {
+		_ = i
+		dbs = append(dbs, kit.NewTestDB())
+	}
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+
+	ens.InterconnectFullNodes()
+	ens.BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, g, dbs[:MirTotalValidatorNumber], miners[:MirTotalValidatorNumber])
+
+	t.Log(">>> check that nodes are advanced")
+	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> check that persisted votes restored")
+	for _, m := range miners[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
+		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
+		require.NoError(t, err)
+		var r mir.VoteRecords
+		err = r.UnmarshalCBOR(bytes.NewReader(b))
+		require.NoError(t, err)
+		for _, v := range r.Records {
+			require.Equal(t, uint64(0), v.ConfigurationNumber)
+			require.Equal(t, "hash", v.ValSetHash)
+		}
+		votes := mir.GetConfigurationVotes(r.Records)
+		require.Greater(t, MirTotalValidatorNumber, len(votes))
+	}
+
+	var cn uint64 = 1
+
+	t.Log(">>> new validators have been added to the membership")
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
+	require.Equal(t, cn, membership.GetConfigurationNumber())
+	// Start new miners.
+	ens.InterconnectFullNodes()
+
+	ens.BeginMirMiningWithMembershipFromFileAndDB(ctx, membershipFileName, g, dbs[MirTotalValidatorNumber:], miners[MirTotalValidatorNumber:])
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+
+	// Core validators must send 1 message with recovered "nonce".
+	for _, m := range miners[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
+
+		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
+		require.NoError(t, err)
+		var r mir.VoteRecords
+		err = r.UnmarshalCBOR(bytes.NewReader(b))
+		require.NoError(t, err)
+		for _, v := range r.Records {
+			require.Equal(t, cn, v.ConfigurationNumber)
+		}
+		votes := mir.GetConfigurationVotes(r.Records)
+		require.Greater(t, MirTotalValidatorNumber, len(votes))
+	}
+}
+
+// TestMirReconfiguration_AddOneValidatorToMembershipWithDelay tests that the reconfiguration mechanism operates normally
+// if a new validator is added to the membership files with delays.
+func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
+	membershipFiles := make([]string, MirTotalValidatorNumber+1)
+	for i := 0; i < MirTotalValidatorNumber+1; i++ {
+		membershipFiles[i] = kit.TempFileName("membership")
+	}
+
+	t.Cleanup(func() {
+		for i := 0; i < MirTotalValidatorNumber+1; i++ {
+			err := os.Remove(membershipFiles[i])
+			require.NoError(t, err)
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+1, mirTestOpts...)
+
+	// Append initial validators.
+	for i := 0; i < MirTotalValidatorNumber; i++ {
+		ens.SaveValidatorSetToFile(0, membershipFiles[i], miners[:MirTotalValidatorNumber]...)
+	}
+	// Add all validators to the membership file of the new validator.
+	ens.SaveValidatorSetToFile(0, membershipFiles[MirTotalValidatorNumber], miners[:MirTotalValidatorNumber+1]...)
+
+	// Run validators, including the added validator.
+	ens.InterconnectFullNodes()
+	for i := 0; i < MirTotalValidatorNumber; i++ {
+		ens.BeginMirMiningWithMembershipFromFile(ctx, membershipFiles[i], g, []*kit.TestMiner{miners[i]})
+	}
+	ens.BeginMirMiningWithMembershipFromFile(ctx, membershipFiles[MirTotalValidatorNumber], g, miners[MirTotalValidatorNumber:])
+
+	err := kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	// Add the new validator to the membership file of all other validators.
+	t.Log(">>> new validator is being added to the membership files")
+	for i := 0; i < MirTotalValidatorNumber; i++ {
+		kit.RandomDelay(i + 10)
+		ens.SaveValidatorSetToFile(1, membershipFiles[i], miners...)
+
+		membership, err := validator.NewValidatorSetFromFile(membershipFiles[i])
+		require.NoError(t, err)
+		require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
+	}
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+}
+
+// TestMirReconfiguration_AddValidatorsOnce tests that the reconfiguration mechanism operates normally
+// if new validators join the network at the same time.
+func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
+	initialValidatorNumber := 4
+	addedValidatorNumber := 2
+
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, initialValidatorNumber+addedValidatorNumber, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:initialValidatorNumber]...)
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, initialValidatorNumber, membership.Size())
+
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[:initialValidatorNumber])
+
+	err = kit.AdvanceChain(ctx, 20, nodes[:initialValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:initialValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> all new validators have been added to the membership")
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, initialValidatorNumber+addedValidatorNumber, membership.Size())
+	// Start new miners.
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[initialValidatorNumber:])
+
+	err = kit.AdvanceChain(ctx, 40, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	require.NoError(t, err)
+}
+
+// TestMirReconfiguration_AddValidatorsOneByOne tests that the reconfiguration mechanism operates normally
+// if validators join the network one by one.
+func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
+	addedValidatorNumber := 3
+
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+addedValidatorNumber, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[:MirTotalValidatorNumber])
+
+	err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	for i := 1; i <= addedValidatorNumber; i++ {
+		t.Logf(">>> new validator %d is being added to the membership", i)
+		ens.SaveValidatorSetToFile(uint64(i), membershipFileName, miners[:MirTotalValidatorNumber+i]...)
+		membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+		require.NoError(t, err)
+
+		require.Equal(t, MirTotalValidatorNumber+i, membership.Size())
+		require.Equal(t, MirTotalValidatorNumber+i, len(miners[:MirTotalValidatorNumber+i]))
+		require.Equal(t, MirTotalValidatorNumber+i-1, len(nodes[1:MirTotalValidatorNumber+i]))
+
+		// Start new miners.
+		ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, []*kit.TestMiner{miners[MirTotalValidatorNumber+i-1]})
+
+		t.Logf(">>> advancing the chain after adding validator %d", i)
+		err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber+i]...)
+		require.NoError(t, err)
+	}
+
+	err = kit.AdvanceChain(ctx, 30, nodes...)
+	require.NoError(t, err)
+
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+}
+
+// TestMirReconfiguration_NewNodeFailsToJoin tests that the reconfiguration mechanism operates normally
+// if a new validator cannot join the network.
+// In this test we don't stop the faulty validator explicitly, instead, we don't spawn it.
+func TestMirReconfiguration_NewNodeFailsToJoin(t *testing.T) {
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, mirTestOpts...)
+	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
+	ens.InterconnectFullNodes().BeginMirMiningWithMembershipFromFile(ctx, membershipFileName, g, miners[:MirTotalValidatorNumber])
+
+	err := kit.AdvanceChain(ctx, 3*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Log(">>> new validators have been added to the membership")
+	ens.SaveValidatorSetToFile(1, membershipFileName, miners...)
+
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+}
+
+// TestMirSmoke_OneNodeMines tests that a Mir node can mine blocks.
+func TestMirSmoke_OneNodeMines(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	full, miner, ens := kit.EnsembleMinimalMir(t, mirTestOpts...)
-	ens.BeginMirMining(ctx, &wg, miner)
+	ens.BeginMirMining(ctx, g, miner)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, full)
 	require.NoError(t, err)
 }
 
-// TestMirTwoNodesMining tests that two Mir nodes can mine blocks.
+// TestMirBasic_TwoNodesMining tests that two Mir nodes can mine blocks.
 //
 // NOTE: The peculiarity of this test is that it uses other mechanisms to instantiate testing
 // comparing to the main tests here.
-func TestMirTwoNodesMining(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_TwoNodesMining(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	n1, n2, m1, m2, ens := kit.EnsembleTwoMirNodes(t, mirTestOpts...)
@@ -147,7 +593,7 @@ func TestMirTwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, p, "node two has peers")
 
-	ens.Connect(n1, n2).BeginMirMining(ctx, &wg, m1, m2)
+	ens.Connect(n1, n2).BeginMirMining(ctx, g, m1, m2)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, n1, n2)
 	require.NoError(t, err)
@@ -155,47 +601,50 @@ func TestMirTwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirAllNodesMining tests that n nodes can mine blocks normally.
-func TestMirAllNodesMining(t *testing.T) {
-	t.Run("TestMirAllNodesMining", func(t *testing.T) {
-		var wg sync.WaitGroup
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer func() {
-			t.Logf("[*] defer: cancelling %s context", t.Name())
-			cancel()
-			wg.Wait()
-		}()
-
-		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
-
-		err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-		require.NoError(t, err)
-		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
-		require.NoError(t, err)
-	})
-}
-
-// TestMirAllNodesMiningWithMangling run TestMirAllNodesMining with mangler.
-func TestMirAllNodesMiningWithMangling(t *testing.T) {
-	setupMangler(t)
-	TestMirAllNodesMining(t)
-}
-
-// TestMirFNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
-func TestMirFNodesNeverStart(t *testing.T) {
-	var wg sync.WaitGroup
-
+// TestMirSmoke_AllNodesMine tests that n nodes can mine blocks normally.
+func TestMirSmoke_AllNodesMine(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
+
+	err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+
+}
+
+// TestMirWithMangler_AllNodesMining run TestMirBasic_AllNodesMining with mangler.
+func TestMirWithMangler_AllNodesMining(t *testing.T) {
+	setupMangler(t)
+	TestMirSmoke_AllNodesMine(t)
+}
+
+// TestMirBasic_FNodesNeverStart tests that n − f nodes operate normally if f nodes never start.
+func TestMirBasic_FNodesNeverStart(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirHonestValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -203,20 +652,22 @@ func TestMirFNodesNeverStart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWhenLearnersJoin tests that all nodes operate normally
+// TestMirBasic_WhenLearnersJoin tests that all nodes operate normally
 // if new learner joins when the network is already started and syncs the whole network.
-func TestMirWhenLearnersJoin(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_WhenLearnersJoin(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -239,18 +690,23 @@ func TestMirWhenLearnersJoin(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirWhenLearnersJoinWithMangler runs TestMirWhenLearnersJoin with mangler.
-func TestMirWhenLearnersJoinWithMangler(t *testing.T) {
+// TestMirWithMangler_WhenLearnersJoin runs TestMir_WhenLearnersJoin with mangler.
+func TestMirWithMangler_WhenLearnersJoin(t *testing.T) {
 	setupMangler(t)
-	TestMirWhenLearnersJoin(t)
+	TestMirBasic_WhenLearnersJoin(t)
 }
 
-// TestGenesisBlocksOfValidatorsAndLearners tests that genesis for validators and learners are correct.
-func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
+// TestMirSmoke_GenesisBlocksOfValidatorsAndLearners tests that genesis for validators and learners are correct.
+func TestMirSmoke_GenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, _, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
@@ -281,21 +737,24 @@ func TestGenesisBlocksOfValidatorsAndLearners(t *testing.T) {
 	}
 }
 
-// TestMirMessageFromLearner tests that messages can be sent from learners and validators,
+// TestMirBasic_MessageFromLearner tests that messages can be sent from learners and validators,
 // and successfully proposed by validators
-func TestMirMessageFromLearner(t *testing.T) {
+func TestMirBasic_MessageFromLearner(t *testing.T) {
 	t.Skip()
-	var wg sync.WaitGroup
 
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	// immediately start learners
 	var learners []*kit.TestFullNode
@@ -311,7 +770,7 @@ func TestMirMessageFromLearner(t *testing.T) {
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
-	// send funds to learners so they can send a message themselves
+	// Send funds to learners, so they can send a message themselves
 	for _, l := range learners {
 		src, err := nodes[0].WalletDefaultAddress(ctx)
 		require.NoError(t, err)
@@ -362,20 +821,22 @@ func TestMirMessageFromLearner(t *testing.T) {
 	}
 }
 
-// TestMirNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// TestMirBasic_NodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if all nodes start with large, random delays (1-2 minutes).
-func TestMirNodesStartWithRandomDelay(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_NodesStartWithRandomDelay(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMiningWithDelay(ctx, &wg, MaxDelay, miners...)
+	ens.InterconnectFullNodes().BeginMirMiningWithDelay(ctx, g, MaxDelay, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -383,20 +844,22 @@ func TestMirNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirFNodesStartWithRandomDelay tests that all nodes eventually operate normally
+// TestMirBasic_FNodesStartWithRandomDelay tests that all nodes eventually operate normally
 // if f nodes start with large, random delays (1-2 minutes).
-func TestMirFNodesStartWithRandomDelay(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_FNodesStartWithRandomDelay(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMiningWithDelayForFaultyNodes(ctx, &wg, MaxDelay, miners[MirFaultyValidatorNumber:], miners[:MirFaultyValidatorNumber]...)
+	ens.InterconnectFullNodes().BeginMirMiningWithDelayForFaultyNodes(ctx, g, MaxDelay, miners[MirFaultyValidatorNumber:], miners[:MirFaultyValidatorNumber]...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -404,19 +867,21 @@ func TestMirFNodesStartWithRandomDelay(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirAllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
-func TestMirAllNodesMiningWithMessaging(t *testing.T) {
-	var wg sync.WaitGroup
-
+// TestMirBasic_AllNodesMiningWithMessaging tests that sending messages mechanism operates normally for all nodes when there are not any faults.
+func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	for range nodes {
 		rand.Seed(time.Now().UnixNano())
@@ -441,61 +906,103 @@ func TestMirAllNodesMiningWithMessaging(t *testing.T) {
 	}
 }
 
-// TestMirAllNodesMiningWithMessagingWithMangler runs TestMirAllNodesMiningWithMessaging with mangler.
-func TestMirAllNodesMiningWithMessagingWithMangler(t *testing.T) {
-	setupMangler(t)
-	TestMirAllNodesMiningWithMessaging(t)
-}
-
-// TestMirWithFOmissionNodes tests that n − f nodes operate normally and can recover
-// if f nodes do not have access to network at the same time.
-func TestMirWithFOmissionNodes(t *testing.T) {
-	var wg sync.WaitGroup
-
+// TestMirBasic_MiningWithOneByzantineNode tests that sending messages mechanism operates normally
+// in a presence of one byzantine node.
+func TestMirBasic_MiningWithOneByzantineNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, twinNodes, miners, twinMiners, ens := kit.EnsembleMirNodesWithByzantineTwins(t, 4, mirTestOpts...)
+	ens.Connect(nodes[0], nodes[3])
+	ens.Connect(nodes[3], nodes[1])
+
+	ens.Connect(nodes[1], twinNodes[0])
+	ens.Connect(twinNodes[0], nodes[2])
+
+	ens.BeginMirMining(ctx, g, append(miners, twinMiners...)...)
+
+	err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, append(nodes, twinNodes...)...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+}
+
+// TestMirWithMangler_AllNodesMiningWithMessaging runs TestMir_AllNodesMiningWithMessaging with mangler.
+func TestMirWithMangler_AllNodesMiningWithMessaging(t *testing.T) {
+	setupMangler(t)
+	TestMirBasic_AllNodesMiningWithMessaging(t)
+}
+
+// TestMirBasic_WithFOmissionNodes tests that n − f nodes operate normally and can recover
+// if f nodes do not have access to network at the same time.
+func TestMirBasic_WithFOmissionNodes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
 
-	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
+	restoreConnections := ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
 	restoreConnections()
 
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
-	time.Sleep(10 * time.Second)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
 }
 
-// TestMirWithFCrashedNodes tests that n − f nodes operate normally and can recover
+// TestMirBasic_WithFCrashedNodes tests that n − f nodes operate normally and can recover
 // if f nodes crash at the same time.
-func TestMirWithFCrashedNodes(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -503,76 +1010,125 @@ func TestMirWithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
 	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
 
-	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
-	time.Sleep(10 * time.Second)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
 }
 
-// TestMirStartStop tests that Mir nodes can be stopped.
-func TestMirStartStop(t *testing.T) {
-	t.Run("TestMirStartStop", func(t *testing.T) {
-		var wg sync.WaitGroup
-		wait := make(chan struct{})
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer func() {
-			t.Logf("[*] defer: cancelling %s context", t.Name())
-			cancel()
-			select {
-			case <-time.After(10 * time.Second):
-				t.Fatalf("fail to stop Mir nodes")
-			case <-wait:
-			}
-		}()
-
-		go func() {
-			// This goroutine is leaking after time.After(x) seconds with panicking.
-			select {
-			case <-time.After(200 * time.Second):
-				panic("test time exceeded")
-			case <-ctx.Done():
-				return
-			}
-		}()
-
-		go func() {
-			// This goroutine is leaking after time.After(x) seconds with panicking.
-			wg.Wait()
-			close(wait)
-		}()
-
-		nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-		ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
-
-		err := kit.AdvanceChain(ctx, 20, nodes...)
-		require.NoError(t, err)
-	})
-}
-
-// TestMirWithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
-// and recovered nodes eventually operate normally
-// if f nodes crash and then recover (with only initial state) after a long delay (few minutes).
-func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
-	var wg sync.WaitGroup
+// TestMirSmoke_StartStop tests that Mir nodes can be stopped.
+func TestMirSmoke_StartStop(t *testing.T) {
+	wait := make(chan struct{})
 
 	ctx, cancel := context.WithCancel(context.Background())
+	g := errgroup.Group{}
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
+		after := time.NewTimer(10 * time.Second)
 		cancel()
-		wg.Wait()
+		select {
+		case <-after.C:
+			t.Fatalf("fail to stop Mir nodes")
+		case <-wait:
+		}
+		after.Stop()
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		select {
+		case <-time.After(20 * time.Second):
+			panic("test time exceeded")
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		err := g.Wait()
+		require.NoError(t, err)
+		close(wait)
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, &g, miners...)
+
+	err := kit.AdvanceChain(ctx, 10, nodes...)
+	require.NoError(t, err)
+}
+
+// TestMirSmoke_StopWithError tests that the tests can be stopped if an error occurred during mining.
+func TestMirSmoke_StopWithError(t *testing.T) {
+	wait := make(chan struct{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		after := time.NewTimer(10 * time.Second)
+		cancel()
+		select {
+		case <-after.C:
+			t.Fatalf("fail to stop Mir nodes")
+		case <-wait:
+		}
+		after.Stop()
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		select {
+		case <-time.After(200 * time.Second):
+			panic("test time exceeded")
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	go func() {
+		// This goroutine is leaking after time.After(x) seconds with panicking.
+		err := g.Wait()
+		require.NoError(t, err)
+		close(wait)
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+	ens.InterconnectFullNodes().BeginMirMiningWithError(ctx, g, miners...)
+
+	err := kit.AdvanceChain(ctx, 10, nodes...)
+	require.Error(t, err)
+}
+
+// TestMirBasic_WithFCrashedAndRecoveredNodes tests that n − f nodes operate normally without significant interruption,
+// and recovered nodes eventually operate normally
+// if f nodes crash and then recover (with only initial state) after a long delay (few minutes).
+func TestMirBasic_WithFCrashedAndRecoveredNodes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -580,7 +1136,7 @@ func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
 	t.Logf(">>> crash %d miners", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
@@ -594,20 +1150,22 @@ func TestMirWithFCrashedAndRecoveredNodes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirFNodesCrashLongTimeApart tests that n − f nodes operate normally
+// TestMirBasic_FNodesCrashLongTimeApart tests that n − f nodes operate normally
 // if f nodes crash, long time apart (few minutes).
-func TestMirFNodesCrashLongTimeApart(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_FNodesCrashLongTimeApart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -615,7 +1173,7 @@ func TestMirFNodesCrashLongTimeApart(t *testing.T) {
 	t.Logf(">>> crash %d nodes", MirFaultyValidatorNumber)
 	ens.CrashMirMiners(ctx, MaxDelay, miners[:MirFaultyValidatorNumber]...)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
@@ -628,49 +1186,51 @@ func TestMirFNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
+// TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash tests that n − f nodes operate normally
 // and partitioned nodes eventually catch up
 // if f nodes have a long period of no network access, but do not crash.
-func TestMirFNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
-	var wg sync.WaitGroup
-
+func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	defer func() {
 		t.Logf("[*] defer: cancelling %s context", t.Name())
 		cancel()
-		wg.Wait()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, &wg, miners...)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
-	restoreConnections := ens.DisconnectMirMiners(miners[:MirFaultyValidatorNumber])
+	restoreConnections := ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
-	err = kit.ChainHeightCheckWithFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
 
 	t.Log(">>> restoring network connections")
 	restoreConnections()
 
-	// FIXME: Consider using advance chain instead of a time.Sleep here if possible.
-	// err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	// require.NoError(t, err)
-	time.Sleep(10 * time.Second)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+		if err == nil {
+			break
+		}
+	}
 	require.NoError(t, err)
-}
-
-// TestMirFNodesSleepAndThenOperate tests that n − f nodes operate normally without significant interruption
-// and woken up nodes eventually operate normally
-// if f  nodes sleep for a significant amount of time and then continue operating but keep network connection.
-func TestMirFNodesSleepAndThenOperate(t *testing.T) {
-	// TBD
-	t.Skip()
 }

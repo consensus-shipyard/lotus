@@ -13,17 +13,17 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
+	"github.com/filecoin-project/mir/pkg/checkpoint"
 )
 
 var runCmd = &cli.Command{
@@ -58,9 +58,9 @@ var runCmd = &cli.Command{
 			Usage: "pass initial checkpoint as a file (it overwrites 'init-height' flag)",
 		},
 		&cli.IntFlag{
-			Name:  "checkpoint-period",
-			Usage: "Checkpoint period",
-			Value: 8,
+			Name:  "segment-length",
+			Usage: "The length of an ISS segment. Must not be negative",
+			Value: 1,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -115,17 +115,17 @@ var runCmd = &cli.Command{
 		}
 
 		// Validator identity.
-		validator, err := validatorIDFromFlag(ctx, cctx, nodeApi)
+		validatorID, err := validatorIDFromFlag(ctx, cctx, nodeApi)
 		if err != nil {
 			return err
 		}
 
 		// Membership config.
 		// TODO: Make this configurable.
-		membershipCfg := filepath.Join(cctx.String("repo"), MembershipCfgPath)
+		membershipFile := filepath.Join(cctx.String("repo"), MembershipPath)
 
-		// Checkpoint period.
-		checkpointPeriod := cctx.Int("checkpoint-period")
+		// Segment length period.
+		segmentLength := cctx.Int("segment-length")
 
 		h, err := newLp2pHost(cctx.String("repo"))
 		if err != nil {
@@ -160,14 +160,18 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		log.Infow("Starting mining with validator", "validator", validator)
+		log.Infow("Starting mining with validator", "validator", validatorID)
+
+		membership := validator.NewFileMembership(membershipFile)
+
 		cfg := mir.NewConfig(
-			mir.MembershipFromFile(membershipCfg),
 			dbPath,
-			checkpointPeriod,
 			initCh,
-			cctx.String("checkpoints-repo"))
-		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
+			cctx.String("checkpoints-repo"),
+			segmentLength,
+		)
+
+		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
 	},
 }
 

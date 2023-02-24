@@ -158,7 +158,7 @@ jobs:
         default: golang
       go-test-flags:
         type: string
-        default: "-tags=spacenet -timeout 20m"
+        default: "-tags=spacenet -shuffle=on -v -count=1"
         description: Flags passed to go test.
       target:
         type: string
@@ -198,6 +198,7 @@ jobs:
           environment:
             TEST_RUSTPROOFS_LOGS: << parameters.proofs-log-test >>
             SKIP_CONFORMANCE: "1"
+            MIR_INTERCEPTOR_OUTPUT: "mir-interceptor"
           command: |
             mkdir -p /tmp/test-reports/<< parameters.suite >>
             mkdir -p /tmp/test-artifacts
@@ -213,15 +214,15 @@ jobs:
       - run:
           command: |
             dates="$(date +%s)"
-            mkdir -p /tmp/test-mir-eventlogs/"$dates"
-            cp -R ./itests/eudico-recorder* /tmp/test-mir-eventlogs/"$dates"/
+            mkdir -p /tmp/test-mir-interceptor/"$dates"
+            cp -R ./itests/mir-interceptor/* /tmp/test-mir-interceptor/"$dates"/
           when: on_fail
       - store_test_results:
           path: /tmp/test-reports
       - store_artifacts:
           path: /tmp/test-artifacts/<< parameters.suite >>.json
       - store_artifacts:
-          path: /tmp/test-mir-eventlogs
+          path: /tmp/test-mir-interceptor
       - when:
           condition: << parameters.codecov-upload >>
           steps:
@@ -229,19 +230,20 @@ jobs:
                 shell: /bin/bash -eo pipefail
                 command: |
                   bash <(curl -s https://codecov.io/bash)
-  test-consensus-smoke:
+
+  test-mir-smoke:
     <<: *basic_test
 
   test-consensus-unit:
     <<: *basic_test
 
-  test-consensus:
+  test-mir-basic:
     <<: *basic_test
 
-  test-consensus-advanced:
+  test-mir-with-mangler:
     <<: *basic_test
 
-  test-consensus-with-mangler:
+  test-mir-reconfiguration:
     <<: *basic_test
 
   test-conformance:
@@ -560,25 +562,32 @@ workflows:
       - gofmt
       - gen-check
       - test-consensus-unit:
-            name: consensus-unit-tests
-            suite: consensus
-            target: "./chain/consensus/..."
-            requires:
-              - lint-all
-      - test-consensus-smoke:
-          name: consensus-smoke-tests
+          name: consensus-unit-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 10m -run TestMirConsensusSmoke"
+          target: "./chain/consensus/..."
+          requires:
+            - lint-all
+      - test-mir-smoke:
+          name: mir-smoke-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 10m -run TestMirSmoke"
           target: "./itests/mir_test.go"
           requires:
             - consensus-unit-tests
-      - test-consensus-advanced:
-          name: consensus-advanced-tests
+      - test-mir-basic:
+          name: mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirConsensusAdvanced"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
           requires:
-            - consensus-smoke-tests
+            - mir-smoke-tests
+      - test-mir-reconfiguration:
+          name: mir-reconfiguration-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
+          target: "./itests/mir_test.go"
+          requires:
+            - mir-smoke-tests
       - build-spacenet
       - build-all:
           filters:
@@ -608,13 +617,18 @@ workflows:
               only:
                 - spacenet
     jobs:
-      - test-consensus-with-mangler:
-          name: mangler-tests
+      - test-mir-with-mangler:
+          name: mir-mangler-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 120m -run TestMirConsensusWithMangler"
+          go-test-flags: "-tags=spacenet -timeout 120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
-      - test-consensus:
-          name: mir-consensus-tests
+      - test-mir-basic:
+          name: mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 60m -run TestMirConsensus"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
+          target: "./itests/mir_test.go"
+      - test-mir-reconfiguration:
+          name: mir-reconfiguration-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"

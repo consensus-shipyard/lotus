@@ -13,6 +13,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 
 	"github.com/filecoin-project/lotus/api"
@@ -57,10 +58,14 @@ var runCmd = &cli.Command{
 			Name:  "init-checkpoint",
 			Usage: "pass initial checkpoint as a file (it overwrites 'init-height' flag)",
 		},
+		&cli.StringFlag{
+			Name:  "restore-configuration-number",
+			Usage: "use persisted configuration number",
+		},
 		&cli.IntFlag{
-			Name:  "checkpoint-period",
-			Usage: "Checkpoint period",
-			Value: 8,
+			Name:  "segment-length",
+			Usage: "The length of an ISS segment. Must not be negative",
+			Value: 1,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -116,17 +121,17 @@ var runCmd = &cli.Command{
 		}
 
 		// Validator identity.
-		validator, err := validatorIDFromFlag(ctx, cctx, nodeApi)
+		validatorID, err := validatorIDFromFlag(ctx, cctx, nodeApi)
 		if err != nil {
 			return err
 		}
 
 		// Membership config.
 		// TODO: Make this configurable.
-		membershipCfg := filepath.Join(cctx.String("repo"), MembershipCfgPath)
+		membershipFile := filepath.Join(cctx.String("repo"), MembershipCfgPath)
 
-		// Checkpoint period.
-		checkpointPeriod := cctx.Int("checkpoint-period")
+		// Segment length period.
+		segmentLength := cctx.Int("segment-length")
 
 		h, err := newLp2pHost(cctx.String("repo"))
 		if err != nil {
@@ -161,14 +166,15 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		log.Infow("Starting mining with validator", "validator", validator)
+		membership := validator.NewFileMembership(membershipFile)
+
+		log.Infow("Starting mining with validator", "validator", validatorID)
 		cfg := mir.NewConfig(
-			mir.MembershipFromFile(membershipCfg),
 			dbPath,
-			checkpointPeriod,
 			initCh,
-			cctx.String("checkpoints-repo"))
-		return mir.Mine(ctx, validator, h, nodeApi, ds, cfg)
+			cctx.String("checkpoints-repo"),
+			segmentLength)
+		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
 	},
 }
 

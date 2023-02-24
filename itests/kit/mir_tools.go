@@ -2,6 +2,7 @@ package kit
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"time"
@@ -14,14 +15,22 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
 	testTimeout = 1200
 )
+
+// TempFileName generates a temporary filename for use in testing or whatever
+func TempFileName(suffix string) string {
+	randBytes := make([]byte, 8)
+	rand.Read(randBytes)
+	return suffix + "_" + hex.EncodeToString(randBytes) + ".json"
+}
 
 // CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current
 // height, if for some reason any of the nodes haven't seen a block
@@ -35,7 +44,7 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 	if len(checkedNodes) < 1 {
 		return fmt.Errorf("no checked nodes")
 	}
-	baseHead, err := baseNode.ChainHead(ctx)
+	baseHead, err := ChainHeadWithCtx(ctx, baseNode)
 	if err != nil {
 		return err
 	}
@@ -74,12 +83,21 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
 func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
-	timeout := time.After(5 * time.Second)
+	// one minute baseline timeout
+	timeout := 10 * time.Second
+	base, err := ChainHeadWithCtx(ctx, node)
+	if err != nil {
+		return err
+	}
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
+	after := time.After(timeout)
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-timeout:
+		case <-after:
 			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
 			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
@@ -105,7 +123,7 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 
 func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode) error {
 	// get base to determine the gap to sync and configure timeout.
-	base, err := api.ChainHead(ctx)
+	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return xerrors.Errorf("failed to get chain head: %w", err)
 	}
@@ -127,7 +145,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 		// poll until we get the desired height.
 		// TODO: We may be able to add a slight sleep here if needed.
 		for head != height {
-			base, err := api.ChainHead(ctx)
+			base, err := ChainHeadWithCtx(ctx, api)
 			if err != nil {
 				return err
 			}
@@ -143,7 +161,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 }
 
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
-	base, err := api.ChainHead(ctx)
+	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return err
 	}
@@ -176,14 +194,15 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 	return g.Wait()
 }
 
-func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
+// NoProgressForFaultyNodes checks that the heights of the faulty nodes are not changed after advancing the chain.
+func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
 	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
 
 	// Adding an initial buffer for peers to sync their chain head.
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(800 * time.Millisecond)
 
 	for i, fn := range faultyNodes {
-		ts, err := fn.FullNode.ChainHead(ctx)
+		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
 		if err != nil {
 			return err
 		}
@@ -199,16 +218,16 @@ func ChainHeightCheckWithFaultyNodes(ctx context.Context, blocks int, nodes []*T
 	}
 
 	for i, fn := range faultyNodes {
-		ts, err := fn.FullNode.ChainHead(ctx)
+		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
 		if err != nil {
 			return err
 		}
 		if ts == nil {
-			return fmt.Errorf("nil tipset for an new block")
+			return fmt.Errorf("nil tipset for a new block")
 		}
 		newHeight := ts.Height()
 		if newHeight != oldHeights[i] {
-			return fmt.Errorf("different heights for miner %d: new - %d, old - %d", i, newHeight, oldHeights[i])
+			return fmt.Errorf("different heights for validator %d: new - %d, old - %d", i, newHeight, oldHeights[i])
 		}
 	}
 
@@ -278,4 +297,18 @@ func NodeLibp2pAddr(h host.Host) (m multiaddr.Multiaddr, err error) {
 func RandomDelay(seconds int) {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
+}
+
+type fakeMembership struct {
+}
+
+func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
+	return nil, fmt.Errorf("no validators")
+}
+
+func ChainHeadWithCtx(ctx context.Context, api v1api.FullNode) (*types.TipSet, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return api.ChainHead(ctx)
 }
