@@ -66,7 +66,7 @@ type Manager struct {
 	confManager   *ConfigurationManager
 	stateManager  *StateManager
 	interceptor   *eventlog.Recorder
-	toMir         chan chan []*mirproto.Request
+	mirReady      chan chan []*mirproto.Request
 	stopCh        chan struct{}
 	membership    validator.Reader
 	stopped       bool
@@ -148,7 +148,7 @@ func NewManager(ctx context.Context,
 		net:                 netTransport,
 		ds:                  ds,
 		initialValidatorSet: initialValidatorSet,
-		toMir:               make(chan chan []*mirproto.Request),
+		mirReady:            make(chan chan []*mirproto.Request),
 		checkpointRepo:      cfg.CheckpointRepo,
 		segmentLength:       cfg.SegmentLength,
 	}
@@ -160,7 +160,7 @@ func NewManager(ctx context.Context,
 
 	// Create SMR modules.
 	mpool := pool.NewModule(
-		m.toMir,
+		m.mirReady,
 		pool.DefaultModuleConfig(),
 		pool.DefaultModuleParams(),
 	)
@@ -251,10 +251,10 @@ func (m *Manager) Serve(ctx context.Context) error {
 		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
 			m.netName, m.mirID, m.mirID, m.initialValidatorSet.GetValidators())
 
-	errChan := make(chan error, 1)
+	mirErrChan := make(chan error, 1)
 	go func() {
 		// Run Mir node until it stops.
-		errChan <- m.mirNode.Run(ctx)
+		mirErrChan <- m.mirNode.Run(ctx)
 	}()
 	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
 	defer func() {
@@ -272,27 +272,19 @@ func (m *Manager) Serve(ctx context.Context) error {
 	lastValidatorSet := m.initialValidatorSet
 
 	for {
-		// Here we use `ctx.Err()` in the beginning of the `for` loop instead of using it in the `select` statement,
-		// because if `ctx` has been closed then `api.ChainHead(ctx)` returns an error,
-		// and we will be in the infinite loop due to `continue`.
-		if ctx.Err() != nil {
-			log.With("validator", m).Debug("Mir manager: context closed")
-			return nil
-		}
 
 		select {
+		case <-ctx.Done():
+			log.With("validator", m.mirID).Debug("Mir manager: context closed")
+			return nil
 
-		// first catch potential errors when mining
-		case err := <-errChan:
+		// First catch potential errors when mining.
+		case err := <-mirErrChan:
 			log.With("validator", m.mirID).Info("manager received error:", err)
 			if err != nil && !errors.Is(err, mir.ErrStopped) {
 				panic(fmt.Sprintf("validator %s consensus error: %v", m.mirID, err))
 			}
 			log.With("validator", m.mirID).Infof("Mir node stopped signal")
-			return nil
-
-		case <-ctx.Done():
-			log.With("validator", m.mirID).Debug("Mir manager: context closed")
 			return nil
 
 		case <-reconfigure.C:
@@ -317,7 +309,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 				configRequests = append(configRequests, r)
 			}
 
-		case mirChan := <-m.toMir:
+		case mirChan := <-m.mirReady:
 			base, err := m.stateManager.api.ChainHead(ctx)
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.mirID, err)
