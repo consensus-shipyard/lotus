@@ -52,29 +52,36 @@ func MakeGenesisBytes(ctx context.Context, subnetID string) ([]byte, error) {
 
 }
 
-func makeGenesis(ctx context.Context, w io.Writer, subnetID string) error {
+func MakeGenesisTemplate(subnetID string) (genesis.Template, error) {
 	e, err := os.Executable()
 	if err != nil {
-		return err
+		return genesis.Template{}, err
 	}
 
 	tmplFilePath := filepath.Join(filepath.Dir(e), genesisTemplateFilePath)
 	tmplBytes, err := ioutil.ReadFile(tmplFilePath)
 	if err != nil {
-		return xerrors.Errorf("failed to read template %s: %w", tmplFilePath, err)
+		return genesis.Template{}, xerrors.Errorf("failed to read template %s: %w", tmplFilePath, err)
 	}
 
 	var tmpl genesis.Template
 	if err := json.Unmarshal(tmplBytes, &tmpl); err != nil {
-		return err
+		return genesis.Template{}, err
 	}
 	tmpl.NetworkName = subnetID
+	return tmpl, nil
+}
 
+func makeGenesis(ctx context.Context, w io.Writer, subnetID string) error {
+	tmpl, err := MakeGenesisTemplate(subnetID)
+	if err != nil {
+		return err
+	}
 	jrnl := journal.NilJournal()
 	bs := blockstore.WrapIDStore(blockstore.NewMemorySync())
 	sbldr := vm.Syscalls(ffiwrapper.ProofVerifier)
 
-	b, err := lotusGenesis.MakeGenesisBlock(ctx, jrnl, bs, sbldr, tmpl)
+	b, err := lotusGenesis.MakeGenesisBlock(ctx, jrnl, bs, sbldr, tmpl, true)
 	if err != nil {
 		return xerrors.Errorf("failed to make genesis block: %w", err)
 	}

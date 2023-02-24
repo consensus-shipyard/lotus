@@ -3,6 +3,7 @@ package ipc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
@@ -134,7 +135,7 @@ func (a *IpcAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 	return sn.PrevCheckpoint.Cid()
 }
 
-// IpcGetCheckpointTemplate to be populated and signed for the epoch given as input.
+// IPCGetCheckpointTemplate to be populated and signed for the epoch given as input.
 // If the template for the epoch is empty (either because it has no data or an epoch from the
 // future was provided) an empty template is returned.
 func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
@@ -145,38 +146,15 @@ func (a *IpcAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
 }
 
-// IpcGetPrevCheckpointForChild gets the latest checkpoint committed for a child subnet.
-// This function is expected to be called in the parent of the checkpoint being populated.
-// It inspects the state in the heaviest block (i.e. latest state available)
-func (a *IpcAPI) IpcGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
-	st, err := a.IpcReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
-	if err != nil {
-		return cid.Undef, err
-	}
-	sn, found, err := st.GetSubnet(adt.WrapStore(ctx, a.Chain.ActorStore(ctx)), subnet)
-	if err != nil {
-		return cid.Undef, xerrors.Errorf("error getting subnet from actor store: %w", err)
-	}
-	if !found {
-		return cid.Undef, xerrors.Errorf("no subnet registered with id %s", subnet)
-	}
-	return sn.PrevCheckpoint.Cid()
-}
-
-// IpcGetCheckpointTemplate to be populated and signed for the epoch given as input.
-// If the template for the epoch is empty (either because it has no data or an epoch from the
-// future was provided) an empty template is returned.
-func (a *IpcAPI) IpcGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
-	st, err := a.IpcReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+// IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
+// peers in a subnet can deterministically generate the genesis block for the subnet.
+func (a *IpcAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID) ([]byte, error) {
+	tmpl, err := genesis.MakeGenesisTemplate(subnet.String())
 	if err != nil {
 		return nil, err
 	}
-	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
-}
+	return json.Marshal(&tmpl)
 
-// IPCCreateSubnetGenesis creates a new genesis for a subnet given a subnet id.OB
-func (a *IpcAPI) IPCCreateSubnetGenesis(ctx context.Context, subnet sdk.SubnetID) ([]byte, error) {
-	return genesis.MakeGenesisBytes(ctx, subnet.String())
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.

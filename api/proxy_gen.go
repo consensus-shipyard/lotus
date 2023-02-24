@@ -329,6 +329,8 @@ type FullNodeMethods struct {
 
 	IPCReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
 
+	IPCSubnetGenesisTemplate func(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) `perm:"read"`
+
 	MarketAddBalance func(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) `perm:"sign"`
 
 	MarketGetReserved func(p0 context.Context, p1 address.Address) (types.BigInt, error) `perm:"sign"`
@@ -2473,6 +2475,17 @@ func (s *FullNodeStruct) IPCReadSubnetActorState(p0 context.Context, p1 address.
 
 func (s *FullNodeStub) IPCReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCSubnetGenesisTemplate(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
+	if s.Internal.IPCSubnetGenesisTemplate == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.IPCSubnetGenesisTemplate(p0, p1)
+}
+
+func (s *FullNodeStub) IPCSubnetGenesisTemplate(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
 }
 
 func (s *FullNodeStruct) MarketAddBalance(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) {

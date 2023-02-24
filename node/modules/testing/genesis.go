@@ -34,7 +34,7 @@ func MakeGenesisMem(out io.Writer, template genesis.Template) func(bs dtypes.Cha
 	return func(bs dtypes.ChainBlockstore, syscalls vm.SyscallBuilder, j journal.Journal) modules.Genesis {
 		return func() (*types.BlockHeader, error) {
 			glog.Warn("Generating new random genesis block, note that this SHOULD NOT happen unless you are setting up new network")
-			b, err := genesis2.MakeGenesisBlock(context.TODO(), j, bs, syscalls, template)
+			b, err := genesis2.MakeGenesisBlock(context.TODO(), j, bs, syscalls, template, false)
 			if err != nil {
 				return nil, xerrors.Errorf("make genesis block failed: %w", err)
 			}
@@ -74,7 +74,7 @@ func MakeGenesis(outFile, genesisTemplate string) func(bs dtypes.ChainBlockstore
 				template.Timestamp = uint64(build.Clock.Now().Unix())
 			}
 
-			b, err := genesis2.MakeGenesisBlock(context.TODO(), j, bs, syscalls, template)
+			b, err := genesis2.MakeGenesisBlock(context.TODO(), j, bs, syscalls, template, false)
 			if err != nil {
 				return nil, xerrors.Errorf("make genesis block: %w", err)
 			}
