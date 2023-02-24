@@ -9,7 +9,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 )
 
 var initCmd = &cli.Command{
@@ -54,12 +54,12 @@ var initCmd = &cli.Command{
 		// TODO: Pass validator set for initialization
 		mp := path.Join(cctx.String("repo"), MembershipCfgPath)
 		if cctx.String("membership") != "" {
-			validators, err := mir.GetValidatorsFromFile(cctx.String("membership"))
+			validators, err := validator.NewValidatorSetFromFile(cctx.String("membership"))
 			if err != nil {
 				return fmt.Errorf("error importing membership config specified: %s", err)
 			}
 			// persist validator config in the right path.
-			if err := mir.ValidatorsToCfg(validators, mp); err != nil {
+			if err := validators.Save(mp); err != nil {
 				return fmt.Errorf("error exporting membership config: %s", err)
 			}
 		} else {

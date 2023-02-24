@@ -5,12 +5,14 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
-	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/host"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -31,156 +33,152 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 const (
+	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
+	ManglerEnv           = "MIR_MANGLER"
+
 	CheckpointDBKeyPrefix = "mir/checkpoints/"
-	InterceptorOutputEnv  = "MIR_INTERCEPTOR_OUTPUT"
-	ManglerEnv            = "MIR_MANGLER"
+
+	ReconfigurationInterval = 2000 * time.Millisecond
 )
 
-var (
-	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
-	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
-)
-
-// Manager manages the Lotus and Mir nodes participating in ISS consensus protocol.
 type Manager struct {
-	// Lotus related types.
-	NetName dtypes.NetworkName
-	Addr    address.Address
-	Pool    *fifo.Pool
+	ctx context.Context
+	ds  db.DB
 
-	// Mir related types.
-	MirNode       *mir.Node
-	MirID         string
-	WAL           *simplewal.WAL
-	Net           net.Transport
-	CryptoManager *CryptoManager
-	StateManager  *StateManager
+	// Lotus types.
+	netName   dtypes.NetworkName
+	Pool      *fifo.Pool
+	lotusNode v1api.FullNode
+	lotusID   address.Address
+
+	// Mir types.
+	mirNode       *mir.Node
+	mirID         string
+	wal           *simplewal.WAL
+	net           net.Transport
+	cryptoManager *CryptoManager
+	confManager   *ConfigurationManager
+	stateManager  *StateManager
 	interceptor   *eventlog.Recorder
-	ToMir         chan chan []*mirproto.Request
-	ds            db.DB
+	toMir         chan chan []*mirproto.Request
 	stopCh        chan struct{}
+	membership    validator.Reader
+	stopped       bool
 
-	// Reconfiguration related types.
-	InitialValidatorSet  *ValidatorSet
-	reconfigurationNonce uint64
+	// Reconfiguration types.
+	initialValidatorSet *validator.Set
 
-	// Checkpoints
-	segmentLength  int    // segment length determining the checkpoint period.
-	checkpointRepo string // path where checkpoints are (optionally) persisted
+	// Checkpoint types.
+	segmentLength  int    // Segment length determining the checkpoint period.
+	checkpointRepo string // Path where checkpoints are (optionally) persisted
 }
 
-func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1api.FullNode, ds db.DB, cfg *Config) (*Manager, error) {
+func NewManager(ctx context.Context,
+	addr address.Address,
+	h host.Host,
+	api v1api.FullNode,
+	ds db.DB,
+	membership validator.Reader,
+	cfg *Config,
+) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
+	mirID := addr.String()
 
-	initialValidatorSet, err := GetValidators(cfg.MembershipCfg)
+	if cfg == nil {
+		return nil, fmt.Errorf("nil config")
+	}
+
+	if cfg.SegmentLength < 0 {
+		return nil, fmt.Errorf("validator %v segment length must not be negative", mirID)
+	}
+
+	initialValidatorSet, err := membership.GetValidatorSet()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get validator set: %w", err)
+		return nil, fmt.Errorf("validator %v failed to get validator set: %w", mirID, err)
 	}
 	if initialValidatorSet.Size() == 0 {
-		return nil, fmt.Errorf("empty validator set")
+		return nil, fmt.Errorf("validator %v: empty validator set", mirID)
 	}
 
-	nodeIDs, initialMembership, err := validatorsMembership(initialValidatorSet.Validators)
+	_, initialMembership, err := validator.Membership(initialValidatorSet.Validators)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build node membership: %w", err)
+		return nil, fmt.Errorf("validator %v failed to build node membership: %w", mirID, err)
 	}
 
-	// Create (ConfigOffset + 1) copies of the initial membership,
-	// since ConfigOffset determines the number of epochs after the current epoch
-	// for which the membership configuration is fixed.
-	// That is, if the current epoch is e,
-	// the following ConfigOffset configurations are already fixed
-	// and configuration submitted to Mir will be for e + ConfigOffset + 1.
-	// This is why the first ConfigOffset + 1 epochs have the same initial configuration.
-	// NOTE: The notion of an epoch here is NOT the same as in Filecoin consensus,
-	// but describes a whole sequence of output blocks.
-	memberships := make([]map[t.NodeID]t.NodeAddress, ConfigOffset+1)
-	for i := 0; i < ConfigOffset+1; i++ {
-		memberships[t.EpochNr(i)] = initialMembership
-	}
-
-	mirID := addr.String()
-	mirAddr, ok := initialMembership[t.NodeID(mirID)]
+	_, ok := initialMembership[t.NodeID(mirID)]
 	if !ok {
-		return nil, fmt.Errorf("self identity not included in validator set")
+		return nil, fmt.Errorf("validator %v failed to find its identity in membership", mirID)
 	}
-
-	log.Info("Lotus wallet for Mir ID: ", mirID)
-	log.Info("Libp2p host address for Mir: ", mirAddr)
-	log.Info("Mir nodes IDs: ", nodeIDs)
-	log.Info("Mir node libp2p peerID: ", h.ID())
-	log.Info("Mir nodes addresses: ", initialMembership)
 
 	logger := newManagerLogger(mirID)
 
 	// Create Mir modules.
-	netTransport, err := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), h, t.NodeID(mirID), logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transport: %w", err)
-	}
-	if err := netTransport.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start transport: %w", err)
-	}
-	netTransport.Connect(initialMembership)
+	netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(mirID), h, logger)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create crypto manager: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", addr, err)
 	}
 
-	// Instantiate an interceptor.
-	var interceptor *eventlog.Recorder
+	confManager, err := NewConfigurationManager(ctx, ds, mirID)
+	if err != nil {
+		return nil, fmt.Errorf("validator %v failed to create configuration manager: %w", addr, err)
+	}
 
 	m := Manager{
+		ctx:                 ctx,
 		stopCh:              make(chan struct{}),
-		Addr:                addr,
-		NetName:             netName,
+		lotusID:             addr,
+		lotusNode:           api,
+		membership:          membership,
+		netName:             netName,
 		Pool:                fifo.New(),
-		MirID:               mirID,
-		interceptor:         interceptor,
-		CryptoManager:       cryptoManager,
-		Net:                 netTransport,
+		mirID:               mirID,
+		cryptoManager:       cryptoManager,
+		confManager:         confManager,
+		net:                 netTransport,
 		ds:                  ds,
-		InitialValidatorSet: initialValidatorSet,
-		ToMir:               make(chan chan []*mirproto.Request),
+		initialValidatorSet: initialValidatorSet,
+		toMir:               make(chan chan []*mirproto.Request),
 		checkpointRepo:      cfg.CheckpointRepo,
+		segmentLength:       cfg.SegmentLength,
 	}
 
-	m.StateManager, err = NewStateManager(ctx, initialMembership, &m, api)
+	m.stateManager, err = NewStateManager(ctx, initialMembership, &m, m.confManager, api)
 	if err != nil {
-		return nil, fmt.Errorf("error starting mir state manager: %w", err)
+		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", mirID, err)
 	}
 
+	// Create SMR modules.
 	mpool := pool.NewModule(
-		m.ToMir,
+		m.toMir,
 		pool.DefaultModuleConfig(),
 		pool.DefaultModuleParams(),
 	)
 
 	params := trantor.DefaultParams(initialMembership)
-	// configure SegmentLength for specific checkpoint period.
-	m.segmentLength, err = segmentForCheckpointPeriod(cfg.CheckpointPeriod, initialMembership)
-	if err != nil {
-		return nil, fmt.Errorf("error getting segment length: %w", err)
-	}
 	params.Iss.SegmentLength = m.segmentLength
 	params.Mempool.MaxTransactionsInBatch = 1024
 	params.Iss.AdjustSpeed(1 * time.Second)
+	params.Iss.ConfigOffset = ConfigOffset
+	params.Iss.PBFTViewChangeSNTimeout = 6 * time.Second
+	params.Iss.PBFTViewChangeSegmentTimeout = 6 * time.Second
 
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config
 	if initCh == nil {
 		initCh, err = m.initCheckpoint(params, 0)
 		if err != nil {
-			return nil, fmt.Errorf("error getting initial snapshot SMR system: %w", err)
+			return nil, fmt.Errorf("validator %v failed to get initial snapshot SMR system: %w", mirID, err)
 		}
 	}
 
@@ -188,14 +186,15 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 		t.NodeID(mirID),
 		netTransport,
 		initCh,
-		m.CryptoManager,
-		m.StateManager,
+		m.cryptoManager,
+		m.stateManager,
 		params,
 		logger,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create SMR system: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create SMR system: %w", mirID, err)
 	}
+
 	smrSystem = smrSystem.
 		WithModule("mempool", mpool).
 		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
@@ -204,7 +203,7 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 	if mirManglerParams != "" {
 		p, err := GetEnvManglerParams()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("validator %v failed to get mangler params: %w", mirID, err)
 		}
 		err = smrSystem.PerturbMessages(&eventmangler.ModuleParams{
 			MinDelay: p.MinDelay,
@@ -212,90 +211,172 @@ func NewManager(ctx context.Context, addr address.Address, h host.Host, api v1ap
 			DropRate: p.DropRate,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to configure SMR mangler: %w", err)
+			return nil, fmt.Errorf("validator %v failed to configure SMR mangler: %w", mirID, err)
 		}
 	}
 
 	if err := smrSystem.Start(); err != nil {
-		return nil, fmt.Errorf("could not start SMR system: %w", err)
+		return nil, fmt.Errorf("validator %v failed to start SMR system: %w", mirID, err)
 	}
 
 	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
 
-	interceptorOutput := os.Getenv(InterceptorOutputEnv)
-	if interceptorOutput != "" {
+	if interceptorPath := os.Getenv(InterceptorOutputEnv); interceptorPath != "" {
 		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized")
+		log.Infof("Interceptor initialized on %s", interceptorPath)
 		m.interceptor, err = eventlog.NewRecorder(
 			t.NodeID(mirID),
-			interceptorOutput+"/"+mirID,
+			path.Join(interceptorPath, cfg.GroupName, mirID),
 			logging.Decorate(logger, "Interceptor: "),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create interceptor: %w", err)
 		}
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
+		m.mirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
 	} else {
-		m.MirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, nil)
+		m.mirNode, err = mir.NewNode(t.NodeID(mirID), nodeCfg, smrSystem.Modules(), nil, nil)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Mir node: %w", err)
+		return nil, fmt.Errorf("validator %v failed to create Mir node: %w", mirID, err)
 	}
 
 	return &m, nil
 }
 
-// Start starts the manager.
-func (m *Manager) Start(ctx context.Context) chan error {
-	log.Infof("Mir manager %s starting", m.MirID)
-	log.Info("Mir initial checkpointing period: ", m.StateManager.GetCheckpointPeriod())
+func (m *Manager) Serve(ctx context.Context) error {
+	log.With("validator", m.mirID).Info("Mir manager serve starting")
+	defer log.With("validator", m.mirID).Info("Mir manager serve stopped")
+
+	log.With("validator", m.mirID).
+		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
+			m.netName, m.mirID, m.mirID, m.initialValidatorSet.GetValidators())
 
 	errChan := make(chan error, 1)
-
 	go func() {
 		// Run Mir node until it stops.
-		errChan <- m.MirNode.Run(ctx)
+		errChan <- m.mirNode.Run(ctx)
+	}()
+	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
+	defer func() {
+		m.Stop()
 	}()
 
-	return errChan
+	reconfigure := time.NewTicker(ReconfigurationInterval)
+	defer reconfigure.Stop()
+
+	configRequests, err := m.confManager.Pending()
+	if err != nil {
+		return fmt.Errorf("validator %v failed to get pending confgiguration requests: %w", m.mirID, err)
+	}
+
+	lastValidatorSet := m.initialValidatorSet
+
+	for {
+		// Here we use `ctx.Err()` in the beginning of the `for` loop instead of using it in the `select` statement,
+		// because if `ctx` has been closed then `api.ChainHead(ctx)` returns an error,
+		// and we will be in the infinite loop due to `continue`.
+		if ctx.Err() != nil {
+			log.With("validator", m).Debug("Mir manager: context closed")
+			return nil
+		}
+
+		select {
+
+		// first catch potential errors when mining
+		case err := <-errChan:
+			log.With("validator", m.mirID).Info("manager received error:", err)
+			if err != nil && !errors.Is(err, mir.ErrStopped) {
+				panic(fmt.Sprintf("validator %s consensus error: %v", m.mirID, err))
+			}
+			log.With("validator", m.mirID).Infof("Mir node stopped signal")
+			return nil
+
+		case <-ctx.Done():
+			log.With("validator", m.mirID).Debug("Mir manager: context closed")
+			return nil
+
+		case <-reconfigure.C:
+			// Send a reconfiguration transaction if the validator set in the actor has been changed.
+			newSet, err := m.membership.GetValidatorSet()
+			if err != nil {
+				log.With("validator", m.mirID).Warnf("failed to get subnet validators: %w", err)
+				continue
+			}
+
+			if lastValidatorSet.Equal(newSet) {
+				continue
+			}
+
+			log.With("validator", m.mirID).
+				Infof("new validator set: number: %d, size: %d, members: %v",
+					newSet.ConfigurationNumber, newSet.Size(), newSet.GetValidatorIDs())
+
+			lastValidatorSet = newSet
+			r := m.createAndStoreConfigurationRequest(newSet)
+			if r != nil {
+				configRequests = append(configRequests, r)
+			}
+
+		case mirChan := <-m.toMir:
+			base, err := m.stateManager.api.ChainHead(ctx)
+			if err != nil {
+				return xerrors.Errorf("validator %v failed to get chain head: %w", m.mirID, err)
+			}
+			log.With("validator", m.mirID).Debugf("selecting messages from mempool from base: %v", base.Key())
+			msgs, err := m.lotusNode.MpoolSelect(ctx, base.Key(), 1)
+			if err != nil {
+				log.With("validator", m.mirID).With("epoch", base.Height()).
+					Errorw("failed to select messages from mempool", "error", err)
+			}
+
+			requests := m.createTransportRequests(msgs)
+
+			if len(configRequests) > 0 {
+				requests = append(requests, configRequests...)
+			}
+
+			mirChan <- requests
+		}
+	}
 }
 
 // Stop stops the manager and all its components.
 func (m *Manager) Stop() {
-	log.With("miner", m.MirID).Infof("Mir manager shutting down")
-	defer log.With("miner", m.MirID).Info("Mir manager stopped")
+	log.With("validator", m.mirID).Infof("Mir manager stopping")
+	defer log.With("validator", m.mirID).Info("Mir manager stopped")
+
+	if m.stopped {
+		log.With("validator", m.mirID).Warnf("Mir manager has already been stopped")
+		return
+	}
+	m.stopped = true
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
-			log.With("miner", m.MirID).Errorf("Could not close interceptor: %s", err)
+			log.With("validator", m.mirID).Errorf("Could not close interceptor: %s", err)
 		}
-		log.With("miner", m.MirID).Info("Interceptor closed")
+		log.With("validator", m.mirID).Info("Interceptor closed")
 	}
 
-	m.Net.Stop()
-	log.With("miner", m.MirID).Info("Network transport stopped")
+	m.net.Stop()
+	log.With("validator", m.mirID).Info("Network transport stopped")
 
 	close(m.stopCh)
-	m.MirNode.Stop()
-}
-
-// ID prints Manager ID.
-func (m *Manager) ID() string {
-	return m.Addr.String()
+	m.mirNode.Stop()
 }
 
 func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
-	return GetCheckpointByHeight(m.StateManager.ctx, m.ds, height, &params)
+	return GetCheckpointByHeight(m.stateManager.ctx, m.ds, height, &params)
 }
 
-// GetMessages extracts Filecoin messages from a Mir batch.
-func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
-	log.Infof("received a block with %d messages", len(msgs))
-	for _, tx := range batch.Messages {
+// GetSignedMessages extracts Filecoin signed messages from a Mir batch.
+func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMessage) {
+	log.With("validator", m.mirID).Infof("received a block with %d messages", len(msgs))
+	for _, tx := range mirMsgs {
 
 		input, err := parseTx(tx)
 		if err != nil {
-			log.Error("unable to decode a message in Mir block:", err)
+			log.With("validator", m.mirID).Error("unable to decode a message in Mir block:", err)
 			continue
 		}
 
@@ -304,66 +385,48 @@ func (m *Manager) GetMessages(batch *Batch) (msgs []*types.SignedMessage) {
 			// batch being processed, remove from mpool
 			found := m.Pool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
 			if !found {
-				log.Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
+				log.With("validator", m.mirID).
+					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
 				// TODO: If we try to remove something from the pool, we should remember that
 				// we already tried to remove that to avoid adding as it may lead to a dead-lock.
 				// FIFO should be updated because we don't have the support for in-flight supports.
 				// continue
 			}
 			msgs = append(msgs, msg)
-			log.Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
+			log.With("validator", m.mirID).Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
 		default:
-			log.Error("got unknown message type in a block")
+			log.With("validator", m.mirID).Error("unknown message type in a block")
 		}
 	}
 	return
 }
 
-func (m *Manager) TransportRequests(msgs []*types.SignedMessage) (
-	requests []*mirproto.Request,
-) {
+func (m *Manager) createTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
+	var requests []*mirproto.Request
 	requests = append(requests, m.batchSignedMessages(msgs)...)
-	return
-}
-
-func (m *Manager) ReconfigurationRequest(valset *ValidatorSet) *mirproto.Request {
-	var payload bytes.Buffer
-	if err := valset.MarshalCBOR(&payload); err != nil {
-		log.Error("unable to marshall config valset:", err)
-		return nil
-	}
-	r := mirproto.Request{
-		ClientId: m.MirID,
-		ReqNo:    m.reconfigurationNonce,
-		Type:     ReconfigurationType,
-		Data:     payload.Bytes(),
-	}
-	m.reconfigurationNonce++
-	return &r
+	return requests
 }
 
 // batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
-func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
-	requests []*mirproto.Request,
-) {
+func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*mirproto.Request) {
 	for _, msg := range msgs {
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
 		if !m.Pool.IsTargetRequest(clientID, nonce) {
-			log.Warnf("batchSignedMessage: target request not found for client ID")
+			log.With("validator", m.mirID).Warnf("batchSignedMessage: target request not found for client ID")
 			continue
 		}
 
 		data, err := MessageBytes(msg)
 		if err != nil {
-			log.Errorf("error in message bytes in batchSignedMessage: %s", err)
+			log.With("validator", m.mirID).Errorf("error in message bytes in batchSignedMessage: %s", err)
 			continue
 		}
 
 		r := &mirproto.Request{
 			ClientId: clientID,
 			ReqNo:    nonce,
-			Type:     TransportType,
+			Type:     TransportRequest,
 			Data:     data,
 		}
 
@@ -372,4 +435,20 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (
 		requests = append(requests, r)
 	}
 	return requests
+}
+
+func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirproto.Request {
+	var b bytes.Buffer
+	if err := set.MarshalCBOR(&b); err != nil {
+		log.With("validator", m.mirID).Errorf("unable to marshall validator set: %v", err)
+		return nil
+	}
+
+	r, err := m.confManager.NewTX(ConfigurationRequest, b.Bytes())
+	if err != nil {
+		log.With("validator", m.mirID).Errorf("unable to create configuration tx: %v", err)
+		return nil
+	}
+
+	return r
 }

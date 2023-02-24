@@ -56,6 +56,15 @@ func DecodeSignedMessage(data []byte) (*SignedMessage, error) {
 	return &msg, nil
 }
 
+func DecodeConfigurationMessage(data []byte) (*SignedMessage, error) {
+	var msg SignedMessage
+	if err := msg.UnmarshalCBOR(bytes.NewReader(data)); err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
+}
+
 func (sm *SignedMessage) Serialize() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := sm.MarshalCBOR(buf); err != nil {

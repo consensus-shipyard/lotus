@@ -20,13 +20,13 @@ tmux new-session -d -s "mir" \; \
         ./scripts/mir/daemon.sh 3" Enter \; \
   \
   send-keys -t "mir:1.0" "
-        ./scripts/mir/validator.sh 0" Enter \; \
+        ./scripts/mir/validator.sh 0 2>&1 | tee validator_0.log" Enter \; \
   send-keys -t "mir:1.1" "
-        ./scripts/mir/validator.sh 1" Enter \; \
+        ./scripts/mir/validator.sh 1 2>&1 | tee validator_1.log" Enter \; \
   send-keys -t "mir:1.2" "
-        ./scripts/mir/validator.sh 2" Enter \; \
+        ./scripts/mir/validator.sh 2 2>&1 | tee validator_2.log" Enter \; \
   send-keys -t "mir:1.3" "
-        ./scripts/mir/validator.sh 3" Enter \; \
+        ./scripts/mir/validator.sh 3 2>&1 | tee validator_3.log" Enter \; \
  attach-session -t "mir:0.3"
 
  pkill -f lotus

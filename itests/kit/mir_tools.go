@@ -2,6 +2,7 @@ package kit
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"time"
@@ -14,14 +15,21 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
 	testTimeout = 1200
 )
+
+// TempFileName generates a temporary filename for use in testing or whatever
+func TempFileName(suffix string) string {
+	randBytes := make([]byte, 8)
+	rand.Read(randBytes)
+	return suffix + "_" + hex.EncodeToString(randBytes) + ".json"
+}
 
 // CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current
 // height, if for some reason any of the nodes haven't seen a block
@@ -74,12 +82,21 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
 func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
-	timeout := time.After(5 * time.Second)
+	// one minute baseline timeout
+	timeout := 10 * time.Second
+	base, err := node.ChainHead(ctx)
+	if err != nil {
+		return err
+	}
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
+	after := time.After(timeout)
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-timeout:
+		case <-after:
 			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
 			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
@@ -127,6 +144,9 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 		// poll until we get the desired height.
 		// TODO: We may be able to add a slight sleep here if needed.
 		for head != height {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			base, err := api.ChainHead(ctx)
 			if err != nil {
 				return err
@@ -278,4 +298,11 @@ func NodeLibp2pAddr(h host.Host) (m multiaddr.Multiaddr, err error) {
 func RandomDelay(seconds int) {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
+}
+
+type fakeMembership struct {
+}
+
+func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
+	return nil, fmt.Errorf("no validators")
 }

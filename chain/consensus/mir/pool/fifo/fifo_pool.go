@@ -70,6 +70,7 @@ func (p *Pool) DeleteRequest(cid cid.Cid, nonce uint64) (ok bool) {
 
 	return
 }
+
 func (p *Pool) Purge() {
 	p.lk.Lock()
 	defer p.lk.Unlock()

@@ -8,10 +8,11 @@ import (
 
 func main() {
 	if err := gen.WriteTupleEncodersToFile("./cbor_gen.go", "mir",
-		mir.Validator{},
-		mir.ValidatorSet{},
 		mir.Checkpoint{},
 		mir.ParentMeta{},
+		mir.VoteRecord{},
+		mir.VotedValidator{},
+		mir.VoteRecords{},
 	); err != nil {
 		panic(err)
 	}
