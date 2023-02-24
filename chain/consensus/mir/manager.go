@@ -123,6 +123,10 @@ func NewManager(ctx context.Context,
 
 	// Create Mir modules.
 	netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(mirID), h, logger)
+	if err := netTransport.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start transport: %w", err)
+	}
+	netTransport.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
