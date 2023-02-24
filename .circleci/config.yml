@@ -234,7 +234,7 @@ jobs:
   test-mir-smoke:
     <<: *basic_test
 
-  test-consensus-unit:
+  test-chain-unit:
     <<: *basic_test
 
   test-mir-basic:
@@ -561,19 +561,15 @@ workflows:
       - mod-tidy-check
       - gofmt
       - gen-check
-      - test-consensus-unit:
-          name: consensus-unit-tests
+      - test-chain-unit:
+          name: chain-unit-tests
           suite: consensus
-          target: "./chain/consensus/..."
-          requires:
-            - lint-all
+          target: "./chain/types/... ./chain/consensus/..."
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 10m -run TestMirSmoke"
           target: "./itests/mir_test.go"
-          requires:
-            - consensus-unit-tests
       - test-mir-basic:
           name: mir-basic-tests
           suite: consensus
@@ -587,7 +583,7 @@ workflows:
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
           requires:
-            - mir-smoke-tests
+            - test-mir-basic
       - build-spacenet
       - build-all:
           filters:
@@ -620,15 +616,15 @@ workflows:
       - test-mir-with-mangler:
           name: mir-mangler-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 120m -run TestMirWithMangler"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout 120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
       - test-mir-basic:
           name: mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
