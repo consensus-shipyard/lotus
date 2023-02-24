@@ -25,7 +25,7 @@ func newManagerLogger(id string) *managerLogger {
 
 // Log logs a message with additional context.
 func (l *managerLogger) Log(level mirlogging.LogLevel, text string, args ...interface{}) {
-	// adding mirID to logs.
+	// adding id to logs.
 	args = append(args, []interface{}{"nodeID", l.id}...)
 
 	switch level {

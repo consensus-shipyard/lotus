@@ -21,5 +21,5 @@ type ModuleParams struct {
 type State struct {
 	// A channel is sent on this channel when Mir wants to notify Lotus
 	// that Mir is ready for the next batch of input transactions.
-	ToMir chan chan []*requestpb.Request
+	ToMirChan chan chan []*requestpb.Request
 }
