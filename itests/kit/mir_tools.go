@@ -16,6 +16,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -43,7 +44,7 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 	if len(checkedNodes) < 1 {
 		return fmt.Errorf("no checked nodes")
 	}
-	baseHead, err := baseNode.ChainHead(ctx)
+	baseHead, err := ChainHeadWithCtx(ctx, baseNode)
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
 	// one minute baseline timeout
 	timeout := 10 * time.Second
-	base, err := node.ChainHead(ctx)
+	base, err := ChainHeadWithCtx(ctx, node)
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 
 func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode) error {
 	// get base to determine the gap to sync and configure timeout.
-	base, err := api.ChainHead(ctx)
+	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return xerrors.Errorf("failed to get chain head: %w", err)
 	}
@@ -144,10 +145,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 		// poll until we get the desired height.
 		// TODO: We may be able to add a slight sleep here if needed.
 		for head != height {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			base, err := api.ChainHead(ctx)
+			base, err := ChainHeadWithCtx(ctx, api)
 			if err != nil {
 				return err
 			}
@@ -163,7 +161,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 }
 
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
-	base, err := api.ChainHead(ctx)
+	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return err
 	}
@@ -204,10 +202,7 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 	time.Sleep(800 * time.Millisecond)
 
 	for i, fn := range faultyNodes {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		ts, err := fn.FullNode.ChainHead(ctx)
+		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
 		if err != nil {
 			return err
 		}
@@ -223,10 +218,7 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 	}
 
 	for i, fn := range faultyNodes {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		ts, err := fn.FullNode.ChainHead(ctx)
+		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
 		if err != nil {
 			return err
 		}
@@ -312,4 +304,11 @@ type fakeMembership struct {
 
 func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
 	return nil, fmt.Errorf("no validators")
+}
+
+func ChainHeadWithCtx(ctx context.Context, api v1api.FullNode) (*types.TipSet, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return api.ChainHead(ctx)
 }
