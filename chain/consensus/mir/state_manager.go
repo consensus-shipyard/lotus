@@ -253,6 +253,9 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		}
 	}
 
+	if err := sm.ctx.Err(); err != nil {
+		return nil
+	}
 	base, err := sm.api.ChainHead(sm.ctx)
 	if err != nil {
 		return xerrors.Errorf("validator %v failed to get chain head: %w", sm.ValidatorID, err)
@@ -628,6 +631,9 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	defer log.With("validator", sm.ValidatorID).Debugf("waitForBlock @%v finished", height)
 
 	// get base to determine the gap to sync and configure timeout.
+	if err := sm.ctx.Err(); err != nil {
+		return nil
+	}
 	base, err := sm.api.ChainHead(sm.ctx)
 	if err != nil {
 		return xerrors.Errorf("failed to get chain head: %w", err)
