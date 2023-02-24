@@ -325,11 +325,11 @@ type FullNodeMethods struct {
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
+	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) `perm:"read"`
+
 	IPCReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) `perm:"read"`
 
 	IPCReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
-
-	IPCSubnetGenesisTemplate func(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) `perm:"read"`
 
 	MarketAddBalance func(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) `perm:"sign"`
 
@@ -2455,6 +2455,17 @@ func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 addre
 	return *new(cid.Cid), ErrNotSupported
 }
 
+func (s *FullNodeStruct) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
+	if s.Internal.IPCListChildSubnets == nil {
+		return *new([]gateway.Subnet), ErrNotSupported
+	}
+	return s.Internal.IPCListChildSubnets(p0, p1)
+}
+
+func (s *FullNodeStub) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
+	return *new([]gateway.Subnet), ErrNotSupported
+}
+
 func (s *FullNodeStruct) IPCReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
 	if s.Internal.IPCReadGatewayState == nil {
 		return nil, ErrNotSupported
@@ -2475,17 +2486,6 @@ func (s *FullNodeStruct) IPCReadSubnetActorState(p0 context.Context, p1 address.
 
 func (s *FullNodeStub) IPCReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
 	return nil, ErrNotSupported
-}
-
-func (s *FullNodeStruct) IPCSubnetGenesisTemplate(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
-	if s.Internal.IPCSubnetGenesisTemplate == nil {
-		return *new([]byte), ErrNotSupported
-	}
-	return s.Internal.IPCSubnetGenesisTemplate(p0, p1)
-}
-
-func (s *FullNodeStub) IPCSubnetGenesisTemplate(p0 context.Context, p1 sdk.SubnetID) ([]byte, error) {
-	return *new([]byte), ErrNotSupported
 }
 
 func (s *FullNodeStruct) MarketAddBalance(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) {

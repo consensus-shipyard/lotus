@@ -1556,6 +1556,21 @@ func (mr *MockFullNodeMockRecorder) IPCGetPrevCheckpointForChild(arg0, arg1, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetPrevCheckpointForChild", reflect.TypeOf((*MockFullNode)(nil).IPCGetPrevCheckpointForChild), arg0, arg1, arg2)
 }
 
+// IPCListChildSubnets mocks base method.
+func (m *MockFullNode) IPCListChildSubnets(arg0 context.Context, arg1 address.Address) ([]gateway.Subnet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCListChildSubnets", arg0, arg1)
+	ret0, _ := ret[0].([]gateway.Subnet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCListChildSubnets indicates an expected call of IPCListChildSubnets.
+func (mr *MockFullNodeMockRecorder) IPCListChildSubnets(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCListChildSubnets", reflect.TypeOf((*MockFullNode)(nil).IPCListChildSubnets), arg0, arg1)
+}
+
 // IPCReadGatewayState mocks base method.
 func (m *MockFullNode) IPCReadGatewayState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*gateway.State, error) {
 	m.ctrl.T.Helper()
@@ -1584,21 +1599,6 @@ func (m *MockFullNode) IPCReadSubnetActorState(arg0 context.Context, arg1 addres
 func (mr *MockFullNodeMockRecorder) IPCReadSubnetActorState(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCReadSubnetActorState", reflect.TypeOf((*MockFullNode)(nil).IPCReadSubnetActorState), arg0, arg1, arg2)
-}
-
-// IPCSubnetGenesisTemplate mocks base method.
-func (m *MockFullNode) IPCSubnetGenesisTemplate(arg0 context.Context, arg1 sdk.SubnetID) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IPCSubnetGenesisTemplate", arg0, arg1)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IPCSubnetGenesisTemplate indicates an expected call of IPCSubnetGenesisTemplate.
-func (mr *MockFullNodeMockRecorder) IPCSubnetGenesisTemplate(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCSubnetGenesisTemplate", reflect.TypeOf((*MockFullNode)(nil).IPCSubnetGenesisTemplate), arg0, arg1)
 }
 
 // LogAlerts mocks base method.
