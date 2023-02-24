@@ -583,7 +583,7 @@ workflows:
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
           requires:
-            - test-mir-basic
+            - mir-basic-tests
       - build-spacenet
       - build-all:
           filters:
