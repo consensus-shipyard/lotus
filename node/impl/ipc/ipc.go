@@ -157,6 +157,15 @@ func (a *IpcAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID
 
 }
 
+// IPCListChildSubnets lists information about all child subnets registered as childs from the current one.
+func (a *IpcAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	return st.ListSubnets(a.Chain.ActorStore(ctx))
+}
+
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
 //
 // The function accepts the address actor and the tipSetKet from which to read the state as an input, along

@@ -110,9 +110,9 @@
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
+  * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
   * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
-  * [IPCSubnetGenesisTemplate](#IPCSubnetGenesisTemplate)
 * [Log](#Log)
   * [LogAlerts](#LogAlerts)
   * [LogList](#LogList)
@@ -3222,6 +3222,79 @@ Response:
 }
 ```
 
+### IPCListChildSubnets
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234"
+]
+```
+
+Response:
+```json
+[
+  {
+    "ID": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
+    "Stake": "0",
+    "TopDownMsgs": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Nonce": 42,
+    "CircSupply": "0",
+    "Status": 0,
+    "PrevCheckpoint": {
+      "Data": {
+        "Source": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "TipSet": "Ynl0ZSBhcnJheQ==",
+        "Epoch": 10101,
+        "PrevCheck": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "Children": [
+          {
+            "Source": {
+              "Parent": "string value",
+              "Actor": "f01234"
+            },
+            "Checks": {
+              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+            }
+          }
+        ],
+        "CrossMsgs": [
+          {
+            "From": {
+              "Parent": "string value",
+              "Actor": "f01234"
+            },
+            "To": {
+              "Parent": "string value",
+              "Actor": "f01234"
+            },
+            "MsgsCID": {
+              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+            },
+            "Nonce": 42,
+            "Value": "0"
+          }
+        ]
+      },
+      "Sig": "Ynl0ZSBhcnJheQ=="
+    }
+  }
+]
+```
+
 ### IPCReadGatewayState
 
 
@@ -3328,23 +3401,6 @@ Response:
   "MinValidators": 42
 }
 ```
-
-### IPCSubnetGenesisTemplate
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  {
-    "Parent": "string value",
-    "Actor": "f01234"
-  }
-]
-```
-
-Response: `"Ynl0ZSBhcnJheQ=="`
 
 ## Log
 
