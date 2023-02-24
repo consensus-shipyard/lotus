@@ -215,7 +215,7 @@ jobs:
           command: |
             dates="$(date +%s)"
             mkdir -p /tmp/test-mir-interceptor/"$dates"
-            cp -R ./itests/mir-interceptor/* /tmp/test-mir-interceptor/"$dates"/
+            [ -d "./itests/mir-interceptor/" ] && cp -R ./itests/mir-interceptor/* /tmp/test-mir-interceptor/"$dates"/ || echo "Mir Interceptor directory not found"
           when: on_fail
       - store_test_results:
           path: /tmp/test-reports
