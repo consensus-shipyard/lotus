@@ -246,6 +246,15 @@ jobs:
   test-mir-reconfiguration:
     <<: *basic_test
 
+  nightly-test-mir-basic:
+    <<: *basic_test
+
+  nighly-test-mir-with-mangler:
+      <<: *basic_test
+
+  nightly-test-mir-reconfiguration:
+    <<: *basic_test
+
   test-conformance:
     description: |
       Run tests using a corpus of interoperable test vectors for Filecoin 
