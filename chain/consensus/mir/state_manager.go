@@ -627,46 +627,13 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 // The timeout to determine how much to wait before aborting is
 // determined by the number of blocks to sync.
 func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
-	log.With("validator", sm.ValidatorID).Debugf("waitForBlock @%v started", height)
-	defer log.With("validator", sm.ValidatorID).Debugf("waitForBlock @%v finished", height)
+	log.With("validator", sm.ValidatorID).Debugf("waitForBlock %v started", height)
+	defer log.With("validator", sm.ValidatorID).Debugf("waitForBlock %v finished", height)
 
-	// get base to determine the gap to sync and configure timeout.
-	if err := sm.ctx.Err(); err != nil {
-		return nil
+	if err := WaitForBlock(sm.ctx, height, sm.api); err != nil {
+		xerrors.Errorf("validator %v failed to wait for a block: %w", err)
 	}
-	base, err := sm.api.ChainHead(sm.ctx)
-	if err != nil {
-		return xerrors.Errorf("validator %v failed to get chain head: %w", sm.MirManager.lotusID, err)
-	}
-	head := base.Height()
-	if head >= height {
-		return nil
-	}
-	timeout := 60*time.Second + time.Duration(height-head)*time.Second
-	log.With("validator", sm.ValidatorID).Debugf("waiting for block on height %d with timeout %v", height, timeout)
-
-	after := time.NewTimer(timeout)
-	defer after.Stop()
-
-	// poll until we get the desired height.
-	// TODO: We may be able to add a slight sleep here if needed.
-	for {
-		select {
-		case <-sm.ctx.Done():
-			return CtxDoneWhileWaitingForBlockError{sm.MirManager.lotusID}
-		case <-after.C:
-			return TimerExceededWhileWaitingForBlockError{sm.MirManager.lotusID}
-		default:
-			if head >= height {
-				return nil
-			}
-			base, err := sm.api.ChainHead(sm.ctx)
-			if err != nil {
-				return xerrors.Errorf("validator %v failed to get chain head: %w", sm.MirManager.lotusID, err)
-			}
-			head = base.Height()
-		}
-	}
+	return nil
 }
 
 // get first checkpoint from genesis when a validator is restarted from scratch.
@@ -725,4 +692,43 @@ func parseTx(tx []byte) (interface{}, error) {
 	}
 
 	return msg, nil
+}
+
+func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode) error {
+	// get base to determine the gap to sync and configure timeout.
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
+	base, err := api.ChainHead(ctx)
+	if err != nil {
+		return err
+	}
+	head := base.Height()
+	if head >= height {
+		return nil
+	}
+	timeout := 60*time.Second + time.Duration(height-head)*time.Second
+
+	after := time.NewTimer(timeout)
+	defer after.Stop()
+
+	// poll until we get the desired height.
+	// TODO: We may be able to add a slight sleep here if needed.
+	for {
+		select {
+		case <-ctx.Done():
+			return xerrors.Errorf("context done while waiting for a snapshot")
+		case <-after.C:
+			return xerrors.Errorf("timer exceeded while waiting for a snapshot")
+		default:
+			if head >= height {
+				return nil
+			}
+			base, err := api.ChainHead(ctx)
+			if err != nil {
+				return err
+			}
+			head = base.Height()
+		}
+	}
 }

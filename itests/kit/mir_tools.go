@@ -12,11 +12,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -121,50 +121,12 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 	}
 }
 
-func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode) error {
-	// get base to determine the gap to sync and configure timeout.
-	base, err := ChainHeadWithCtx(ctx, api)
-	if err != nil {
-		return xerrors.Errorf("failed to get chain head: %w", err)
-	}
-
-	head := base.Height()
-	if head >= height {
-		return nil
-	}
-	timeout := 60*time.Second + time.Duration(height-head)*time.Second
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	g, ctx := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		// poll until we get the desired height.
-		// TODO: We may be able to add a slight sleep here if needed.
-		for head < height {
-			base, err := ChainHeadWithCtx(ctx, api)
-			if err != nil {
-				return err
-			}
-			head = base.Height()
-		}
-		return nil
-	})
-
-	return g.Wait()
-}
-
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
 	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return err
 	}
-	err = WaitForBlock(ctx, base.Height()+abi.ChainEpoch(n), api)
-	if err != nil {
-		return err
-	}
-	return nil
+	return mir.WaitForBlock(ctx, base.Height()+abi.ChainEpoch(n), api)
 }
 
 // AdvanceChain advances the chain and verifies that an amount of arbitrary blocks was added to
