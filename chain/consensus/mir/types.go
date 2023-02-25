@@ -34,12 +34,20 @@ const (
 	ConfigurationRequest = 0
 )
 
-type CtxCanceledWhileWaitingForBlockError struct {
+type CtxDoneWhileWaitingForBlockError struct {
 	Addr address.Address
 }
 
-func (e CtxCanceledWhileWaitingForBlockError) Error() string {
-	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.Addr)
+func (e CtxDoneWhileWaitingForBlockError) Error() string {
+	return fmt.Sprintf("validator %s context done while waiting for a snapshot", e.Addr)
+}
+
+type TimerExceededWhileWaitingForBlockError struct {
+	Addr address.Address
+}
+
+func (e TimerExceededWhileWaitingForBlockError) Error() string {
+	return fmt.Sprintf("validator %s timer exceeded while waiting for a snapshot", e.Addr)
 }
 
 type Config struct {

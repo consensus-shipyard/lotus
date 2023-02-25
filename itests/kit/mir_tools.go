@@ -128,12 +128,11 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 		return xerrors.Errorf("failed to get chain head: %w", err)
 	}
 
-	// one minute baseline timeout
-	timeout := 60 * time.Second
-	// add extra if the gap is big.
-	if base.Height() < height {
-		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	head := base.Height()
+	if head >= height {
+		return nil
 	}
+	timeout := 60*time.Second + time.Duration(height-head)*time.Second
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -141,18 +140,14 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api lapi.FullNode)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		head := abi.ChainEpoch(0)
 		// poll until we get the desired height.
 		// TODO: We may be able to add a slight sleep here if needed.
-		for head != height {
+		for head < height {
 			base, err := ChainHeadWithCtx(ctx, api)
 			if err != nil {
 				return err
 			}
 			head = base.Height()
-			if head > height {
-				break
-			}
 		}
 		return nil
 	})

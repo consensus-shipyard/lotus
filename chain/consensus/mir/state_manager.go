@@ -636,17 +636,15 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	}
 	base, err := sm.api.ChainHead(sm.ctx)
 	if err != nil {
-		return xerrors.Errorf("failed to get chain head: %w", err)
+		return xerrors.Errorf("validator %v failed to get chain head: %w", sm.MirManager.lotusID, err)
 	}
-
-	// one minute baseline timeout
-	timeout := 60 * time.Second
-	// add extra if the gap is big.
-	if base.Height() < height {
-		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	head := base.Height()
+	if head >= height {
+		return nil
 	}
+	timeout := 60*time.Second + time.Duration(height-head)*time.Second
 	log.With("validator", sm.ValidatorID).Debugf("waiting for block on height %d with timeout %v", height, timeout)
-	head := abi.ChainEpoch(0)
+
 	after := time.NewTimer(timeout)
 	defer after.Stop()
 
@@ -655,23 +653,18 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	for {
 		select {
 		case <-sm.ctx.Done():
-			return nil
+			return CtxDoneWhileWaitingForBlockError{sm.MirManager.lotusID}
 		case <-after.C:
-			return CtxCanceledWhileWaitingForBlockError{sm.MirManager.lotusID}
+			return TimerExceededWhileWaitingForBlockError{sm.MirManager.lotusID}
 		default:
-			if head == height {
+			if head >= height {
 				return nil
 			}
 			base, err := sm.api.ChainHead(sm.ctx)
 			if err != nil {
-				log.With("validator", sm.ValidatorID).Errorf("failed to get chain head: %v", err)
-				return nil
+				return xerrors.Errorf("validator %v failed to get chain head: %w", sm.MirManager.lotusID, err)
 			}
 			head = base.Height()
-			if head > height {
-				log.With("validator", sm.ValidatorID).Warnf("already have a larger head: waiting %d, head %d", height, head)
-				return nil
-			}
 		}
 	}
 }
