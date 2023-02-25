@@ -612,17 +612,17 @@ workflows:
               only:
                 - spacenet
     jobs:
-      - test-mir-with-mangler:
+      - nightly-test-mir-with-mangler:
           name: mir-mangler-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
-      - test-mir-basic:
+      - nightly-test-mir-basic:
           name: mir-basic-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
-      - test-mir-reconfiguration:
+      - nightly-test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
