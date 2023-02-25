@@ -617,7 +617,7 @@ func TestMirSmoke_AllNodesMine(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
-	err := kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes...)
+	err := kit.AdvanceChainNew(ctx, 10*TestedBlockNumber, miners, nodes)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)

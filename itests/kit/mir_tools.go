@@ -194,6 +194,25 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 	return g.Wait()
 }
 
+func AdvanceChainNew(ctx context.Context, blocks int, miners []*TestMiner, nodes []*TestFullNode) error {
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i, node := range nodes {
+		node := node
+		i := i
+		g.Go(func() error {
+			fmt.Printf(">>> node started advancing chain: %v\n", miners[i].mirAddr)
+			if err := ChainHeightCheckForBlocks(ctx, blocks, node); err != nil {
+				return err
+			}
+			fmt.Printf(">>> node finished advancing chain: %v\n", miners[i].mirAddr)
+			return nil
+		})
+	}
+
+	return g.Wait()
+}
+
 // NoProgressForFaultyNodes checks that the heights of the faulty nodes are not changed after advancing the chain.
 func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
 	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
