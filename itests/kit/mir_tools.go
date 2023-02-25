@@ -44,13 +44,14 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 	if len(checkedNodes) < 1 {
 		return fmt.Errorf("no checked nodes")
 	}
-	baseHead, err := ChainHeadWithCtx(ctx, baseNode)
+	base, err := ChainHeadWithCtx(ctx, baseNode)
 	if err != nil {
 		return err
 	}
 
-	for h := from; h <= baseHead.Height(); h++ {
+	for h := from; h <= base.Height(); h++ {
 		h := h
+
 		baseTipSet, err := baseNode.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
 		if err != nil {
 			return err
@@ -82,32 +83,35 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 }
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
-func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
-	// one minute baseline timeout
-	timeout := 10 * time.Second
-	base, err := ChainHeadWithCtx(ctx, node)
+func waitNodeInSync(ctx context.Context, targetHeight abi.ChainEpoch, targetTipSet *types.TipSet, api *TestFullNode) error {
+	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return err
 	}
-	if base.Height() < height {
-		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	d := 60 * time.Second
+	if base.Height() < targetHeight {
+		d = d + time.Duration(targetHeight-base.Height())*time.Second
 	}
-	after := time.After(timeout)
+	timeout := time.NewTimer(d)
+	defer timeout.Stop()
+
+	attempt := time.NewTicker(time.Second)
+	defer attempt.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-after:
-			return fmt.Errorf("timeout: failed to find tipset in node")
-		default:
-			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
+			return fmt.Errorf("waitNodeInSync: context canceled")
+		case <-timeout.C:
+			return fmt.Errorf("waitNodeInSync: timer exceeded")
+		case <-attempt.C:
+			ts, err := api.ChainGetTipSetByHeight(ctx, targetHeight, types.EmptyTSK)
 			if err != nil {
-				time.Sleep(1 * time.Second)
+				// we are not synced yet, so continue
 				continue
 			}
 			if ts.Height() < targetTipSet.Height() {
 				// we are not synced yet, so continue
-				time.Sleep(1 * time.Second)
 				continue
 			}
 			if ts.Height() != targetTipSet.Height() {

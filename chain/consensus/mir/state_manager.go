@@ -723,7 +723,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 
 		select {
 		case <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for a block")
+			return xerrors.Errorf("context cancelled while waiting for a block")
 		case <-timeout.C:
 			return xerrors.Errorf("timer exceeded while waiting for a block")
 		default:
