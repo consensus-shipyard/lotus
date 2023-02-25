@@ -249,7 +249,7 @@ jobs:
   nightly-test-mir-basic:
     <<: *basic_test
 
-  nighly-test-mir-with-mangler:
+  nightly-test-mir-with-mangler:
       <<: *basic_test
 
   nightly-test-mir-reconfiguration:
