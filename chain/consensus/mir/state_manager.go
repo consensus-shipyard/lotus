@@ -697,7 +697,7 @@ func parseTx(tx []byte) (interface{}, error) {
 func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode) error {
 	// get base to determine the gap to sync and configure timeout.
 	if err := ctx.Err(); err != nil {
-		return nil
+		return err
 	}
 	base, err := api.ChainHead(ctx)
 	if err != nil {
@@ -707,23 +707,26 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 	if head >= height {
 		return nil
 	}
-	timeout := 60*time.Second + time.Duration(height-head)*time.Second
 
-	after := time.NewTimer(timeout)
-	defer after.Stop()
+	// height > head
+
+	d := 60*time.Second + time.Duration(height-head)*time.Second
+	timeout := time.NewTimer(d)
+	defer timeout.Stop()
 
 	// poll until we get the desired height.
 	// TODO: We may be able to add a slight sleep here if needed.
 	for {
+		if head >= height {
+			return nil
+		}
+
 		select {
 		case <-ctx.Done():
-			return xerrors.Errorf("context done while waiting for a snapshot")
-		case <-after.C:
-			return xerrors.Errorf("timer exceeded while waiting for a snapshot")
+			return xerrors.Errorf("context done while waiting for a block")
+		case <-timeout.C:
+			return xerrors.Errorf("timer exceeded while waiting for a block")
 		default:
-			if head >= height {
-				return nil
-			}
 			base, err := api.ChainHead(ctx)
 			if err != nil {
 				return err
