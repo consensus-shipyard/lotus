@@ -88,7 +88,7 @@ func waitNodeInSync(ctx context.Context, targetHeight abi.ChainEpoch, targetTipS
 	if err != nil {
 		return err
 	}
-	d := 60 * time.Second
+	d := 180 * time.Second
 	if base.Height() < targetHeight {
 		d = d + time.Duration(targetHeight-base.Height())*time.Second
 	}

@@ -631,7 +631,7 @@ func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
 	defer log.With("validator", sm.ValidatorID).Debugf("waitForBlock %v finished", height)
 
 	if err := WaitForBlock(sm.ctx, height, sm.api); err != nil {
-		return xerrors.Errorf("validator %v failed to wait for a block: %w", err)
+		return xerrors.Errorf("validator %v failed to wait for a block: %w", sm.ValidatorID, err)
 	}
 	return nil
 }
@@ -710,7 +710,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 
 	// height > head
 
-	d := 60*time.Second + time.Duration(height-head)*time.Second
+	d := 180*time.Second + time.Duration(height-head)*time.Second
 	timeout := time.NewTimer(d)
 	defer timeout.Stop()
 
