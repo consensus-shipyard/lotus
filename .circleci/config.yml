@@ -556,6 +556,15 @@ workflows:
   version: 2.1
   ci:
     jobs:
+      - lint-all:
+          concurrency: "16"   # expend all docker 2xlarge CPUs.
+      - mod-tidy-check
+      - gofmt
+      - gen-check
+      - test-chain-unit:
+          name: chain-unit-tests
+          suite: consensus
+          target: "./chain/consensus/..."
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
@@ -568,7 +577,32 @@ workflows:
           target: "./itests/mir_test.go"
           requires:
             - mir-smoke-tests
-
+      - test-mir-reconfiguration:
+          name: mir-reconfiguration-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
+          target: "./itests/mir_test.go"
+          requires:
+            - mir-basic-tests
+      - build-spacenet
+      - build-all:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-macos:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      - build-appimage:
+          filters:
+            branches:
+              ignore:
+                - /.*/
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
   nightly:
     triggers:
       - schedule:
