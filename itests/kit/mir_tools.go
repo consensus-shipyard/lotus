@@ -98,12 +98,11 @@ func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *ty
 	if base.Height() < height {
 		d = d + time.Duration(height-base.Height())*time.Second
 	}
-	timeout := time.After(d * time.Second)
 
-	attempt := time.NewTicker(2 * time.Second)
-	defer attempt.Stop()
+	timeout := time.After(d)
 
 	for {
+		time.Sleep(3 * time.Second)
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("waitNodeInSync: context canceled")
