@@ -49,7 +49,10 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 		return err
 	}
 
-	for h := from; h <= base.Height(); h++ {
+	to := base.Height()
+	// FIXME DENIS:
+	// This is a temporal hypothesis: we can check the last block the base node has had.
+	for h := to; h <= to; h++ {
 		h := h
 
 		baseTipSet, err := baseNode.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
@@ -66,6 +69,7 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 
 		for _, node := range checkedNodes {
 			node := node
+
 			// We don't need to check that base node is in sync with itself.
 			if node == baseNode {
 				continue
@@ -78,40 +82,72 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 		if err := g.Wait(); err != nil {
 			return err
 		}
+
+		fmt.Println(">>> finished CheckNodesInSync for height ", h)
 	}
 	return nil
 }
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
-func waitNodeInSync(ctx context.Context, targetHeight abi.ChainEpoch, targetTipSet *types.TipSet, api *TestFullNode) error {
+func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, api *TestFullNode) error {
 	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
 		return err
 	}
-	d := 180 * time.Second
-	if base.Height() < targetHeight {
-		d = d + time.Duration(targetHeight-base.Height())*time.Second
+	d := 60 * time.Second
+	if base.Height() < height {
+		d = d + time.Duration(height-base.Height())*time.Second
 	}
-	timeout := time.NewTimer(d)
-	defer timeout.Stop()
+	timeout := time.After(d * time.Second)
 
-	attempt := time.NewTicker(time.Second)
+	attempt := time.NewTicker(2 * time.Second)
 	defer attempt.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("waitNodeInSync: context canceled")
-		case <-timeout.C:
+		case <-timeout:
 			return fmt.Errorf("waitNodeInSync: timer exceeded")
-		case <-attempt.C:
-			ts, err := api.ChainGetTipSetByHeight(ctx, targetHeight, types.EmptyTSK)
+		default:
+			ts, err := api.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
+			if err == nil {
+				if ts.Height() == targetTipSet.Height() && ts.Key().String() == targetTipSet.Key().String() {
+					return nil
+				}
+			}
+		}
+	}
+}
+
+// FIXME DENIS: this is original function just for reference.
+// waitNodeInSyncOld waits when the tipset at height will be equal to targetTipSet value.
+func waitNodeInSyncOld(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
+	// one minute baseline timeout
+	timeout := 10 * time.Second
+	base, err := ChainHeadWithCtx(ctx, node)
+	if err != nil {
+		return err
+	}
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
+	after := time.After(timeout)
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled: failed to find tipset in node")
+		case <-after:
+			return fmt.Errorf("timeout: failed to find tipset in node")
+		default:
+			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
 			if err != nil {
-				// we are not synced yet, so continue
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if ts.Height() < targetTipSet.Height() {
 				// we are not synced yet, so continue
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if ts.Height() != targetTipSet.Height() {

@@ -708,11 +708,10 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 		return nil
 	}
 
-	// height > head
+	// If we are on this line then height > head.
 
 	d := 180*time.Second + time.Duration(height-head)*time.Second
-	timeout := time.NewTimer(d)
-	defer timeout.Stop()
+	timeout := time.After(d)
 
 	// poll until we get the desired height.
 	// TODO: We may be able to add a slight sleep here if needed.
@@ -724,7 +723,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 		select {
 		case <-ctx.Done():
 			return xerrors.Errorf("context cancelled while waiting for a block")
-		case <-timeout.C:
+		case <-timeout:
 			return xerrors.Errorf("timer exceeded while waiting for a block")
 		default:
 			base, err := api.ChainHead(ctx)
