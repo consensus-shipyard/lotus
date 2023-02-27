@@ -34,7 +34,7 @@ func IncludeBatchCreation(
 
 	mpdsl.UponRequestBatch(m, func(origin *mempoolpb.RequestBatchOrigin) error {
 		inputChan := make(chan []*requestpb.Request)
-		state.ToMir <- inputChan
+		state.ReadyForTxsChan <- inputChan
 		receivedRequests := <-inputChan
 		mpdsl.RequestTransactionIDs(m, mc.Self, receivedRequests, &requestTxIDsContext{receivedRequests, origin})
 		return nil
