@@ -192,8 +192,25 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		if err != nil {
 			return xerrors.Errorf("error getting list of peers from daemon: %w", err)
 		}
+
 		if len(connPeers) == 0 {
-			return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
+			timeout := time.After(120 * time.Second)
+			attempt := time.NewTicker(500 * time.Millisecond)
+			defer attempt.Stop()
+
+		loop:
+			for {
+				select {
+				case <-attempt.C:
+					connPeers, err = sm.api.NetPeers(sm.ctx)
+					if err != nil {
+						return xerrors.Errorf("error getting list of peers from daemon: %w", err)
+					}
+					break loop
+				case <-timeout:
+					return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
+				}
+			}
 		}
 
 		for _, addr := range connPeers {

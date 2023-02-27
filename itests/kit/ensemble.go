@@ -71,6 +71,8 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/mock"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	mapi "github.com/filecoin-project/mir"
+	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	t "github.com/filecoin-project/mir/pkg/types"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	power3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/power"
 )
@@ -957,42 +959,27 @@ func (n *Ensemble) Disconnect(from api.Net, to ...api.Net) *Ensemble {
 }
 
 // DisconnectNodes disconnects one full from the provided full nodes.
-func (n *Ensemble) DisconnectNodes(from api.Net, to ...*TestFullNode) *Ensemble {
-	addr, err := from.NetAddrsListen(context.Background())
-	require.NoError(n.t, err)
-
-	for _, other := range to {
-		err = other.NetDisconnect(context.Background(), addr.ID)
-		require.NoError(n.t, err)
+func (n *Ensemble) DisconnectNodes(from []*TestFullNode, to []*TestFullNode) *Ensemble {
+	for _, src := range from {
+		for _, dst := range to {
+			n.Disconnect(src, dst)
+		}
 	}
 	return n
 }
 
-// DisconnectMirMiners disconnects Mir miners.
-func (n *Ensemble) DisconnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) context.CancelFunc {
-	rctx, cancel := context.WithCancel(context.Background())
-
+func (n *Ensemble) DisconnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) {
 	for _, m := range faultyMiners {
-		go func(rctx context.Context, m *TestMiner) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-rctx.Done():
-					return
-				default:
-
-				}
-				conns := m.mirHost.Network().Conns()
-				for _, c := range conns {
-					err := c.Close()
-					require.NoError(n.t, err)
-				}
-			}
-		}(rctx, m)
+		m.mirNet.Disable()
+		fmt.Println(">>>", m.mirAddr, " disconnected")
 	}
+}
 
-	return cancel
+func (n *Ensemble) ConnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) {
+	for _, m := range faultyMiners {
+		m.mirNet.Enable()
+		fmt.Println(">>>", m.mirAddr, " connected")
+	}
 }
 
 func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestMiner) []*BlockMiner {
@@ -1118,7 +1105,10 @@ func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Grou
 				SegmentLength: 1,
 				GroupName:     n.t.Name(),
 			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, nil, fakeMembership{}, &cfg)
+
+			var netLogger = mir.NewLogger(m.mirAddr.String())
+			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, nil, fakeMembership{}, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
 			}
@@ -1159,7 +1149,10 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 			if i > len(miners) && delay > 0 {
 				RandomDelay(delay)
 			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			var netLogger = mir.NewLogger(m.mirAddr.String())
+			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			m.mirNet = netTransport
+			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
 			}
@@ -1194,7 +1187,9 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
 			}
 			membership := validator.FileMembership{FileName: configFileName}
 
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			var netLogger = mir.NewLogger(m.mirAddr.String())
+			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
 			}
@@ -1224,7 +1219,9 @@ func (n *Ensemble) BeginMirMiningWithMembershipFromFile(
 			}
 			membership := validator.FileMembership{FileName: configFileName}
 
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			var netLogger = mir.NewLogger(m.mirAddr.String())
+			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
 			}
@@ -1260,7 +1257,9 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 			}
 			membership := validator.StringMembership(m.mirMembership)
 
-			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			var netLogger = mir.NewLogger(m.mirAddr.String())
+			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			err = mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}

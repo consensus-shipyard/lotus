@@ -8,23 +8,23 @@ import (
 
 const managerLoggerName = "mir-manager"
 
-var _ mirlogging.Logger = &managerLogger{}
+var _ mirlogging.Logger = &Logger{}
 
-// mirLogger implements Mir's Log interface.
-type managerLogger struct {
+// Logger implements Mir's Log interface.
+type Logger struct {
 	logger *ipfslogging.ZapEventLogger
 	id     string
 }
 
-func newManagerLogger(id string) *managerLogger {
-	return &managerLogger{
+func NewLogger(id string) *Logger {
+	return &Logger{
 		logger: ipfslogging.Logger(managerLoggerName),
 		id:     id,
 	}
 }
 
 // Log logs a message with additional context.
-func (l *managerLogger) Log(level mirlogging.LogLevel, text string, args ...interface{}) {
+func (l *Logger) Log(level mirlogging.LogLevel, text string, args ...interface{}) {
 	// adding mirID to logs.
 	args = append(args, []interface{}{"nodeID", l.id}...)
 
@@ -40,7 +40,7 @@ func (l *managerLogger) Log(level mirlogging.LogLevel, text string, args ...inte
 	}
 }
 
-func (l *managerLogger) MinLevel() mirlogging.LogLevel {
+func (l *Logger) MinLevel() mirlogging.LogLevel {
 	level := ipfslogging.GetConfig().SubsystemLevels[managerLoggerName]
 	switch level {
 	case ipfslogging.LevelDebug:
@@ -62,6 +62,6 @@ func (l *managerLogger) MinLevel() mirlogging.LogLevel {
 	}
 }
 
-func (l *managerLogger) IsConcurrent() bool {
+func (l *Logger) IsConcurrent() bool {
 	return true
 }

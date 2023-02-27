@@ -95,6 +95,7 @@ type TestMiner struct {
 	// Mir types
 	mirPrivKey    crypto.PrivKey
 	mirHost       host.Host
+	mirNet        *MockedTransport
 	mirAddr       address.Address
 	mirMultiAddr  []multiaddr.Multiaddr
 	stopMir       context.CancelFunc

@@ -943,7 +943,7 @@ func TestMirWithMangler_AllNodesMiningWithMessaging(t *testing.T) {
 	TestMirBasic_AllNodesMiningWithMessaging(t)
 }
 
-// TestMirBasic_WithFOmissionNodes tests that n − f nodes operate normally and can recover
+// TestMirBasic_WithFOmissionNodes tests that n − f nodes operate normally and the system can recover
 // if f nodes do not have access to network at the same time.
 func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -963,21 +963,22 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
-	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
+	t.Logf(">>> disconnecting %d nodes", MirFaultyValidatorNumber)
+	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[:MirFaultyValidatorNumber])
+	ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
-	restoreConnections := ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
-
-	for i := 0; i < 15; i++ {
-		time.Sleep(4 * time.Second)
-		err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
-		if err == nil {
-			break
-		}
+	for _, node := range nodes[:MirFaultyValidatorNumber] {
+		ps, err := node.NetPeers(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(ps))
 	}
+
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
-	t.Logf(">>> reconnecting %d Mir miners", MirFaultyValidatorNumber)
-	restoreConnections()
+	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)
+	ens.InterconnectFullNodes()
+	ens.ConnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
@@ -1209,23 +1210,19 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
-	t.Logf(">>> disconnecting %d Mir miners", MirFaultyValidatorNumber)
-	restoreConnections := ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
+	t.Logf(">>> disconnecting %d nodes", MirFaultyValidatorNumber)
+	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[:MirFaultyValidatorNumber])
+	ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
-	for i := 0; i < 15; i++ {
-		time.Sleep(4 * time.Second)
-		err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
-		if err == nil {
-			break
-		}
-	}
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
 	require.NoError(t, err)
 
-	t.Log(">>> restoring network connections")
-	restoreConnections()
+	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)
+	ens.InterconnectFullNodes()
+	ens.ConnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)

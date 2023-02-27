@@ -19,6 +19,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/mir/pkg/events"
+	"github.com/filecoin-project/mir/pkg/logging"
+	"github.com/filecoin-project/mir/pkg/net"
+	"github.com/filecoin-project/mir/pkg/net/libp2p"
+	"github.com/filecoin-project/mir/pkg/pb/eventpb"
+	"github.com/filecoin-project/mir/pkg/pb/messagepb"
+	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 const (
@@ -49,8 +56,9 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 		return err
 	}
 
+	var tss []*types.TipSet
 	to := base.Height()
-	// FIXME DENIS:
+	// FIXME DENIS: Ask Alfonso, review and change the description if approved.
 	// This is a temporal hypothesis: we can check the last block the base node has had.
 	for h := to; h <= to; h++ {
 		h := h
@@ -62,6 +70,8 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 		if baseTipSet.Height() != h {
 			return fmt.Errorf("couldn't find tipset for height %d in base node", h)
 		}
+
+		tss = append(tss, baseTipSet)
 
 		// TODO: We can probably parallelize the check for each node?
 
@@ -85,6 +95,16 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 
 		fmt.Println(">>> finished CheckNodesInSync for height ", h)
 	}
+
+	for _, node := range checkedNodes {
+		ts, err := node.ChainGetTipSetByHeight(ctx, to, types.EmptyTSK)
+		if err != nil {
+			return err
+		}
+		tss = append(tss, ts)
+	}
+
+	fmt.Println(">>>>> CheckNodesInSync artifacts:", tss)
 	return nil
 }
 
@@ -213,17 +233,14 @@ func AdvanceChainNew(ctx context.Context, blocks int, miners []*TestMiner, nodes
 func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
 	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
 
-	// Adding an initial buffer for peers to sync their chain head.
-	time.Sleep(800 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 
 	for i, fn := range faultyNodes {
 		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
 		if err != nil {
 			return err
 		}
-		if ts == nil {
-			return fmt.Errorf("nil tipset for an old block")
-		}
+		fmt.Println(">>> head", ts, ts.Height())
 		oldHeights[i] = ts.Height()
 	}
 
@@ -237,11 +254,10 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 		if err != nil {
 			return err
 		}
-		if ts == nil {
-			return fmt.Errorf("nil tipset for a new block")
-		}
+		fmt.Println(">>> head new", ts, ts.Height())
 		newHeight := ts.Height()
 		if newHeight != oldHeights[i] {
+			panic(22)
 			return fmt.Errorf("different heights for validator %d: new - %d, old - %d", i, newHeight, oldHeights[i])
 		}
 	}
@@ -326,4 +342,95 @@ func ChainHeadWithCtx(ctx context.Context, api v1api.FullNode) (*types.TipSet, e
 		return nil, ctx.Err()
 	}
 	return api.ChainHead(ctx)
+}
+
+var _ net.Transport = &MockedTransport{}
+
+func NewTransport(params libp2p.Params, ownID t.NodeID, h host.Host, logger logging.Logger) *MockedTransport {
+	tr := libp2p.NewTransport(params, ownID, h, logger)
+	return &MockedTransport{transport: tr, logger: logger, h: h}
+}
+
+type MockedTransport struct {
+	h            host.Host
+	transport    *libp2p.Transport
+	logger       logging.Logger
+	disconnected bool
+}
+
+func (m *MockedTransport) Start() error {
+	return m.transport.Start()
+}
+
+func (m *MockedTransport) Disable() {
+	m.h.RemoveStreamHandler("/mir/0.0.1")
+	conns := m.h.Network().Conns()
+	for _, c := range conns {
+		_ = c.Close() // nolint
+	}
+	m.disconnected = true
+}
+
+func (m *MockedTransport) Enable() {
+	m.disconnected = false
+	err := m.Start()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (m *MockedTransport) Stop() {
+	m.transport.Stop()
+}
+
+func (m *MockedTransport) Send(dest t.NodeID, msg *messagepb.Message) error {
+	if m.disconnected {
+		return nil // fmt.Errorf("no connection")
+	}
+	return m.transport.Send(dest, msg)
+}
+
+func (m *MockedTransport) Connect(nodes map[t.NodeID]t.NodeAddress) {
+	if m.disconnected {
+		return
+	}
+	m.transport.Connect(nodes)
+}
+
+func (m *MockedTransport) WaitFor(n int) {
+	m.transport.WaitFor(n)
+}
+
+// CloseOldConnections closes connections to the nodes that don't needed.
+func (m *MockedTransport) CloseOldConnections(newNodes map[t.NodeID]t.NodeAddress) {
+	m.transport.CloseOldConnections(newNodes)
+}
+
+func (m *MockedTransport) ImplementsModule() {}
+
+func (m *MockedTransport) ApplyEvents(ctx context.Context, eventList *events.EventList) error {
+	iter := eventList.Iterator()
+	for event := iter.Next(); event != nil; event = iter.Next() {
+
+		switch e := event.Type.(type) {
+		case *eventpb.Event_Init:
+			// no actions on init
+		case *eventpb.Event_SendMessage:
+			for _, destID := range e.SendMessage.Destinations {
+				if err := m.Send(t.NodeID(destID), e.SendMessage.Msg); err != nil {
+					m.logger.Log(logging.LevelWarn, "Failed to send a message", "dest", destID, "err", err)
+				}
+			}
+		default:
+			return fmt.Errorf("unexpected event: %T", event.Type)
+		}
+	}
+	return nil
+}
+
+func (m *MockedTransport) EventsOut() <-chan *events.EventList {
+	if m.disconnected {
+		return nil
+	}
+	return m.transport.EventsOut()
 }

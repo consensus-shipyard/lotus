@@ -11,7 +11,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -23,7 +22,7 @@ import (
 	"github.com/filecoin-project/mir/pkg/eventmangler"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
-	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	mirlibp2p "github.com/filecoin-project/mir/pkg/net"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -61,7 +60,7 @@ type Manager struct {
 	mirNode       *mir.Node
 	mirID         string
 	wal           *simplewal.WAL
-	net           net.Transport
+	netTransport  net.Transport
 	cryptoManager *CryptoManager
 	confManager   *ConfigurationManager
 	stateManager  *StateManager
@@ -81,7 +80,7 @@ type Manager struct {
 
 func NewManager(ctx context.Context,
 	addr address.Address,
-	h host.Host,
+	netTransport mirlibp2p.Transport,
 	api v1api.FullNode,
 	ds db.DB,
 	membership validator.Reader,
@@ -119,10 +118,10 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to find its identity in membership", mirID)
 	}
 
-	logger := newManagerLogger(mirID)
+	logger := NewLogger(mirID)
 
 	// Create Mir modules.
-	netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(mirID), h, logger)
+	// netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(mirID), transport, logger)
 	if err := netTransport.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
@@ -149,7 +148,7 @@ func NewManager(ctx context.Context,
 		mirID:               mirID,
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
-		net:                 netTransport,
+		netTransport:        netTransport,
 		ds:                  ds,
 		initialValidatorSet: initialValidatorSet,
 		mirReady:            make(chan chan []*mirproto.Request),
@@ -354,7 +353,7 @@ func (m *Manager) Stop() {
 		log.With("validator", m.mirID).Info("Interceptor closed")
 	}
 
-	m.net.Stop()
+	m.netTransport.Stop()
 	log.With("validator", m.mirID).Info("Network transport stopped")
 
 	close(m.stopCh)
@@ -389,7 +388,7 @@ func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMess
 				// continue
 			}
 			msgs = append(msgs, msg)
-			log.With("validator", m.mirID).Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
+			log.With("validator", m.mirID).Debugf("got message: to=%s, nonce=%d", msg.Message.To, msg.Message.Nonce)
 		default:
 			log.With("validator", m.mirID).Error("unknown message type in a block")
 		}
