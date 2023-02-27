@@ -9,6 +9,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -29,6 +30,9 @@ import (
 var (
 	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
 	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
+
+	PeerDiscoveryInterval = 300 * time.Millisecond
+	PeerDiscoveryTimeout  = 3 * time.Minute
 )
 
 type Message []byte
@@ -125,6 +129,45 @@ func NewStateManager(
 	return &sm, nil
 }
 
+// syncFromPeers sync the chain from Filecoin peers.
+func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
+	// From all the peers of my daemon try to get the latest tipset.
+	timeout := time.After(PeerDiscoveryTimeout)
+	attempt := time.NewTicker(PeerDiscoveryInterval)
+	defer attempt.Stop()
+
+	var connPeers []peer.AddrInfo
+	for len(connPeers) == 0 {
+		connPeers, err = sm.api.NetPeers(sm.ctx)
+		if err != nil {
+			return xerrors.Errorf("failed to get peers: %w", err)
+		}
+		select {
+		case <-timeout:
+			return xerrors.Errorf("no connection with other Filecoin peers, can't sync my daemon")
+		case <-attempt.C:
+		}
+	}
+
+	for _, addr := range connPeers {
+		ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, addr.ID, tsk)
+		if err != nil {
+			log.With("validator", sm.ValidatorID).Errorf("error fetching latest tipset from peer %s: %v", addr.ID, err)
+			continue
+		}
+		// wait for full-sync before returning from restoreState.
+		err = sm.waitForBlock(ts.Height())
+		if err != nil {
+			log.With("validator", sm.ValidatorID).Warnf("RestoreState: failed to wait for block %d: %v", ts.Height(), err)
+			continue
+		}
+		return nil
+	}
+
+	// if we couldn't find any valid peer or validator to sync from, just abort.
+	return xerrors.Errorf("couldn't sync from peers")
+}
+
 // RestoreState is called by Mir when the validator goes out-of-sync, and it requires
 // lotus to sync from the latest checkpoint. Mir provides lotus with the latest
 // checkpoint and from this:
@@ -167,7 +210,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
-	ch := &Checkpoint{}
+	var ch Checkpoint
 	if len(snapshot) > 0 {
 		// get checkpoint from snapshot.
 		err := ch.FromBytes(snapshot)
@@ -186,60 +229,15 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 			return xerrors.Errorf("validator %v couldn't purge state to recover from checkpoint: %w", sm.ValidatorID, err)
 		}
 
-		internalSync := false
-		// From all the peers of my daemon try to get the latest tipset.
-		connPeers, err := sm.api.NetPeers(sm.ctx)
-		if err != nil {
-			return xerrors.Errorf("error getting list of peers from daemon: %w", err)
-		}
-
-		if len(connPeers) == 0 {
-			timeout := time.After(120 * time.Second)
-			attempt := time.NewTicker(500 * time.Millisecond)
-			defer attempt.Stop()
-
-		loop:
-			for {
-				select {
-				case <-attempt.C:
-					connPeers, err = sm.api.NetPeers(sm.ctx)
-					if err != nil {
-						return xerrors.Errorf("error getting list of peers from daemon: %w", err)
-					}
-					break loop
-				case <-timeout:
-					return xerrors.Errorf("no connection with other filecoin peers, can't sync my daemon")
-				}
-			}
-		}
-
-		for _, addr := range connPeers {
-			log.With("validator", sm.ValidatorID).Infof("Trying to sync up to height %d from peer %s", ch.Height, addr.ID)
-			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, addr.ID, types.NewTipSetKey(ch.BlockCids[0]))
-			if err != nil {
-				log.With("validator", sm.ValidatorID).Errorf("error fetching latest tipset from peer %s: %v", addr.ID, err)
-				continue
-			}
-			// wait for full-sync before returning from restoreState.
-			err = sm.waitForBlock(ts.Height())
-			if err != nil {
-				return xerrors.Errorf("RestoreState: validator %v failed to wait for next block %d: %w", sm.ValidatorID, ts.Height(), err)
-			}
-			internalSync = true
-		}
-
-		// if we couldn't find any valid peer or validator to sync from, just abort.
-		if !internalSync {
-			return xerrors.Errorf("validator %v couldn't find any good peers to sync from", sm.ValidatorID)
-		} else {
-			log.With("validator", sm.ValidatorID).Infof("synced to height %d", ch.Height)
+		if err = sm.syncFromPeers(types.NewTipSetKey(ch.BlockCids[0])); err != nil {
+			return xerrors.Errorf("validator %v couldn't sync from peers to recover from checkpoint at %d: %w", sm.ValidatorID, ch.Height, err)
 		}
 
 		// once synced we deliver the checkpoint to our mining process, so it can be
 		// included in the next block (as the rest of Mir validators will do before
 		// accepting the next batch), and we persist it locally.
 		log.With("validator", sm.ValidatorID).Infof("Delivering checkpoint for height %d to mining process after sync", ch.Height)
-		err = sm.deliverCheckpoint(checkpoint, ch)
+		err = sm.deliverCheckpoint(checkpoint, &ch)
 		if err != nil {
 			return xerrors.Errorf("validator %v failed to deliver checkpoint to lotus from mir after restoreState: %w", sm.ValidatorID, err)
 		}

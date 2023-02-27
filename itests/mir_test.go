@@ -964,7 +964,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d nodes", MirFaultyValidatorNumber)
-	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[:MirFaultyValidatorNumber])
+	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[MirFaultyValidatorNumber:])
 	ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	for _, node := range nodes[:MirFaultyValidatorNumber] {
@@ -1211,7 +1211,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	require.NoError(t, err)
 
 	t.Logf(">>> disconnecting %d nodes", MirFaultyValidatorNumber)
-	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[:MirFaultyValidatorNumber])
+	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[MirFaultyValidatorNumber:])
 	ens.DisconnectMirMiners(ctx, miners[:MirFaultyValidatorNumber])
 
 	t.Logf(">>> delay")
