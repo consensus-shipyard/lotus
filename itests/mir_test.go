@@ -34,7 +34,7 @@ const (
 	MirHonestValidatorNumber = MirTotalValidatorNumber - MirFaultyValidatorNumber
 	MirLearnersNumber        = MirFaultyValidatorNumber + 1
 	TestedBlockNumber        = 10
-	MaxDelay                 = 30
+	MaxDelay                 = 15
 )
 
 var mirTestOpts = []interface{}{kit.ThroughRPC(), kit.MirConsensus()}
