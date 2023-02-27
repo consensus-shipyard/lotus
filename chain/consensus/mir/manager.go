@@ -359,38 +359,6 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 	return GetCheckpointByHeight(m.stateManager.ctx, m.ds, height, &params)
 }
 
-// GetSignedMessages extracts Filecoin signed messages from a Mir batch.
-func (m *Manager) GetSignedMessages(mirMsgs []Message) (msgs []*types.SignedMessage) {
-	log.With("validator", m.id).Infof("received a block with %d messages", len(msgs))
-	for _, tx := range mirMsgs {
-
-		input, err := parseTx(tx)
-		if err != nil {
-			log.With("validator", m.id).Error("unable to decode a message in Mir block:", err)
-			continue
-		}
-
-		switch msg := input.(type) {
-		case *types.SignedMessage:
-			// batch being processed, remove from mpool
-			found := m.requestPool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
-			if !found {
-				log.With("validator", m.id).
-					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
-				// TODO: If we try to remove something from the pool, we should remember that
-				// we already tried to remove that to avoid adding as it may lead to a dead-lock.
-				// FIFO should be updated because we don't have the support for in-flight supports.
-				// continue
-			}
-			msgs = append(msgs, msg)
-			log.With("validator", m.id).Infof("got message: to=%s, nonce= %d", msg.Message.To, msg.Message.Nonce)
-		default:
-			log.With("validator", m.id).Error("unknown message type in a block")
-		}
-	}
-	return
-}
-
 func (m *Manager) createTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
 	var requests []*mirproto.Request
 	requests = append(requests, m.batchSignedMessages(msgs)...)
