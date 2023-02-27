@@ -92,8 +92,6 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 		if err := g.Wait(); err != nil {
 			return err
 		}
-
-		fmt.Println(">>> finished CheckNodesInSync for height ", h)
 	}
 
 	for _, node := range checkedNodes {
@@ -213,15 +211,12 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 func AdvanceChainNew(ctx context.Context, blocks int, miners []*TestMiner, nodes []*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	for i, node := range nodes {
+	for _, node := range nodes {
 		node := node
-		i := i
 		g.Go(func() error {
-			fmt.Printf(">>> node started advancing chain: %v\n", miners[i].mirAddr)
 			if err := ChainHeightCheckForBlocks(ctx, blocks, node); err != nil {
 				return err
 			}
-			fmt.Printf(">>> node finished advancing chain: %v\n", miners[i].mirAddr)
 			return nil
 		})
 	}
@@ -240,7 +235,6 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 		if err != nil {
 			return err
 		}
-		fmt.Println(">>> head", ts, ts.Height())
 		oldHeights[i] = ts.Height()
 	}
 
@@ -254,10 +248,8 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 		if err != nil {
 			return err
 		}
-		fmt.Println(">>> head new", ts, ts.Height())
 		newHeight := ts.Height()
 		if newHeight != oldHeights[i] {
-			panic(22)
 			return fmt.Errorf("different heights for validator %d: new - %d, old - %d", i, newHeight, oldHeights[i])
 		}
 	}
