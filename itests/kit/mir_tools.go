@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	testTimeout = 1200
+	MessageWaitTimeout = 1200 * time.Second
 )
 
 // TempFileName generates a temporary filename for use in testing or whatever
@@ -265,9 +265,10 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 // `StateWaitMsg` fails. This wrapper in `strict=false` disregards errors from `StateWaitMsg` for a
 // specific timeout.
 func WaitForMessageWithAvailable(ctx context.Context, n *TestFullNode, c cid.Cid, strict bool) error {
+	after := time.After(MessageWaitTimeout)
 	for {
 		select {
-		case <-time.After(testTimeout * time.Second):
+		case <-after:
 			return fmt.Errorf("WaitForMessageWithAvailable timeout expired")
 		default:
 

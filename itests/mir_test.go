@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -885,6 +886,12 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+
+	var cids []cid.Cid
 	for range nodes {
 		rand.Seed(time.Now().UnixNano())
 		j := rand.Intn(len(nodes))
@@ -902,8 +909,16 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 			Value: big.Zero(),
 		}, nil)
 		require.NoError(t, err)
+		cids = append(cids, smsg.Cid())
+	}
 
-		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+
+	for _, id := range cids {
+		err = kit.MirNodesWaitMsg(ctx, id, nodes[0])
 		require.NoError(t, err)
 	}
 }

@@ -642,11 +642,11 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 // The timeout to determine how much to wait before aborting is
 // determined by the number of blocks to sync.
 func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
-	log.With("validator", sm.ValidatorID).Debugf("waitForBlock %v started", height)
-	defer log.With("validator", sm.ValidatorID).Debugf("waitForBlock %v finished", height)
+	log.With("validator", sm.ValidatorID).Infof("waitForBlock %v started", height)
+	defer log.With("validator", sm.ValidatorID).Infof("waitForBlock %v finished", height)
 
 	if err := WaitForBlock(sm.ctx, height, sm.api); err != nil {
-		return xerrors.Errorf("validator %v failed to wait for a block: %w", sm.ValidatorID, err)
+		return xerrors.Errorf("failed to wait for a block: %w", err)
 	}
 	return nil
 }
