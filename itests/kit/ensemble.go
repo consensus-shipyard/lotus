@@ -1087,10 +1087,7 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Grou
 }
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{})
-	// once validators start mining mark the network as bootstrapped so no
-	// new genesis are generated.
-	n.Bootstrapped()
+	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{MembershipType: StringMembership})
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
@@ -1105,8 +1102,14 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	miners []*TestMiner,
 	faultyMiners ...*TestMiner,
 ) {
-	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{Delay: delay}, faultyMiners...)
+	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{Delay: delay, MembershipType: StringMembership}, faultyMiners...)
 }
+
+const (
+	FakeMembership   = 0
+	StringMembership = 1
+	FileMembership   = 2
+)
 
 type MiningConfig struct {
 	Delay              int
@@ -1137,13 +1140,16 @@ func (n *Ensemble) BeginMirMiningMax(
 		g.Go(func() error {
 
 			switch config.MembershipType {
-			case 0:
+			case FakeMembership:
 				membership = fakeMembership{}
-			case 1:
+			case StringMembership:
 				ms := n.fixedMirMembership(append(miners, faultyMiners...)...)
 				membership = validator.StringMembership(ms)
 				m.mirMembership = ms
-			case 2:
+			case FileMembership:
+				if config.MembershipFileName == "" {
+					return fmt.Errorf("membership file is not specified")
+				}
 				membership = validator.FileMembership{FileName: config.MembershipFileName}
 			default:
 				return fmt.Errorf("unknown membership type")
@@ -1181,6 +1187,10 @@ func (n *Ensemble) BeginMirMiningMax(
 			return err
 		})
 	}
+
+	// once validators start mining mark the network as bootstrapped so no
+	// new genesis are generated.
+	n.Bootstrapped()
 }
 
 func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
