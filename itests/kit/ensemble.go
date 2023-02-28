@@ -1087,7 +1087,7 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Grou
 }
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{MembershipType: StringMembership})
+	n.BeginMirMiningWithConfig(ctx, g, miners, &MiningConfig{MembershipType: StringMembership})
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
@@ -1102,7 +1102,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	miners []*TestMiner,
 	faultyMiners ...*TestMiner,
 ) {
-	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{Delay: delay, MembershipType: StringMembership}, faultyMiners...)
+	n.BeginMirMiningWithConfig(ctx, g, miners, &MiningConfig{Delay: delay, MembershipType: StringMembership}, faultyMiners...)
 }
 
 const (
@@ -1120,7 +1120,7 @@ type MiningConfig struct {
 	MockedTransport    bool
 }
 
-func (n *Ensemble) BeginMirMiningMax(
+func (n *Ensemble) BeginMirMiningWithConfig(
 	ctx context.Context,
 	g *errgroup.Group,
 	miners []*TestMiner,

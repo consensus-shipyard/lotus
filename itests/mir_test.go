@@ -80,7 +80,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[:MirTotalValidatorNumber],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[:MirTotalValidatorNumber],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -98,7 +98,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
 	// Start new miners.
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[MirTotalValidatorNumber:],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[MirTotalValidatorNumber:],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -173,7 +173,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[:MirTotalValidatorNumber],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[:MirTotalValidatorNumber],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -191,7 +191,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
 	// Start new miners.
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[MirTotalValidatorNumber:],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[MirTotalValidatorNumber:],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -267,7 +267,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
 	ens.InterconnectFullNodes()
-	ens.BeginMirMiningMax(ctx, g, miners[:MirTotalValidatorNumber], &kit.MiningConfig{
+	ens.BeginMirMiningWithConfig(ctx, g, miners[:MirTotalValidatorNumber], &kit.MiningConfig{
 		MembershipType:     kit.FileMembership,
 		MembershipFileName: membershipFileName,
 		Databases:          dbs[:MirTotalValidatorNumber],
@@ -315,7 +315,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	// Start new miners.
 	ens.InterconnectFullNodes()
 
-	ens.BeginMirMiningMax(ctx, g, miners[MirTotalValidatorNumber:], &kit.MiningConfig{
+	ens.BeginMirMiningWithConfig(ctx, g, miners[MirTotalValidatorNumber:], &kit.MiningConfig{
 		MembershipType:     kit.FileMembership,
 		MembershipFileName: membershipFileName,
 		Databases:          dbs[MirTotalValidatorNumber:],
@@ -389,13 +389,13 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 	// Run validators, including the added validator.
 	ens.InterconnectFullNodes()
 	for i := 0; i < MirTotalValidatorNumber; i++ {
-		ens.BeginMirMiningMax(ctx, g, []*kit.TestMiner{miners[i]}, &kit.MiningConfig{
+		ens.BeginMirMiningWithConfig(ctx, g, []*kit.TestMiner{miners[i]}, &kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFiles[i],
 		})
 	}
 
-	ens.BeginMirMiningMax(ctx, g, miners[MirTotalValidatorNumber:], &kit.MiningConfig{
+	ens.BeginMirMiningWithConfig(ctx, g, miners[MirTotalValidatorNumber:], &kit.MiningConfig{
 		MembershipType:     kit.FileMembership,
 		MembershipFileName: membershipFiles[MirTotalValidatorNumber],
 	})
@@ -452,7 +452,7 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, initialValidatorNumber, membership.Size())
 
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[:initialValidatorNumber],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[:initialValidatorNumber],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -469,7 +469,7 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, initialValidatorNumber+addedValidatorNumber, membership.Size())
 	// Start new miners.
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[initialValidatorNumber:],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[initialValidatorNumber:],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -510,7 +510,7 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[:MirTotalValidatorNumber],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[:MirTotalValidatorNumber],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -532,7 +532,7 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 		require.Equal(t, MirTotalValidatorNumber+i-1, len(nodes[1:MirTotalValidatorNumber+i]))
 
 		// Start new miners.
-		ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, []*kit.TestMiner{miners[MirTotalValidatorNumber+i-1]},
+		ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, []*kit.TestMiner{miners[MirTotalValidatorNumber+i-1]},
 			&kit.MiningConfig{
 				MembershipType:     kit.FileMembership,
 				MembershipFileName: membershipFileName,
@@ -573,7 +573,7 @@ func TestMirReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber+MirFaultyValidatorNumber, mirTestOpts...)
 	ens.SaveValidatorSetToFile(0, membershipFileName, miners[:MirTotalValidatorNumber]...)
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners[:MirTotalValidatorNumber],
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners[:MirTotalValidatorNumber],
 		&kit.MiningConfig{
 			MembershipType:     kit.FileMembership,
 			MembershipFileName: membershipFileName,
@@ -1024,9 +1024,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
-
-	ens.BeginMirMiningMax(ctx, g, miners, &kit.MiningConfig{
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners, &kit.MiningConfig{
 		MembershipType:  kit.StringMembership,
 		MockedTransport: true,
 	})
@@ -1180,7 +1178,7 @@ func TestMirSmoke_StopWithError(t *testing.T) {
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMiningMax(ctx, g, miners, &kit.MiningConfig{
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners, &kit.MiningConfig{
 		MembershipType: kit.FakeMembership,
 	})
 
@@ -1278,7 +1276,12 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	}()
 
 	nodes, miners, ens := kit.EnsembleMirNodes(t, MirTotalValidatorNumber, mirTestOpts...)
-	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, miners,
+		&kit.MiningConfig{
+			MembershipType:  kit.StringMembership,
+			MockedTransport: true,
+		},
+	)
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
