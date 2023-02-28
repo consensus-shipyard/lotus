@@ -584,15 +584,11 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
-          requires:
-            - mir-smoke-tests
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
-          requires:
-            - mir-basic-tests
       - build-spacenet
       - build-all:
           filters:
