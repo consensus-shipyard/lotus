@@ -71,6 +71,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/mock"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	mapi "github.com/filecoin-project/mir"
+	mirlibp2p2 "github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	t "github.com/filecoin-project/mir/pkg/types"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
@@ -1086,35 +1087,10 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Grou
 }
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelay(ctx, g, 0, miners...)
+	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{})
 	// once validators start mining mark the network as bootstrapped so no
 	// new genesis are generated.
 	n.Bootstrapped()
-}
-
-// BeginMirMiningWithError simulates an error in Mine function.
-func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	for _, m := range miners {
-		m := m
-
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
-
-		g.Go(func() error {
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-
-			var netLogger = mir.NewLogger(m.mirAddr.String())
-			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
-			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, nil, fakeMembership{}, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return nil
-			}
-			return err
-		})
-	}
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
@@ -1129,7 +1105,25 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	miners []*TestMiner,
 	faultyMiners ...*TestMiner,
 ) {
-	membershipString := n.fixedMirMembership(append(miners, faultyMiners...)...)
+	n.BeginMirMiningMax(ctx, g, miners, &MiningConfig{Delay: delay}, faultyMiners...)
+}
+
+type MiningConfig struct {
+	Delay              int
+	MembershipFileName string
+	MembershipType     int
+	MembershipFilename string
+	Databases          []*TestDB
+	MockedTransport    bool
+}
+
+func (n *Ensemble) BeginMirMiningMax(
+	ctx context.Context,
+	g *errgroup.Group,
+	miners []*TestMiner,
+	config *MiningConfig,
+	faultyMiners ...*TestMiner,
+) {
 
 	for i, m := range append(miners, faultyMiners...) {
 		i := i
@@ -1138,89 +1132,48 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 		ctx, cancel := context.WithCancel(ctx)
 		m.stopMir = cancel
 
-		g.Go(func() error {
-			m.mirMembership = membershipString
-			m.mirDB = NewTestDB()
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-			membership := validator.StringMembership(membershipString)
-			if i > len(miners) && delay > 0 {
-				RandomDelay(delay)
-			}
-			var netLogger = mir.NewLogger(m.mirAddr.String())
-			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
-			m.mirNet = netTransport
-			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return nil
-			}
-			return err
-		})
-	}
-}
-
-func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
-	ctx context.Context,
-	configFileName string,
-	g *errgroup.Group,
-	db []*TestDB,
-	miners []*TestMiner,
-) {
-	for i, m := range miners {
-		i := i
-		m := m
-
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
+		var membership validator.Reader
 
 		g.Go(func() error {
-			if db != nil && db[i] != nil {
-				m.mirDB = db[i]
+
+			switch config.MembershipType {
+			case 0:
+				membership = fakeMembership{}
+			case 1:
+				ms := n.fixedMirMembership(append(miners, faultyMiners...)...)
+				membership = validator.StringMembership(ms)
+				m.mirMembership = ms
+			case 2:
+				membership = validator.FileMembership{FileName: config.MembershipFileName}
+			default:
+				return fmt.Errorf("unknown membership type")
+
+			}
+
+			if config.Databases != nil && config.Databases[i] != nil {
+				m.mirDB = config.Databases[i]
 			} else {
-				return fmt.Errorf("unable to find DB for miner %v", m)
+				m.mirDB = NewTestDB()
 			}
+
 			cfg := mir.Config{
 				SegmentLength: 1,
 				GroupName:     n.t.Name(),
 			}
-			membership := validator.FileMembership{FileName: configFileName}
 
-			var netLogger = mir.NewLogger(m.mirAddr.String())
-			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
-			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return nil
+			if i > len(miners) && config.Delay > 0 {
+				RandomDelay(config.Delay)
 			}
-			return err
-		})
-	}
-}
 
-func (n *Ensemble) BeginMirMiningWithMembershipFromFile(
-	ctx context.Context,
-	configFileName string,
-	g *errgroup.Group,
-	miners []*TestMiner,
-	faultyMiners ...*TestMiner,
-) {
-	for _, m := range append(miners, faultyMiners...) {
-		m := m
-
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
-
-		g.Go(func() error {
-			m.mirDB = NewTestDB()
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-			membership := validator.FileMembership{FileName: configFileName}
-
+			var netTransport mirlibp2p2.Transport
 			var netLogger = mir.NewLogger(m.mirAddr.String())
-			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			if config.MockedTransport {
+				m.mirNet = NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+				netTransport = mirlibp2p2.Transport(m.mirNet)
+			} else {
+				netTransport = mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.mirAddr.String()), m.mirHost, netLogger)
+			}
+
 			err := mir.Mine(ctx, m.mirAddr, netTransport, m.FullNode, m.mirDB, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
