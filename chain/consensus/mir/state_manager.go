@@ -127,7 +127,7 @@ func NewStateManager(
 	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
 
 	return &sm, nil
-}g
+}
 
 // syncFromPeers sync the chain from Filecoin peers.
 func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
