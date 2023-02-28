@@ -127,7 +127,7 @@ func NewStateManager(
 	sm.prevCheckpoint = ParentMeta{Height: ch.Height, Cid: c}
 
 	return &sm, nil
-}
+}g
 
 // syncFromPeers sync the chain from Filecoin peers.
 func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
@@ -138,15 +138,16 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 
 	var connPeers []peer.AddrInfo
 	for len(connPeers) == 0 {
-		connPeers, err = sm.api.NetPeers(sm.ctx)
-		if err != nil {
-			return xerrors.Errorf("failed to get peers: %w", err)
-		}
 		select {
 		case <-timeout:
 			return xerrors.Errorf("no connection with other Filecoin peers, can't sync my daemon")
 		case <-attempt.C:
+			connPeers, err = sm.api.NetPeers(sm.ctx)
+			if err != nil {
+				return xerrors.Errorf("failed to get peers: %w", err)
+			}
 		}
+		fmt.Println(">>>> lest attempt: len is ", len(connPeers))
 	}
 
 	for _, addr := range connPeers {
@@ -328,7 +329,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("validator %v unable to sync a block: %w", sm.ValidatorID, err)
 	}
 
-	log.With("validator", sm.MirManager.mirID).With("epoch", sm.currentEpoch).Infof("mined a block at height %d", bh.Header.Height)
+	log.With("validator", sm.MirManager.mirID).With("epoch", sm.currentEpoch).Infof("mined block %d : %v ", bh.Header.Height, bh.Header.Cid())
 	return nil
 }
 

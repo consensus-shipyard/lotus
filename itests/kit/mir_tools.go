@@ -341,14 +341,25 @@ var _ net.Transport = &MockedTransport{}
 
 func NewTransport(params libp2p.Params, ownID t.NodeID, h host.Host, logger logging.Logger) *MockedTransport {
 	tr := libp2p.NewTransport(params, ownID, h, logger)
-	return &MockedTransport{transport: tr, logger: logger, h: h}
+
+	return &MockedTransport{
+		transport:      tr,
+		logger:         logger,
+		h:              h,
+		transportChan:  tr.EventsOut(),
+		controlledChan: make(chan *events.EventList),
+		stop:           make(chan struct{}),
+	}
 }
 
 type MockedTransport struct {
-	h            host.Host
-	transport    *libp2p.Transport
-	logger       logging.Logger
-	disconnected bool
+	stop           chan struct{}
+	h              host.Host
+	transport      *libp2p.Transport
+	logger         logging.Logger
+	transportChan  <-chan *events.EventList
+	controlledChan chan *events.EventList
+	disconnected   bool
 }
 
 func (m *MockedTransport) Start() error {
@@ -364,6 +375,7 @@ func (m *MockedTransport) Disable() {
 	m.disconnected = true
 }
 
+// Enable enables the transport after calling Disable.
 func (m *MockedTransport) Enable() {
 	m.disconnected = false
 	err := m.Start()
@@ -374,6 +386,7 @@ func (m *MockedTransport) Enable() {
 
 func (m *MockedTransport) Stop() {
 	m.transport.Stop()
+	close(m.stop)
 }
 
 func (m *MockedTransport) Send(dest t.NodeID, msg *messagepb.Message) error {
@@ -384,9 +397,6 @@ func (m *MockedTransport) Send(dest t.NodeID, msg *messagepb.Message) error {
 }
 
 func (m *MockedTransport) Connect(nodes map[t.NodeID]t.NodeAddress) {
-	if m.disconnected {
-		return
-	}
 	m.transport.Connect(nodes)
 }
 
@@ -422,8 +432,19 @@ func (m *MockedTransport) ApplyEvents(ctx context.Context, eventList *events.Eve
 }
 
 func (m *MockedTransport) EventsOut() <-chan *events.EventList {
-	if m.disconnected {
-		return nil
-	}
-	return m.transport.EventsOut()
+	go func() {
+		for {
+			select {
+			case <-m.stop:
+				return
+			case msg := <-m.transportChan:
+				if !m.disconnected {
+					m.controlledChan <- msg
+				}
+			}
+		}
+
+	}()
+
+	return m.controlledChan
 }
