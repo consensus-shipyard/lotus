@@ -53,9 +53,7 @@ func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
 }
 
 func EnsembleWithMirMiners(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
-	mirDefaultTestOpts := []interface{}{ThroughRPC(), MirConsensus()}
-
-	opts = append(opts, WithAllSubsystems(), mirDefaultTestOpts)
+	opts = append(opts, WithAllSubsystems(), ThroughRPC(), MirConsensus())
 
 	eopts, nopts := siftOptions(t, opts)
 

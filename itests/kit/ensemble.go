@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -1082,12 +1083,12 @@ func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile st
 	require.NoError(n.t, err)
 }
 
-func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Group, delay int, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelayForFaultyNodes(ctx, g, delay, miners)
+func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, delay int, miners ...*TestMiner) {
+	n.BeginMirMiningWithDelayForFaultyNodes(ctx, delay, miners)
 }
 
-func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	n.BeginMirMiningWithConfig(ctx, g, miners, &MiningConfig{MembershipType: StringMembership})
+func (n *Ensemble) BeginMirMining(ctx context.Context, miners ...*TestMiner) {
+	n.BeginMirMiningWithConfig(ctx, miners, &MiningConfig{MembershipType: StringMembership})
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
@@ -1097,12 +1098,11 @@ func (n *Ensemble) Bootstrapped() {
 
 func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	ctx context.Context,
-	g *errgroup.Group,
 	delay int,
 	miners []*TestMiner,
 	faultyMiners ...*TestMiner,
 ) {
-	n.BeginMirMiningWithConfig(ctx, g, miners, &MiningConfig{Delay: delay, MembershipType: StringMembership}, faultyMiners...)
+	n.BeginMirMiningWithConfig(ctx, miners, &MiningConfig{Delay: delay, MembershipType: StringMembership}, faultyMiners...)
 }
 
 const (
@@ -1115,18 +1115,34 @@ type MiningConfig struct {
 	Delay              int
 	MembershipFileName string
 	MembershipType     int
-	MembershipFilename string
 	Databases          []*TestDB
 	MockedTransport    bool
 }
 
 func (n *Ensemble) BeginMirMiningWithConfig(
 	ctx context.Context,
-	g *errgroup.Group,
 	miners []*TestMiner,
 	config *MiningConfig,
 	faultyMiners ...*TestMiner,
 ) {
+
+	if config.MembershipType == FileMembership {
+		n.t.Cleanup(func() {
+			err := os.Remove(config.MembershipFileName)
+			require.NoError(n.t, err)
+		})
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	g, ctx := errgroup.WithContext(ctx)
+	n.t.Cleanup(func() {
+		n.t.Logf("[*] defer: cancelling %s context", n.t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(n.t, err)
+		n.t.Logf("[*] defer: system %s stopped", n.t.Name())
+	})
 
 	for i, m := range append(miners, faultyMiners...) {
 		i := i
@@ -1148,7 +1164,7 @@ func (n *Ensemble) BeginMirMiningWithConfig(
 				m.mirMembership = ms
 			case FileMembership:
 				if config.MembershipFileName == "" {
-					return fmt.Errorf("membership file is not specified")
+					return fmt.Errorf("membership file is empty")
 				}
 				membership = validator.FileMembership{FileName: config.MembershipFileName}
 			default:
