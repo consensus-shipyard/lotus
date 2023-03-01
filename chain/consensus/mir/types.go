@@ -15,7 +15,6 @@ import (
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -34,20 +33,12 @@ const (
 	ConfigurationRequest = 0
 )
 
-type CtxDoneWhileWaitingForBlockError struct {
-	Addr address.Address
+type CtxCanceledWhileWaitingForBlockError struct {
+	ID string
 }
 
-func (e CtxDoneWhileWaitingForBlockError) Error() string {
-	return fmt.Sprintf("validator %s context done while waiting for a snapshot", e.Addr)
-}
-
-type TimerExceededWhileWaitingForBlockError struct {
-	Addr address.Address
-}
-
-func (e TimerExceededWhileWaitingForBlockError) Error() string {
-	return fmt.Sprintf("validator %s timer exceeded while waiting for a snapshot", e.Addr)
+func (e CtxCanceledWhileWaitingForBlockError) Error() string {
+	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.ID)
 }
 
 type Config struct {
