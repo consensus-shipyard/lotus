@@ -69,7 +69,7 @@ func CheckNodesInSyncWithNextHeight(ctx context.Context, from abi.ChainEpoch, ba
 				continue
 			}
 			g.Go(func() error {
-				return waitNodeInSync(ctx, h, baseTipSet, node)
+				return waitForTipSet(ctx, h, baseTipSet, node)
 			})
 		}
 
@@ -103,33 +103,42 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 	return err
 }
 
-// waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
-func waitNodeInSync(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, api *TestFullNode) error {
-	base, err := ChainHeadWithCtx(ctx, api)
+func waitForTipSet(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
+	// one minute baseline timeout
+	timeout := 10 * time.Second
+	base, err := ChainHeadWithCtx(ctx, node)
 	if err != nil {
 		return err
 	}
-	d := 60 * time.Second
 	if base.Height() < height {
-		d = d + time.Duration(height-base.Height())*time.Second
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
 	}
-
-	timeout := time.After(d)
+	after := time.After(timeout)
 
 	for {
-		time.Sleep(3 * time.Second)
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("waitNodeInSync: context canceled")
-		case <-timeout:
-			return fmt.Errorf("waitNodeInSync: timer exceeded")
+			return fmt.Errorf("context canceled: failed to find tipset in node")
+		case <-after:
+			return fmt.Errorf("timeout: failed to find tipset in node")
 		default:
-			ts, err := api.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
-			if err == nil {
-				if ts.Height() == targetTipSet.Height() && ts.Key().String() == targetTipSet.Key().String() {
-					return nil
-				}
+			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
+			if err != nil {
+				time.Sleep(1 * time.Second)
+				continue
 			}
+			if ts.Height() < targetTipSet.Height() {
+				// we are not synced yet, so continue
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			if ts.Height() != targetTipSet.Height() {
+				return fmt.Errorf("failed to reach the same height in node")
+			}
+			if ts.Key() != targetTipSet.Key() {
+				return fmt.Errorf("failed to reach the same CID in node")
+			}
+			return nil
 		}
 	}
 }
@@ -180,7 +189,7 @@ func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) er
 	if err != nil {
 		return err
 	}
-	return mir.WaitForBlock(ctx, base.Height()+abi.ChainEpoch(n), api)
+	return mir.WaitForHeight(ctx, base.Height()+abi.ChainEpoch(n), api)
 }
 
 // AdvanceChain advances the chain and verifies that an amount of arbitrary blocks was added to

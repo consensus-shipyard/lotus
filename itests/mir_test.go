@@ -939,7 +939,7 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	from, err := kit.CheckNodesInSyncWithNextHeight(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
 	var cids []cid.Cid
@@ -965,7 +965,7 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	err = kit.CheckNodesInSync(ctx, from, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
 	for _, id := range cids {

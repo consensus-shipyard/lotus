@@ -35,6 +35,8 @@ var (
 
 	PeerDiscoveryInterval = 300 * time.Millisecond
 	PeerDiscoveryTimeout  = 3 * time.Minute
+
+	WaitForHeightTimeout = 60 * time.Second
 )
 
 type Message []byte
@@ -148,35 +150,38 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 	defer attempt.Stop()
 
 	var connPeers []peer.AddrInfo
-	for len(connPeers) == 0 {
+	for {
+		connPeers, err = sm.api.NetPeers(sm.ctx)
+		if err != nil {
+			return xerrors.Errorf("failed to get peers: %w", err)
+		}
+		if len(connPeers) > 0 {
+			break
+		}
+
+		log.With("validator", sm.id).Warn("no connected peers")
 		select {
 		case <-timeout:
-			return xerrors.Errorf("no connection with other Filecoin peers, can't sync my daemon")
+			return xerrors.Errorf("timeout exceeded")
 		case <-attempt.C:
-			connPeers, err = sm.api.NetPeers(sm.ctx)
-			if err != nil {
-				return xerrors.Errorf("failed to get peers: %w", err)
-			}
 		}
-		fmt.Println(">>>> lest attempt: len is ", len(connPeers))
 	}
 
 	for _, p := range connPeers {
 		ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, p.ID, tsk)
 		if err != nil {
-			log.With("validator", sm.id).Errorf("error fetching latest tipset from peer %s: %v", p.ID, err)
+			log.With("validator", sm.id).Errorf("failed to get the latest tipset from peer %s: %v", p.ID, err)
 			continue
 		}
 		// wait for full-sync before returning from restoreState.
-		err = sm.waitForBlock(ts.Height())
+		err = sm.waitForHeight(ts.Height())
 		if err != nil {
-			log.With("validator", sm.id).Warnf("RestoreState: failed to wait for block %d: %v", ts.Height(), err)
+			log.With("validator", sm.id).Warnf("failed to wait for block %d: %v", ts.Height(), err)
 			continue
 		}
 		return nil
 	}
 
-	// if we couldn't find any valid peer or validator to sync from, just abort.
 	return xerrors.Errorf("couldn't sync from peers")
 }
 
@@ -184,15 +189,13 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 // lotus to sync from the latest checkpoint. Mir provides lotus with the latest
 // checkpoint and from this:
 // - The latest membership and configuration for the consensus is recovered.
-// - We clean all previous outdated checkpoints and configurations we may have
-// received while trying to sync.
+// - We clean all previous outdated checkpoints and configurations we may have received while trying to sync.
 // - If there is a snapshot in the checkpoint, we poll our connections to sync
-// to the latest block determined by the checkpoint.
+//   to the latest block determined by the checkpoint.
 // - We deliver the checkpoint to the mining process, so it can be included in the next
-// block (Mir provides the latest checkpoint, which hasn't been included in a block
-// yet)
+//   block (Mir provides the latest checkpoint, which hasn't been included in a block yet)
 // - And we flag the mining process that we are synced, and it can start accepting new
-// batches from Mir and assembling new blocks.
+//   batches from Mir and assembling new blocks.
 func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
 	log.With("validator", sm.id).Infof("RestoreState for epoch %d started", sm.currentEpoch)
 	defer log.With("validator", sm.id).Infof("RestoreState for epoch %d finished", sm.currentEpoch)
@@ -497,7 +500,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 
 	// Wait the last block to sync for the snapshot before populating snapshot.
 	log.With("validator", sm.id).Infof("waiting for latest block (%d) before checkpoint to be synced to assemble the snapshot", i)
-	if err := sm.waitForBlock(i); err != nil {
+	if err := sm.waitForHeight(i); err != nil {
 		return nil, xerrors.Errorf("snapshot: validator %v failed to wait for next block %d: %w", sm.id, i, err)
 	}
 
@@ -680,11 +683,11 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 	}
 }
 
-func (sm *StateManager) waitForBlock(height abi.ChainEpoch) error {
-	log.With("validator", sm.id).Debugf("waitForBlock %v started", height)
-	defer log.With("validator", sm.id).Debugf("waitForBlock %v finished", height)
+func (sm *StateManager) waitForHeight(height abi.ChainEpoch) error {
+	log.With("validator", sm.id).Debugf("waitForGeight %v started", height)
+	defer log.With("validator", sm.id).Debugf("waitForHeight %v finished", height)
 
-	if err := WaitForBlock(sm.ctx, height, sm.api); err != nil {
+	if err := WaitForHeight(sm.ctx, height, sm.api); err != nil {
 		return xerrors.Errorf("failed to wait for a block: %w", err)
 	}
 	return nil
@@ -748,12 +751,12 @@ func parseTx(tx []byte) (interface{}, error) {
 	return msg, nil
 }
 
-// WaitForBlock waits for the syncer to see as the head of the chain
+// WaitForHeight waits for the syncer to see as the head of the chain
 // the block for the height determined as an input.
 //
 // The timeout to determine how much to wait before aborting is
 // determined by the number of blocks to sync.
-func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode) error {
+func WaitForHeight(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode) error {
 	// get base to determine the gap to sync and configure timeout.
 	if err := ctx.Err(); err != nil {
 		return err
@@ -767,9 +770,7 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 		return nil
 	}
 
-	// If we are on this line then height > head.
-
-	d := 180*time.Second + time.Duration(height-head)*time.Second
+	d := WaitForHeightTimeout + time.Duration(height-head)*time.Second
 	timeout := time.After(d)
 
 	// poll until we get the desired height.
@@ -781,9 +782,9 @@ func WaitForBlock(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode
 
 		select {
 		case <-ctx.Done():
-			return xerrors.Errorf("context cancelled while waiting for a block")
+			return xerrors.Errorf("context cancelled while waiting for height %v", height)
 		case <-timeout:
-			return xerrors.Errorf("timer exceeded while waiting for a block")
+			return xerrors.Errorf("time exceeded while waiting for height %v", height)
 		default:
 			base, err := api.ChainHead(ctx)
 			if err != nil {
