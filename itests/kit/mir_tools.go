@@ -32,36 +32,27 @@ func TempFileName(suffix string) string {
 	return suffix + "_" + hex.EncodeToString(randBytes) + ".json"
 }
 
-// CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current
-// height, if for some reason any of the nodes haven't seen a block
-// for certain height yet, the check waits up to a timeout to see if
-// the node not synced receives the block for that height, and if this
-// is not the case it returns an error.
-//
-// NOTE: This function takes as the base for the comparison the tipset for the base node,
-// assuming the base node has the most up-to-date chain (we can probably make this configurable).
-func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFullNode, checkedNodes ...*TestFullNode) error {
+func CheckNodesInSyncWithNextHeight(ctx context.Context, from abi.ChainEpoch, baseNode *TestFullNode, checkedNodes ...*TestFullNode) (abi.ChainEpoch, error) {
 	if len(checkedNodes) < 1 {
-		return fmt.Errorf("no checked nodes")
+		return 0, fmt.Errorf("no checked nodes")
 	}
 	base, err := ChainHeadWithCtx(ctx, baseNode)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	var tss []*types.TipSet
 	to := base.Height()
-	// FIXME DENIS: Ask Alfonso, review and change the description if approved.
-	// This is a temporal hypothesis: we can check the last block the base node has had.
-	for h := to; h <= to; h++ {
+
+	for h := from; h <= to; h++ {
 		h := h
 
 		baseTipSet, err := baseNode.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if baseTipSet.Height() != h {
-			return fmt.Errorf("couldn't find tipset for height %d in base node", h)
+			return 0, fmt.Errorf("couldn't find tipset for height %d in base node", h)
 		}
 
 		tss = append(tss, baseTipSet)
@@ -83,20 +74,33 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 		}
 
 		if err := g.Wait(); err != nil {
-			return err
+			return 0, err
 		}
 	}
 
 	for _, node := range checkedNodes {
 		ts, err := node.ChainGetTipSetByHeight(ctx, to, types.EmptyTSK)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		tss = append(tss, ts)
 	}
 
 	fmt.Println(">>>>> CheckNodesInSync artifacts:", tss)
-	return nil
+	return to, nil
+}
+
+// CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current
+// height, if for some reason any of the nodes haven't seen a block
+// for certain height yet, the check waits up to a timeout to see if
+// the node not synced receives the block for that height, and if this
+// is not the case it returns an error.
+//
+// NOTE: This function takes as the base for the comparison the tipset for the base node,
+// assuming the base node has the most up-to-date chain (we can probably make this configurable).
+func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFullNode, checkedNodes ...*TestFullNode) error {
+	_, err := CheckNodesInSyncWithNextHeight(ctx, from, baseNode, checkedNodes...)
+	return err
 }
 
 // waitNodeInSync waits when the tipset at height will be equal to targetTipSet value.
