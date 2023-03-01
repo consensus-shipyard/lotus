@@ -143,47 +143,6 @@ func waitForTipSet(ctx context.Context, height abi.ChainEpoch, targetTipSet *typ
 	}
 }
 
-// FIXME DENIS: this is original function just for reference.
-// waitNodeInSyncOld waits when the tipset at height will be equal to targetTipSet value.
-func waitNodeInSyncOld(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
-	// one minute baseline timeout
-	timeout := 10 * time.Second
-	base, err := ChainHeadWithCtx(ctx, node)
-	if err != nil {
-		return err
-	}
-	if base.Height() < height {
-		timeout = timeout + time.Duration(height-base.Height())*time.Second
-	}
-	after := time.After(timeout)
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-after:
-			return fmt.Errorf("timeout: failed to find tipset in node")
-		default:
-			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
-			if err != nil {
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			if ts.Height() < targetTipSet.Height() {
-				// we are not synced yet, so continue
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			if ts.Height() != targetTipSet.Height() {
-				return fmt.Errorf("failed to reach the same height in node")
-			}
-			if ts.Key() != targetTipSet.Key() {
-				return fmt.Errorf("failed to reach the same CID in node")
-			}
-			return nil
-		}
-	}
-}
-
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
 	base, err := ChainHeadWithCtx(ctx, api)
 	if err != nil {
@@ -199,22 +158,6 @@ func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) er
 // checks (for instance to see if the nodes have forked) you should use some other
 // check.
 func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error {
-	g, ctx := errgroup.WithContext(ctx)
-
-	for _, node := range nodes {
-		node := node
-		g.Go(func() error {
-			if err := ChainHeightCheckForBlocks(ctx, blocks, node); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
-
-	return g.Wait()
-}
-
-func AdvanceChainNew(ctx context.Context, blocks int, miners []*TestMiner, nodes []*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for _, node := range nodes {
@@ -256,7 +199,7 @@ func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFull
 		}
 		newHeight := ts.Height()
 		if newHeight != oldHeights[i] {
-			return fmt.Errorf("different heights for validator %d: new - %d, old - %d", i, newHeight, oldHeights[i])
+			return fmt.Errorf("validator %d chain height updated: new - %d, old - %d", i, newHeight, oldHeights[i])
 		}
 	}
 
