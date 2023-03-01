@@ -190,11 +190,11 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 // - The latest membership and configuration for the consensus is recovered.
 // - We clean all previous outdated checkpoints and configurations we may have received while trying to sync.
 // - If there is a snapshot in the checkpoint, we poll our connections to sync
-//   to the latest block determined by the checkpoint.
+// to the latest block determined by the checkpoint.
 // - We deliver the checkpoint to the mining process, so it can be included in the next
-//   block (Mir provides the latest checkpoint, which hasn't been included in a block yet)
+// block (Mir provides the latest checkpoint, which hasn't been included in a block yet)
 // - And we flag the mining process that we are synced, and it can start accepting new
-//   batches from Mir and assembling new blocks.
+// batches from Mir and assembling new blocks.
 func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
 	log.With("validator", sm.id).Infof("RestoreState for epoch %d started", sm.currentEpoch)
 	defer log.With("validator", sm.id).Infof("RestoreState for epoch %d finished", sm.currentEpoch)
