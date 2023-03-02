@@ -242,38 +242,6 @@ func (f *TestFullNode) IsSyncedWith(ctx context.Context, from abi.ChainEpoch, no
 	return to, nil
 }
 
-func (f *TestFullNode) IsSyncedWithOld(ctx context.Context, from abi.ChainEpoch, baseNode *TestFullNode) error {
-	base, err := ChainHeadWithCtx(ctx, baseNode)
-	if err != nil {
-		return err
-	}
-
-	if f == baseNode {
-		return nil
-	}
-
-	to := base.Height()
-
-	for h := from; h <= to; h++ {
-		h := h
-
-		baseTipSet, err := baseNode.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
-		if err != nil {
-			return err
-		}
-		if baseTipSet.Height() != h {
-			return fmt.Errorf("couldn't find tipset for height %d in base node", h)
-		}
-
-		if err := f.waitForTipSet(ctx, h, baseTipSet); err != nil {
-			return err
-		}
-
-	}
-
-	return nil
-}
-
 func (f *TestFullNode) waitForTipSet(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet) error {
 	// one minute baseline timeout
 	timeout := 10 * time.Second

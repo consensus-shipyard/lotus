@@ -161,7 +161,7 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		log.With("validator", sm.id).Warn("no connected peers")
 		select {
 		case <-timeout:
-			return xerrors.Errorf("timeout exceeded")
+			return xerrors.Errorf("syncing from peers timeout exceeded")
 		case <-attempt.C:
 		}
 	}
