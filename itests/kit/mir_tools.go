@@ -32,64 +32,6 @@ func TempFileName(suffix string) string {
 	return suffix + "_" + hex.EncodeToString(randBytes) + ".json"
 }
 
-func CheckNodesInSyncWithNextHeight(ctx context.Context, from abi.ChainEpoch, baseNode *TestFullNode, checkedNodes ...*TestFullNode) (abi.ChainEpoch, error) {
-	if len(checkedNodes) < 1 {
-		return 0, fmt.Errorf("no checked nodes")
-	}
-	base, err := ChainHeadWithCtx(ctx, baseNode)
-	if err != nil {
-		return 0, err
-	}
-
-	var tss []*types.TipSet
-	to := base.Height()
-
-	for h := from; h <= to; h++ {
-		h := h
-
-		baseTipSet, err := baseNode.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
-		if err != nil {
-			return 0, err
-		}
-		if baseTipSet.Height() != h {
-			return 0, fmt.Errorf("couldn't find tipset for height %d in base node", h)
-		}
-
-		tss = append(tss, baseTipSet)
-
-		// TODO: We can probably parallelize the check for each node?
-
-		g, ctx := errgroup.WithContext(ctx)
-
-		for _, node := range checkedNodes {
-			node := node
-
-			// We don't need to check that base node is in sync with itself.
-			if node == baseNode {
-				continue
-			}
-			g.Go(func() error {
-				return waitForTipSet(ctx, h, baseTipSet, node)
-			})
-		}
-
-		if err := g.Wait(); err != nil {
-			return 0, err
-		}
-	}
-
-	for _, node := range checkedNodes {
-		ts, err := node.ChainGetTipSetByHeight(ctx, to, types.EmptyTSK)
-		if err != nil {
-			return 0, err
-		}
-		tss = append(tss, ts)
-	}
-
-	fmt.Println(">>>>> CheckNodesInSync artifacts:", tss)
-	return to, nil
-}
-
 // CheckNodesInSync checks that all the synced nodes are in sync up with the base node till its current
 // height, if for some reason any of the nodes haven't seen a block
 // for certain height yet, the check waits up to a timeout to see if
@@ -99,48 +41,8 @@ func CheckNodesInSyncWithNextHeight(ctx context.Context, from abi.ChainEpoch, ba
 // NOTE: This function takes as the base for the comparison the tipset for the base node,
 // assuming the base node has the most up-to-date chain (we can probably make this configurable).
 func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFullNode, checkedNodes ...*TestFullNode) error {
-	_, err := CheckNodesInSyncWithNextHeight(ctx, from, baseNode, checkedNodes...)
+	_, err := baseNode.IsSyncedWith(ctx, from, checkedNodes...)
 	return err
-}
-
-func waitForTipSet(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet, node *TestFullNode) error {
-	// one minute baseline timeout
-	timeout := 10 * time.Second
-	base, err := ChainHeadWithCtx(ctx, node)
-	if err != nil {
-		return err
-	}
-	if base.Height() < height {
-		timeout = timeout + time.Duration(height-base.Height())*time.Second
-	}
-	after := time.After(timeout)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("context canceled: failed to find tipset in node")
-		case <-after:
-			return fmt.Errorf("timeout: failed to find tipset in node")
-		default:
-			ts, err := node.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
-			if err != nil {
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			if ts.Height() < targetTipSet.Height() {
-				// we are not synced yet, so continue
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			if ts.Height() != targetTipSet.Height() {
-				return fmt.Errorf("failed to reach the same height in node")
-			}
-			if ts.Key() != targetTipSet.Key() {
-				return fmt.Errorf("failed to reach the same CID in node")
-			}
-			return nil
-		}
-	}
 }
 
 func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
