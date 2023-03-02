@@ -93,22 +93,27 @@ type TestMiner struct {
 	options nodeOpts
 
 	// Mir types
-	mirPrivKey    crypto.PrivKey
-	mirHost       host.Host
-	mirNet        *MockedTransport
-	mirAddr       address.Address
-	mirMultiAddr  []multiaddr.Multiaddr
-	stopMir       context.CancelFunc
-	mirDB         *TestDB
-	mirMembership string
+	mirValidator *MirValidator
+	mirPrivKey   crypto.PrivKey
+	mirHost      host.Host
+	// mirNet        *MockedTransport
+	mirAddr      address.Address
+	mirMultiAddr []multiaddr.Multiaddr
+	// stopMir       context.CancelFunc
+	// mirDB         *TestDB
+	// mirMembership string
 }
 
-func (tm *TestMiner) GetRawDB() map[datastore.Key][]byte {
-	return tm.mirDB.db
+func (tm *TestMiner) GetMirID() string {
+	return tm.mirAddr.String()
 }
 
-func (tm *TestMiner) GetDB() db.DB {
-	return tm.mirDB
+func (tm *TestMiner) GetMirRawDB() map[datastore.Key][]byte {
+	return tm.mirValidator.db.db
+}
+
+func (tm *TestMiner) GetMirDB() db.DB {
+	return tm.mirValidator.db
 }
 
 func (tm *TestMiner) PledgeSectors(ctx context.Context, n, existing int, blockNotif <-chan struct{}) {

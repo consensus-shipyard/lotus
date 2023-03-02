@@ -124,7 +124,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	// Check the configuration client persistent DB state.
 	// Core validators have sent 2 messages.
 	for _, m := range miners[:MirTotalValidatorNumber] {
-		db := m.GetDB()
+		db := m.GetMirDB()
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
@@ -136,7 +136,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 
 	// Added validators must send 1 message.
 	for _, m := range miners[MirTotalValidatorNumber:] {
-		db := m.GetDB()
+		db := m.GetMirDB()
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
@@ -229,8 +229,8 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	recoveredRequestNonce := uint64(4)
 	binary.LittleEndian.PutUint64(bn, recoveredRequestNonce)
 
-	var dbs []*kit.TestDB
-	for i := range miners[:MirTotalValidatorNumber] {
+	dbs := make(map[string]*kit.TestDB)
+	for i, m := range miners[:MirTotalValidatorNumber] {
 		_ = i
 		db := kit.NewTestDB()
 		err := db.Put(ctx, mir.NextConfigurationNumberKey, bn)
@@ -252,11 +252,11 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		err = db.Put(ctx, mir.ReconfigurationVotesKey, br.Bytes())
 		require.NoError(t, err)
 
-		dbs = append(dbs, db)
+		dbs[m.GetMirID()] = db
 	}
-	for i := range miners[MirTotalValidatorNumber:] {
+	for i, m := range miners[MirTotalValidatorNumber:] {
 		_ = i
-		dbs = append(dbs, kit.NewTestDB())
+		dbs[m.GetMirID()] = kit.NewTestDB()
 	}
 
 	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
@@ -268,7 +268,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	ens.BeginMirMiningWithConfig(ctx, g, miners[:MirTotalValidatorNumber], &kit.MirConfig{
 		MembershipType:     kit.FileMembership,
 		MembershipFileName: membershipFileName,
-		Databases:          dbs[:MirTotalValidatorNumber],
+		Databases:          dbs,
 	})
 
 	t.Log(">>> check that nodes are advanced")
@@ -279,7 +279,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 
 	t.Log(">>> check that persisted votes restored")
 	for _, m := range miners[:MirTotalValidatorNumber] {
-		db := m.GetDB()
+		db := m.GetMirDB()
 
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
@@ -316,7 +316,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	ens.BeginMirMiningWithConfig(ctx, g, miners[MirTotalValidatorNumber:], &kit.MirConfig{
 		MembershipType:     kit.FileMembership,
 		MembershipFileName: membershipFileName,
-		Databases:          dbs[MirTotalValidatorNumber:],
+		Databases:          dbs,
 	})
 
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
@@ -327,7 +327,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 
 	// Core validators must send 1 message with recovered "nonce".
 	for _, m := range miners[:MirTotalValidatorNumber] {
-		db := m.GetDB()
+		db := m.GetMirDB()
 		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
