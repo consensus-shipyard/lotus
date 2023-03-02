@@ -35,6 +35,12 @@ type MirConfig struct {
 	MockedTransport    bool
 }
 
+func DefaultMirConfig() *MirConfig {
+	return &MirConfig{
+		MembershipType: StringMembership,
+	}
+}
+
 type MirValidator struct {
 	t     *testing.T
 	miner *TestMiner
@@ -49,9 +55,10 @@ type MirValidator struct {
 	db               *TestDB
 	membershipString string
 	membership       validator.Reader
+	config           *MirConfig
 }
 
-func NewMirValidator(t *testing.T, miner *TestMiner, cfg *MirConfig) (*MirValidator, error) {
+func NewMirValidator(t *testing.T, miner *TestMiner, db *TestDB, cfg *MirConfig) (*MirValidator, error) {
 	v := MirValidator{
 		t:         t,
 		miner:     miner,
@@ -59,6 +66,8 @@ func NewMirValidator(t *testing.T, miner *TestMiner, cfg *MirConfig) (*MirValida
 		host:      miner.mirHost,
 		addr:      miner.mirAddr,
 		multiAddr: miner.mirMultiAddr,
+		db:        db,
+		config:    cfg,
 	}
 
 	switch cfg.MembershipType {
@@ -77,15 +86,6 @@ func NewMirValidator(t *testing.T, miner *TestMiner, cfg *MirConfig) (*MirValida
 		v.membership = validator.FileMembership{FileName: cfg.MembershipFileName}
 	default:
 		return nil, fmt.Errorf("unknown membership type")
-	}
-
-	if cfg.Databases != nil {
-		tdb, ok := cfg.Databases[v.addr.String()]
-		if ok {
-			v.db = tdb
-		}
-	} else {
-		v.db = NewTestDB()
 	}
 
 	var netLogger = mir.NewLogger(v.addr.String())

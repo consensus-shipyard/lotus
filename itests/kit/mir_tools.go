@@ -1,13 +1,16 @@
 package kit
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"testing"
 	"time"
 
 	"github.com/ipfs/go-cid"
+	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -186,4 +189,41 @@ func ChainHeadWithCtx(ctx context.Context, api v1api.FullNode) (*types.TipSet, e
 		return nil, ctx.Err()
 	}
 	return api.ChainHead(ctx)
+}
+
+func PutValueToMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) error {
+	for _, m := range miners {
+		err := m.GetMirDB().Put(ctx, ds.NewKey(t.Name()), []byte(t.Name()))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func GetEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) error {
+	for _, m := range miners {
+		_, err := m.GetMirDB().Get(ctx, ds.NewKey(t.Name()))
+		if err != ds.ErrNotFound {
+			return err
+		}
+		if err == nil {
+			return fmt.Errorf("got non empty value")
+		}
+	}
+	return nil
+}
+
+func GetNonEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) error {
+	for _, m := range miners {
+		v, err := m.GetMirDB().Get(ctx, ds.NewKey(t.Name()))
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal([]byte(t.Name()), v) {
+			return fmt.Errorf("expected %v, got %v", t.Name(), v)
+		}
+
+	}
+	return nil
 }

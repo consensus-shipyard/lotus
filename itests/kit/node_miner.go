@@ -96,12 +96,8 @@ type TestMiner struct {
 	mirValidator *MirValidator
 	mirPrivKey   crypto.PrivKey
 	mirHost      host.Host
-	// mirNet        *MockedTransport
 	mirAddr      address.Address
 	mirMultiAddr []multiaddr.Multiaddr
-	// stopMir       context.CancelFunc
-	// mirDB         *TestDB
-	// mirMembership string
 }
 
 func (tm *TestMiner) GetMirID() string {

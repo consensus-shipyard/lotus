@@ -1115,17 +1115,26 @@ func (n *Ensemble) BeginMirMiningWithConfig(
 		i := i
 		m := m
 
+		var tdb *TestDB
+		if config.Databases != nil {
+			v, ok := config.Databases[m.mirAddr.String()]
+			if ok {
+				tdb = v
+			}
+		} else {
+			tdb = NewTestDB()
+		}
+
 		config.MembershipString = n.fixedMirMembership(append(miners, faultyMiners...)...)
 
+		if i > len(miners) && config.Delay > 0 {
+			RandomDelay(config.Delay)
+		}
+		v, err := NewMirValidator(n.t, m, tdb, config)
+		require.NoError(n.t, err)
+		m.mirValidator = v
+
 		g.Go(func() error {
-			if i > len(miners) && config.Delay > 0 {
-				RandomDelay(config.Delay)
-			}
-			v, err := NewMirValidator(n.t, m, config)
-			if err != nil {
-				return err
-			}
-			m.mirValidator = v
 			err = v.MineBlocks(ctx)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
@@ -1139,7 +1148,7 @@ func (n *Ensemble) BeginMirMiningWithConfig(
 	n.Bootstrapped()
 }
 
-func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
+func (n *Ensemble) RestoreMirMinersWithOptionsOld(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
 	for _, m := range miners {
 		if withPersistentDB && m.mirValidator.db == nil {
 			n.t.Fatalf("nil validator database: %v", m.mirAddr)
@@ -1177,15 +1186,57 @@ func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersiste
 	}
 }
 
-func (n *Ensemble) RestoreMirMinersWithEmptyState(ctx context.Context, miners ...*TestMiner) {
-	n.RestoreMirMinersWithOptions(ctx, false, miners...)
+func (n *Ensemble) RestoreMirMinersWithEmptyState(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
+	n.RestoreMirMinersWithOptions(ctx, g, false, miners...)
 }
 
-func (n *Ensemble) RestoreMirMinersWithState(ctx context.Context, miners ...*TestMiner) {
-	n.RestoreMirMinersWithOptions(ctx, true, miners...)
+func (n *Ensemble) RestoreMirMinersWithState(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
+	n.RestoreMirMinersWithOptions(ctx, g, true, miners...)
+}
+
+func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, g *errgroup.Group, withState bool, miners ...*TestMiner) {
+	for i, m := range miners {
+		_ = i
+		m := m
+
+		var tdb *TestDB
+		if withState {
+			tdb = m.mirValidator.db
+		} else {
+			tdb = NewTestDB()
+		}
+
+		g.Go(func() error {
+			v, err := NewMirValidator(n.t, m, tdb, m.mirValidator.config)
+			if err != nil {
+				return err
+			}
+			m.mirValidator = v
+			err = v.MineBlocks(ctx)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return nil
+			}
+			return err
+		})
+	}
 }
 
 func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
+	for _, m := range miners {
+		m.mirValidator.stop()
+		m.mirValidator.db = NewTestDB()
+		// FIXME: Mir won't close the transport correctly,
+		// and if we crash the node we need to close the libp2p
+		// host to prevent other mir validators from considering
+		// the crash validator as "online".
+		// m.mirHost.Close()
+		if delay > 0 {
+			RandomDelay(delay)
+		}
+	}
+}
+
+func (n *Ensemble) RestartMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
 	for _, m := range miners {
 		m.mirValidator.stop()
 		// FIXME: Mir won't close the transport correctly,

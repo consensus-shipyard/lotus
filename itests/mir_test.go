@@ -1076,6 +1076,8 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	nodes, miners, ens := kit.EnsembleWithMirMiners(t, MirTotalValidatorNumber)
 	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
 
+	require.NoError(t, kit.PutValueToMirDB(ctx, t, miners))
+
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 
@@ -1086,7 +1088,52 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithEmptyState(ctx, g, miners[:MirFaultyValidatorNumber]...)
+
+	require.NoError(t, kit.GetEmptyValueFromMirDB(ctx, t, miners))
+
+	for i := 0; i < 15; i++ {
+		time.Sleep(4 * time.Second)
+		err = kit.CheckNodesInSync(ctx, 0, nodes[MirReferenceSyncingNode], nodes...)
+		if err == nil {
+			break
+		}
+	}
+	require.NoError(t, err)
+}
+
+// TestMirBasic_WithFRestartedNodes tests that n − f nodes operate normally and can recover
+// if f nodes crash at the same time.
+func TestMirBasic_WithFRestartedNodes(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, miners, ens := kit.EnsembleWithMirMiners(t, MirTotalValidatorNumber)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, miners...)
+
+	require.NoError(t, kit.PutValueToMirDB(ctx, t, miners))
+
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+
+	t.Logf(">>> restart %d miners", MirFaultyValidatorNumber)
+	ens.RestartMirMiners(ctx, 0, miners[:MirFaultyValidatorNumber]...)
+
+	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	require.NoError(t, err)
+
+	t.Logf(">>> restore %d miners", MirFaultyValidatorNumber)
+	ens.RestoreMirMinersWithState(ctx, g, miners[:MirFaultyValidatorNumber]...)
+
+	require.NoError(t, kit.GetNonEmptyValueFromMirDB(ctx, t, miners))
 
 	for i := 0; i < 15; i++ {
 		time.Sleep(4 * time.Second)
@@ -1214,7 +1261,7 @@ func TestMirBasic_WithFCrashedAndRecoveredNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d miners from scratch", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersWithEmptyState(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithEmptyState(ctx, g, miners[:MirFaultyValidatorNumber]...)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
@@ -1251,7 +1298,7 @@ func TestMirBasic_FNodesCrashLongTimeApart(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
-	ens.RestoreMirMinersWithState(ctx, miners[:MirFaultyValidatorNumber]...)
+	ens.RestoreMirMinersWithState(ctx, g, miners[:MirFaultyValidatorNumber]...)
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
