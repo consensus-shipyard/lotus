@@ -230,7 +230,7 @@ func (f *TestFullNode) IsSyncedWith(ctx context.Context, from abi.ChainEpoch, no
 	}
 
 	for _, n := range nodes {
-		ts, err := n.ChainGetTipSetByHeight(ctx, to, types.EmptyTSK)
+		ts, err := n.ChainGetTipSetByHeight(ctx, to, baseTipSet.Height())
 		if err != nil {
 			return 0, err
 		}
