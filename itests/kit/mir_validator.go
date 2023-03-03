@@ -43,7 +43,7 @@ func DefaultMirConfig() *MirConfig {
 
 type MirValidator struct {
 	t     *testing.T
-	miner *TestMiner
+	miner *TestValidator
 
 	privKey          crypto.PrivKey
 	host             host.Host
@@ -58,7 +58,7 @@ type MirValidator struct {
 	config           *MirConfig
 }
 
-func NewMirValidator(t *testing.T, miner *TestMiner, db *TestDB, cfg *MirConfig) (*MirValidator, error) {
+func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirConfig) (*MirValidator, error) {
 	v := MirValidator{
 		t:         t,
 		miner:     miner,

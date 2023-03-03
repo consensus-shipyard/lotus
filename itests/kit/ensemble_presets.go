@@ -32,7 +32,7 @@ func EnsembleMinimal(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMin
 	return &full, &miner, ens
 }
 
-func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
+func adaptForMir(t *testing.T, full *TestFullNode, miner *TestValidator) {
 	addr, err := full.WalletNew(context.Background(), types.KTSecp256k1)
 	require.NoError(t, err)
 
@@ -52,14 +52,15 @@ func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
 	miner.mirMultiAddr = h.Addrs()
 }
 
-func EnsembleWithMirMiners(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
+func EnsembleWithMirValidators(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestValidator, *Ensemble) {
 	opts = append(opts, WithAllSubsystems(), ThroughRPC(), MirConsensus())
 
 	eopts, nopts := siftOptions(t, opts)
 
 	var (
-		nodes  []*TestFullNode
-		miners []*TestMiner
+		nodes      []*TestFullNode
+		miners     []*TestMiner
+		validators []*TestValidator
 	)
 
 	ens := NewEnsemble(t, eopts...)
@@ -76,16 +77,16 @@ func EnsembleWithMirMiners(t *testing.T, n int, opts ...interface{}) ([]*TestFul
 	ens.Start()
 
 	for i := 0; i < n; i++ {
-		adaptForMir(t, nodes[i], miners[i])
+		validators = append(validators, NewTestValidator(t, nodes[i], *miners[i]))
 	}
 
 	require.Equal(t, n, len(nodes))
 	require.Equal(t, n, len(miners))
 
-	return nodes, miners, ens
+	return nodes, validators, ens
 }
 
-func AreTwins(t *testing.T, miners []*TestMiner, twins []*TestMiner) {
+func AreTwins(t *testing.T, miners []*TestValidator, twins []*TestValidator) {
 	for _, v := range miners {
 		fmt.Println(v.mirAddr)
 	}
@@ -99,17 +100,19 @@ func AreTwins(t *testing.T, miners []*TestMiner, twins []*TestMiner) {
 	}
 }
 
-func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestFullNode, []*TestMiner, []*TestMiner, *Ensemble) {
+func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestFullNode, []*TestValidator, []*TestValidator, *Ensemble) {
 	opts = append(opts, WithAllSubsystems())
 
 	eopts, nopts := siftOptions(t, opts)
 
 	var (
-		nodes  []*TestFullNode
-		miners []*TestMiner
+		nodes      []*TestFullNode
+		miners     []*TestMiner
+		validators []*TestValidator
 
-		twinNodes  []*TestFullNode
-		twinMiners []*TestMiner
+		twinNodes      []*TestFullNode
+		twinMiners     []*TestMiner
+		twinValidators []*TestValidator
 	)
 
 	ens := NewEnsemble(t, eopts...)
@@ -128,12 +131,13 @@ func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}
 	ens.Start()
 
 	for i := 0; i < n; i++ {
-		adaptForMir(t, nodes[i], miners[i])
+		validators = append(validators, NewTestValidator(t, nodes[i], *miners[i]))
 	}
 
 	for i := 0; i < f; i++ {
 		twinNodes = append(twinNodes, nodes[n+i-1])
 		twinMiners = append(twinMiners, miners[n+i-1])
+		twinValidators = append(twinValidators, validators[n+i-1])
 	}
 
 	require.Equal(t, n, len(nodes))
@@ -145,17 +149,17 @@ func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}
 	require.Equal(t, len(miners[n-f:]), len(twinMiners))
 	require.Equal(t, len(nodes[n-f:]), len(twinNodes))
 
-	AreTwins(t, miners[n-f:], twinMiners)
+	AreTwins(t, validators[n-f:], twinValidators)
 
-	return nodes, twinNodes, miners, twinMiners, ens
+	return nodes, twinNodes, validators, twinValidators, ens
 }
 
-func EnsembleMirNodesWithLearner(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *TestFullNode, *Ensemble) {
+func EnsembleMirNodesWithLearner(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestValidator, *TestFullNode, *Ensemble) {
 	var learner TestFullNode
-	nodes, miners, ens := EnsembleWithMirMiners(t, n, opts)
+	nodes, validators, ens := EnsembleWithMirValidators(t, n, opts)
 	ens.FullNode(&learner, LearnerNode()).Start()
 
-	return nodes, miners, &learner, ens
+	return nodes, validators, &learner, ens
 }
 
 func EnsembleWorker(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMiner, *TestWorker, *Ensemble) {
