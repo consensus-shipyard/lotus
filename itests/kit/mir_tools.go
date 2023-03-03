@@ -227,3 +227,11 @@ func GetNonEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*Test
 	}
 	return nil
 }
+
+func CountPeerIDs(peers []peer.AddrInfo) int {
+	peerIDs := make(map[peer.ID]struct{})
+	for _, p := range peers {
+		peerIDs[p.ID] = struct{}{}
+	}
+	return len(peerIDs)
+}

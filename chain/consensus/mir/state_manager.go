@@ -35,7 +35,7 @@ var (
 	PeerDiscoveryInterval = 300 * time.Millisecond
 	PeerDiscoveryTimeout  = 3 * time.Minute
 
-	WaitForHeightTimeout = 60 * time.Second
+	WaitForHeightTimeout = 180 * time.Second
 )
 
 type Message []byte
@@ -509,8 +509,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		// In Mir tipsets have a single block, so we can access directly the block for
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
-		i--
 		log.With("validator", sm.id).Infof("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
+		i--
 	}
 
 	b, err := ch.Bytes()
