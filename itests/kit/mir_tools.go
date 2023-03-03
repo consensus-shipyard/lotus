@@ -191,9 +191,9 @@ func ChainHeadWithCtx(ctx context.Context, api v1api.FullNode) (*types.TipSet, e
 	return api.ChainHead(ctx)
 }
 
-func PutValueToMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) error {
+func PutValueToMirDB(ctx context.Context, t *testing.T, miners []*TestValidator) error {
 	for _, m := range miners {
-		err := m.GetMirDB().Put(ctx, ds.NewKey(t.Name()), []byte(t.Name()))
+		err := m.GetDB().Put(ctx, ds.NewKey(t.Name()), []byte(t.Name()))
 		if err != nil {
 			return err
 		}
@@ -201,9 +201,9 @@ func PutValueToMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) err
 	return nil
 }
 
-func GetEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) error {
+func GetEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestValidator) error {
 	for _, m := range miners {
-		_, err := m.GetMirDB().Get(ctx, ds.NewKey(t.Name()))
+		_, err := m.GetDB().Get(ctx, ds.NewKey(t.Name()))
 		if err != ds.ErrNotFound {
 			return err
 		}
@@ -214,9 +214,9 @@ func GetEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestMin
 	return nil
 }
 
-func GetNonEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestMiner) error {
+func GetNonEmptyValueFromMirDB(ctx context.Context, t *testing.T, miners []*TestValidator) error {
 	for _, m := range miners {
-		v, err := m.GetMirDB().Get(ctx, ds.NewKey(t.Name()))
+		v, err := m.GetDB().Get(ctx, ds.NewKey(t.Name()))
 		if err != nil {
 			return err
 		}

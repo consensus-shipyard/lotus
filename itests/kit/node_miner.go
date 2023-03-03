@@ -14,10 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
@@ -26,7 +23,6 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/wallet/key"
 	"github.com/filecoin-project/lotus/miner"
 	sealing "github.com/filecoin-project/lotus/storage/pipeline"
@@ -91,25 +87,6 @@ type TestMiner struct {
 	RemoteListener net.Listener
 
 	options nodeOpts
-
-	// Mir types
-	mirValidator *MirValidator
-	mirPrivKey   crypto.PrivKey
-	mirHost      host.Host
-	mirAddr      address.Address
-	mirMultiAddr []multiaddr.Multiaddr
-}
-
-func (tm *TestMiner) GetMirID() string {
-	return tm.mirAddr.String()
-}
-
-func (tm *TestMiner) GetMirRawDB() map[datastore.Key][]byte {
-	return tm.mirValidator.db.db
-}
-
-func (tm *TestMiner) GetMirDB() db.DB {
-	return tm.mirValidator.db
 }
 
 func (tm *TestMiner) PledgeSectors(ctx context.Context, n, existing int, blockNotif <-chan struct{}) {
