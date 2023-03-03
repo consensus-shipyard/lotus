@@ -15,6 +15,8 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
+	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -168,13 +170,16 @@ var runCmd = &cli.Command{
 
 		membership := validator.NewFileMembership(membershipFile)
 
+		var netLogger = mir.NewLogger(validatorID.String())
+		netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(validatorID.String()), h, netLogger)
+
 		log.Infow("Starting mining with validator", "validator", validatorID)
 		cfg := mir.NewConfig(
 			dbPath,
 			initCh,
 			cctx.String("checkpoints-repo"),
 			segmentLength)
-		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
+		return mir.Mine(ctx, validatorID, netTransport, nodeApi, ds, membership, cfg)
 	},
 }
 

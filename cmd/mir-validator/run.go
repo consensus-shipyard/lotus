@@ -24,6 +24,8 @@ import (
 	"github.com/filecoin-project/lotus/lib/ulimit"
 	"github.com/filecoin-project/lotus/metrics"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
+	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 var runCmd = &cli.Command{
@@ -164,6 +166,9 @@ var runCmd = &cli.Command{
 
 		membership := validator.NewFileMembership(membershipFile)
 
+		var netLogger = mir.NewLogger(validatorID.String())
+		netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(validatorID.String()), h, netLogger)
+
 		cfg := mir.NewConfig(
 			dbPath,
 			initCh,
@@ -171,7 +176,7 @@ var runCmd = &cli.Command{
 			segmentLength,
 		)
 
-		return mir.Mine(ctx, validatorID, h, nodeApi, ds, membership, cfg)
+		return mir.Mine(ctx, validatorID, netTransport, nodeApi, ds, membership, cfg)
 	},
 }
 

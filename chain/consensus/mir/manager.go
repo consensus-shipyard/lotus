@@ -11,7 +11,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/host"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -23,7 +22,7 @@ import (
 	"github.com/filecoin-project/mir/pkg/eventmangler"
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
-	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	mirlibp2p "github.com/filecoin-project/mir/pkg/net"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/simplewal"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -78,7 +77,7 @@ type Manager struct {
 
 func NewManager(ctx context.Context,
 	addr address.Address,
-	h host.Host,
+	net mirlibp2p.Transport,
 	api v1api.FullNode,
 	ds db.DB,
 	membership validator.Reader,
@@ -116,14 +115,13 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to find its identity in membership", id)
 	}
 
-	logger := newManagerLogger(id)
+	logger := NewLogger(id)
 
 	// Create Mir modules.
-	netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(id), h, logger)
-	if err := netTransport.Start(); err != nil {
+	if err := net.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
-	netTransport.Connect(initialMembership)
+	net.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(addr, api)
 	if err != nil {
@@ -144,9 +142,9 @@ func NewManager(ctx context.Context,
 		stopChan:            make(chan struct{}),
 		readyForTxsChan:     make(chan chan []*mirproto.Request),
 		requestPool:         fifo.New(),
-		net:                 netTransport,
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
+		net:                 net,
 		initialValidatorSet: initialValidatorSet,
 		membership:          membership,
 	}
@@ -182,7 +180,7 @@ func NewManager(ctx context.Context,
 
 	smrSystem, err := trantor.New(
 		t.NodeID(id),
-		netTransport,
+		net,
 		initCh,
 		m.cryptoManager,
 		m.stateManager,

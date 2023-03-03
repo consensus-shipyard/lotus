@@ -71,6 +71,8 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/mock"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	mapi "github.com/filecoin-project/mir"
+	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
+	t "github.com/filecoin-project/mir/pkg/types"
 	miner2 "github.com/filecoin-project/specs-actors/v2/actors/builtin/miner"
 	power3 "github.com/filecoin-project/specs-actors/v3/actors/builtin/power"
 )
@@ -957,42 +959,27 @@ func (n *Ensemble) Disconnect(from api.Net, to ...api.Net) *Ensemble {
 }
 
 // DisconnectNodes disconnects one full from the provided full nodes.
-func (n *Ensemble) DisconnectNodes(from api.Net, to ...*TestFullNode) *Ensemble {
-	addr, err := from.NetAddrsListen(context.Background())
-	require.NoError(n.t, err)
-
-	for _, other := range to {
-		err = other.NetDisconnect(context.Background(), addr.ID)
-		require.NoError(n.t, err)
+func (n *Ensemble) DisconnectNodes(from []*TestFullNode, to []*TestFullNode) *Ensemble {
+	for _, src := range from {
+		for _, dst := range to {
+			n.Disconnect(src, dst)
+		}
 	}
 	return n
 }
 
-// DisconnectMirMiners disconnects Mir miners.
-func (n *Ensemble) DisconnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) context.CancelFunc {
-	rctx, cancel := context.WithCancel(context.Background())
-
+func (n *Ensemble) DisconnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) {
 	for _, m := range faultyMiners {
-		go func(rctx context.Context, m *TestMiner) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-rctx.Done():
-					return
-				default:
-
-				}
-				conns := m.mirHost.Network().Conns()
-				for _, c := range conns {
-					err := c.Close()
-					require.NoError(n.t, err)
-				}
-			}
-		}(rctx, m)
+		m.mirValidator.mockedNet.Disable()
+		n.t.Log(">>> ", m.mirAddr, " disconnected")
 	}
+}
 
-	return cancel
+func (n *Ensemble) ConnectMirMiners(ctx context.Context, faultyMiners []*TestMiner) {
+	for _, m := range faultyMiners {
+		m.mirValidator.mockedNet.Enable()
+		n.t.Log(">>> ", m.mirAddr, " connected")
+	}
 }
 
 func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestMiner) []*BlockMiner {
@@ -1099,32 +1086,7 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Grou
 }
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	n.BeginMirMiningWithDelay(ctx, g, 0, miners...)
-	// once validators start mining mark the network as bootstrapped so no
-	// new genesis are generated.
-	n.Bootstrapped()
-}
-
-// BeginMirMiningWithError simulates an error in Mine function.
-func (n *Ensemble) BeginMirMiningWithError(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
-	for _, m := range miners {
-		m := m
-
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
-
-		g.Go(func() error {
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, nil, fakeMembership{}, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return nil
-			}
-			return err
-		})
-	}
+	n.BeginMirMiningWithConfig(ctx, g, miners, &MirConfig{MembershipType: StringMembership})
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
@@ -1139,147 +1101,144 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	miners []*TestMiner,
 	faultyMiners ...*TestMiner,
 ) {
-	membershipString := n.fixedMirMembership(append(miners, faultyMiners...)...)
+	n.BeginMirMiningWithConfig(ctx, g, miners, &MirConfig{Delay: delay, MembershipType: StringMembership}, faultyMiners...)
+}
 
+func (n *Ensemble) BeginMirMiningWithConfig(
+	ctx context.Context,
+	g *errgroup.Group,
+	miners []*TestMiner,
+	config *MirConfig,
+	faultyMiners ...*TestMiner,
+) {
 	for i, m := range append(miners, faultyMiners...) {
 		i := i
 		m := m
 
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
+		var tdb *TestDB
+		if config.Databases != nil {
+			v, ok := config.Databases[m.mirAddr.String()]
+			if ok {
+				tdb = v
+			}
+		} else {
+			tdb = NewTestDB()
+		}
+
+		config.MembershipString = n.fixedMirMembership(append(miners, faultyMiners...)...)
+
+		if i > len(miners) && config.Delay > 0 {
+			RandomDelay(config.Delay)
+		}
+		v, err := NewMirValidator(n.t, m, tdb, config)
+		require.NoError(n.t, err)
+		m.mirValidator = v
 
 		g.Go(func() error {
-			m.mirMembership = membershipString
-			m.mirDB = NewTestDB()
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-			membership := validator.StringMembership(membershipString)
-			if i > len(miners) && delay > 0 {
-				RandomDelay(delay)
-			}
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			err = v.MineBlocks(ctx)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return nil
 			}
 			return err
 		})
 	}
+
+	// once validators start mining mark the network as bootstrapped so no
+	// new genesis are generated.
+	n.Bootstrapped()
 }
 
-func (n *Ensemble) BeginMirMiningWithMembershipFromFileAndDB(
-	ctx context.Context,
-	configFileName string,
-	g *errgroup.Group,
-	db []*TestDB,
-	miners []*TestMiner,
-) {
-	for i, m := range miners {
-		i := i
-		m := m
-
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
-
-		g.Go(func() error {
-			if db != nil && db[i] != nil {
-				m.mirDB = db[i]
-			} else {
-				return fmt.Errorf("unable to find DB for miner %v", m)
-			}
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-			membership := validator.FileMembership{FileName: configFileName}
-
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return nil
-			}
-			return err
-		})
-	}
-}
-
-func (n *Ensemble) BeginMirMiningWithMembershipFromFile(
-	ctx context.Context,
-	configFileName string,
-	g *errgroup.Group,
-	miners []*TestMiner,
-	faultyMiners ...*TestMiner,
-) {
-	for _, m := range append(miners, faultyMiners...) {
-		m := m
-
-		ctx, cancel := context.WithCancel(ctx)
-		m.stopMir = cancel
-
-		g.Go(func() error {
-			m.mirDB = NewTestDB()
-			cfg := mir.Config{
-				SegmentLength: 1,
-				GroupName:     n.t.Name(),
-			}
-			membership := validator.FileMembership{FileName: configFileName}
-
-			err := mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
-			if xerrors.Is(mapi.ErrStopped, err) {
-				return nil
-			}
-			return err
-		})
-	}
-}
-
-func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
+func (n *Ensemble) RestoreMirMinersWithOptionsOld(ctx context.Context, withPersistentDB bool, miners ...*TestMiner) {
 	for _, m := range miners {
-		if withPersistentDB && m.mirDB == nil {
-			n.t.Fatalf("nil miner database: %v", m.mirAddr)
+		if withPersistentDB && m.mirValidator.db == nil {
+			n.t.Fatalf("nil validator database: %v", m.mirAddr)
 		}
-		if m.mirMembership == "" {
-			n.t.Fatalf("empty miner membership: %v", m.mirAddr)
+		if m.mirValidator.membershipString == "" {
+			n.t.Fatalf("empty validator membership: %v", m.mirAddr)
 		}
-		go func(m *TestMiner) {
+		go func(m *MirValidator) {
 			var err error
 			// recover host with original config
-			m.mirHost, err = libp2p.New(
-				libp2p.Identity(m.mirPrivKey),
+			m.host, err = libp2p.New(
+				libp2p.Identity(m.privKey),
 				libp2p.DefaultTransports,
-				libp2p.ListenAddrs(m.mirMultiAddr...),
+				libp2p.ListenAddrs(m.multiAddr...),
 			)
 			require.NoError(n.t, err)
 
 			if !withPersistentDB {
-				m.mirDB = NewTestDB()
+				m.db = NewTestDB()
 			}
 			cfg := mir.Config{
 				SegmentLength: 1,
 				GroupName:     n.t.Name(),
 			}
-			membership := validator.StringMembership(m.mirMembership)
+			membership := validator.StringMembership(m.membershipString)
 
-			err = mir.Mine(ctx, m.mirAddr, m.mirHost, m.FullNode, m.mirDB, membership, &cfg)
+			var netLogger = mir.NewLogger(m.addr.String())
+			netTransport := NewTransport(mirlibp2p.DefaultParams(), t.NodeID(m.addr.String()), m.host, netLogger)
+			err = mir.Mine(ctx, m.addr, netTransport, m.miner.FullNode, m.db, membership, &cfg)
 			if xerrors.Is(mapi.ErrStopped, err) {
 				return
 			}
 			require.NoError(n.t, err)
-		}(m)
+		}(m.mirValidator)
 	}
 }
 
-func (n *Ensemble) RestoreMirMinersWithEmptyState(ctx context.Context, miners ...*TestMiner) {
-	n.RestoreMirMinersWithOptions(ctx, false, miners...)
+func (n *Ensemble) RestoreMirMinersWithEmptyState(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
+	n.RestoreMirMinersWithOptions(ctx, g, false, miners...)
 }
 
-func (n *Ensemble) RestoreMirMinersWithState(ctx context.Context, miners ...*TestMiner) {
-	n.RestoreMirMinersWithOptions(ctx, true, miners...)
+func (n *Ensemble) RestoreMirMinersWithState(ctx context.Context, g *errgroup.Group, miners ...*TestMiner) {
+	n.RestoreMirMinersWithOptions(ctx, g, true, miners...)
+}
+
+func (n *Ensemble) RestoreMirMinersWithOptions(ctx context.Context, g *errgroup.Group, withState bool, miners ...*TestMiner) {
+	for i, m := range miners {
+		_ = i
+		m := m
+
+		var tdb *TestDB
+		if withState {
+			tdb = m.mirValidator.db
+		} else {
+			tdb = NewTestDB()
+		}
+
+		g.Go(func() error {
+			v, err := NewMirValidator(n.t, m, tdb, m.mirValidator.config)
+			if err != nil {
+				return err
+			}
+			m.mirValidator = v
+			err = v.MineBlocks(ctx)
+			if xerrors.Is(mapi.ErrStopped, err) {
+				return nil
+			}
+			return err
+		})
+	}
 }
 
 func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
 	for _, m := range miners {
-		m.stopMir()
+		m.mirValidator.stop()
+		m.mirValidator.db = NewTestDB()
+		// FIXME: Mir won't close the transport correctly,
+		// and if we crash the node we need to close the libp2p
+		// host to prevent other mir validators from considering
+		// the crash validator as "online".
+		// m.mirHost.Close()
+		if delay > 0 {
+			RandomDelay(delay)
+		}
+	}
+}
+
+func (n *Ensemble) RestartMirMiners(ctx context.Context, delay int, miners ...*TestMiner) {
+	for _, m := range miners {
+		m.mirValidator.stop()
 		// FIXME: Mir won't close the transport correctly,
 		// and if we crash the node we need to close the libp2p
 		// host to prevent other mir validators from considering
@@ -1293,7 +1252,7 @@ func (n *Ensemble) CrashMirMiners(ctx context.Context, delay int, miners ...*Tes
 
 func (n *Ensemble) StopMirMiners(ctx context.Context, miners ...*TestMiner) {
 	for _, m := range miners {
-		m.stopMir()
+		m.mirValidator.stop()
 		// FIXME: Mir won't close the transport correctly,
 		// and if we crash the node we need to close the libp2p
 		// host to prevent other mir validators from considering

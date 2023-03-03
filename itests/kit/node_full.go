@@ -12,6 +12,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 	cbg "github.com/whyrusleeping/cbor-gen"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -178,6 +179,107 @@ func (f *TestFullNode) ExpectSend(ctx context.Context, from, to address.Address,
 	}
 
 	return nil
+}
+
+func (f *TestFullNode) IsSyncedWith(ctx context.Context, from abi.ChainEpoch, nodes ...*TestFullNode) (abi.ChainEpoch, error) {
+	if len(nodes) < 1 {
+		return 0, fmt.Errorf("no checked nodes")
+	}
+	base, err := ChainHeadWithCtx(ctx, f)
+	if err != nil {
+		return 0, err
+	}
+
+	to := base.Height()
+	for h := from; h <= to; h++ {
+		h := h
+
+		baseTipSet, err := f.ChainGetTipSetByHeight(ctx, h, types.EmptyTSK)
+		if err != nil {
+			return 0, err
+		}
+		if baseTipSet.Height() != h {
+			return 0, fmt.Errorf("couldn't find tipset for height %d in base node", h)
+		}
+
+		// TODO: We can probably parallelize the check for each node?
+
+		g, ctx := errgroup.WithContext(ctx)
+
+		for _, n := range nodes {
+			n := n
+
+			// We don't need to check that base node is in sync with itself.
+			if n == f {
+				continue
+			}
+			g.Go(func() error {
+				return n.waitForTipSet(ctx, h, baseTipSet)
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			return 0, err
+		}
+	}
+
+	// Additional check of the invariant.
+	baseTipSet, err := f.ChainGetTipSetByHeight(ctx, to, types.EmptyTSK)
+	if err != nil {
+		return 0, err
+	}
+
+	for _, n := range nodes {
+		ts, err := n.ChainGetTipSetByHeight(ctx, to, baseTipSet.Key())
+		if err != nil {
+			return 0, err
+		}
+		if baseTipSet.Key() != ts.Key() {
+			return 0, fmt.Errorf("different tipsets at height %d: %v, %v", to, baseTipSet.String(), ts.String())
+		}
+	}
+
+	return to, nil
+}
+
+func (f *TestFullNode) waitForTipSet(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet) error {
+	// one minute baseline timeout
+	timeout := 10 * time.Second
+	base, err := ChainHeadWithCtx(ctx, f)
+	if err != nil {
+		return err
+	}
+	if base.Height() < height {
+		timeout = timeout + time.Duration(height-base.Height())*time.Second
+	}
+	after := time.After(timeout)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled: failed to find tipset in node")
+		case <-after:
+			return fmt.Errorf("timeout: failed to find tipset in node")
+		default:
+			ts, err := f.ChainGetTipSetByHeight(ctx, height, types.EmptyTSK)
+			if err != nil {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			if ts.Height() < targetTipSet.Height() {
+				// we are not synced yet, so continue
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			if ts.Height() != targetTipSet.Height() {
+				return fmt.Errorf("failed to reach the same height in node")
+			}
+			if ts.Key() != targetTipSet.Key() {
+				return fmt.Errorf("failed to reach the same CID in node")
+			}
+			return nil
+		}
+	}
 }
 
 // ChainPredicate encapsulates a chain condition.

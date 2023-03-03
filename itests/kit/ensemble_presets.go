@@ -52,85 +52,8 @@ func adaptForMir(t *testing.T, full *TestFullNode, miner *TestMiner) {
 	miner.mirMultiAddr = h.Addrs()
 }
 
-// EnsembleMinimalMir creates and starts an Ensemble suitable for Mir.
-func EnsembleMinimalMir(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMiner, *Ensemble) {
-	opts = append(opts, WithAllSubsystems())
-
-	eopts, nopts := siftOptions(t, opts)
-
-	var (
-		full  TestFullNode
-		miner TestMiner
-	)
-	ens := NewEnsemble(t, eopts...).FullNode(&full, nopts...).Miner(&miner, &full, nopts...)
-
-	ens.active.miners = []*TestMiner{}
-	ens.Start()
-
-	adaptForMir(t, &full, &miner)
-
-	return &full, &miner, ens
-}
-
-func EnsembleTwoMirNodes(t *testing.T, opts ...interface{}) (
-	*TestFullNode, *TestFullNode,
-	*TestMiner, *TestMiner,
-	*Ensemble,
-) {
-	opts = append(opts, WithAllSubsystems())
-
-	eopts, nopts := siftOptions(t, opts)
-
-	var (
-		n1, n2 TestFullNode
-		m1, m2 TestMiner
-	)
-	ens := NewEnsemble(t, eopts...).FullNode(&n1, nopts...).FullNode(&n2, nopts...).Miner(&m1, &n1, nopts...).Miner(&m2, &n2, nopts...)
-	ens.active.miners = []*TestMiner{}
-	ens.Start()
-
-	adaptForMir(t, &n1, &m1)
-	adaptForMir(t, &n2, &m2)
-
-	return &n1, &n2, &m1, &m2, ens
-}
-
-func EnsembleFourMirNodes(t *testing.T, opts ...interface{}) (
-	*TestFullNode, *TestFullNode, *TestFullNode, *TestFullNode,
-	*TestMiner, *TestMiner, *TestMiner, *TestMiner,
-	*Ensemble,
-) {
-	opts = append(opts, WithAllSubsystems())
-
-	eopts, nopts := siftOptions(t, opts)
-
-	var (
-		n1, n2, n3, n4 TestFullNode
-		m1, m2, m3, m4 TestMiner
-	)
-	ens := NewEnsemble(t, eopts...).
-		FullNode(&n1, nopts...).
-		FullNode(&n2, nopts...).
-		FullNode(&n3, nopts...).
-		FullNode(&n4, nopts...).
-		Miner(&m1, &n1, nopts...).
-		Miner(&m2, &n2, nopts...).
-		Miner(&m3, &n3, nopts...).
-		Miner(&m4, &n4, nopts...)
-
-	ens.active.miners = []*TestMiner{}
-	ens.Start()
-
-	adaptForMir(t, &n1, &m1)
-	adaptForMir(t, &n2, &m2)
-	adaptForMir(t, &n3, &m3)
-	adaptForMir(t, &n4, &m4)
-
-	return &n1, &n2, &n3, &n4, &m1, &m2, &m3, &m4, ens
-}
-
-func EnsembleMirNodes(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
-	opts = append(opts, WithAllSubsystems())
+func EnsembleWithMirMiners(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *Ensemble) {
+	opts = append(opts, WithAllSubsystems(), ThroughRPC(), MirConsensus())
 
 	eopts, nopts := siftOptions(t, opts)
 
@@ -229,7 +152,7 @@ func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}
 
 func EnsembleMirNodesWithLearner(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestMiner, *TestFullNode, *Ensemble) {
 	var learner TestFullNode
-	nodes, miners, ens := EnsembleMirNodes(t, n, opts)
+	nodes, miners, ens := EnsembleWithMirMiners(t, n, opts)
 	ens.FullNode(&learner, LearnerNode()).Start()
 
 	return nodes, miners, &learner, ens

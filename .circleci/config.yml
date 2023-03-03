@@ -246,6 +246,15 @@ jobs:
   test-mir-reconfiguration:
     <<: *basic_test
 
+  nightly-test-mir-basic:
+    <<: *basic_test
+
+  nightly-test-mir-with-mangler:
+      <<: *basic_test
+
+  nightly-test-mir-reconfiguration:
+    <<: *basic_test
+
   test-conformance:
     description: |
       Run tests using a corpus of interoperable test vectors for Filecoin 
@@ -575,15 +584,11 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
-          requires:
-            - mir-smoke-tests
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
-          requires:
-            - mir-basic-tests
       - build-spacenet
       - build-all:
           filters:
@@ -603,7 +608,6 @@ workflows:
             tags:
               only:
                 - /^v\d+\.\d+\.\d+(-rc\d+)?$/
-
   nightly:
     triggers:
       - schedule:
@@ -613,18 +617,18 @@ workflows:
               only:
                 - spacenet
     jobs:
-      - test-mir-with-mangler:
-          name: mir-mangler-tests
+      - nightly-test-mir-with-mangler:
+          name: nightly-mir-mangler-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
-      - test-mir-basic:
-          name: mir-basic-tests
+      - nightly-test-mir-basic:
+          name: nightly-mir-basic-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
           target: "./itests/mir_test.go"
-      - test-mir-reconfiguration:
-          name: mir-reconfiguration-tests
+      - nightly-test-mir-reconfiguration:
+          name: nightly-mir-reconfiguration-tests
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
