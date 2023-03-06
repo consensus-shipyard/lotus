@@ -1,5 +1,9 @@
 package validator
 
+import (
+	"github.com/filecoin-project/lotus/chain/consensus/mir/rpc"
+)
+
 type FileMembership struct {
 	FileName string
 }
@@ -31,4 +35,26 @@ type EnvMembership string
 // GetValidatorSet gets the membership config from the input environment variable.
 func (e EnvMembership) GetValidatorSet() (*Set, error) {
 	return NewValidatorSetFromEnv(string(e))
+}
+
+// -----
+
+type ActorMembership struct {
+	client *rpc.JSONRPCClient
+}
+
+func NewActorMembershipClient(client *rpc.JSONRPCClient) *ActorMembership {
+	return &ActorMembership{
+		client: client,
+	}
+}
+
+// GetValidatorSet gets the membership config from the actor state.
+func (c *ActorMembership) GetValidatorSet() (*Set, error) {
+	var set Set
+	err := c.client.GetValidatorSet(&set)
+	if err != nil {
+		return nil, err
+	}
+	return &set, err
 }

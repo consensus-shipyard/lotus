@@ -67,6 +67,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/gregdhill/go-openrpc v0.0.0-20220114144539-ae6f44720487
 	github.com/hako/durafmt v0.0.0-20200710122514-c0fb7b4da026
