@@ -52,7 +52,7 @@ func NewActorMembershipClient(client *rpc.JSONRPCClient) *ActorMembership {
 // GetValidatorSet gets the membership config from the actor state.
 func (c *ActorMembership) GetValidatorSet() (*Set, error) {
 	var set Set
-	err := c.client.GetValidatorSet(&set)
+	err := c.client.SendRequest("Filecoin.GetValidatorSet", nil, &set)
 	if err != nil {
 		return nil, err
 	}
