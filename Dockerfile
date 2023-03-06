@@ -33,7 +33,7 @@ RUN set -eux; \
 COPY ./ /opt/filecoin
 WORKDIR /opt/filecoin
 
-RUN scripts/docker-git-state-check.sh
+# RUN scripts/docker-git-state-check.sh
 
 ### make configurable filecoin-ffi build
 ARG FFI_BUILD_FROM_SOURCE=0
@@ -46,6 +46,7 @@ ARG GOFLAGS=""
 
 RUN make buildall
 
+RUN make spacenet
 #####################################
 FROM ubuntu:20.04 AS lotus-base
 MAINTAINER Lotus Development Team
@@ -71,7 +72,7 @@ MAINTAINER Lotus Development Team
 
 COPY --from=lotus-builder /opt/filecoin/lotus /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/lotus-shed /usr/local/bin/
-COPY scripts/docker-lotus-entrypoint.sh /
+COPY scripts/docker-eudico-entrypoint.sh /
 
 ARG DOCKER_LOTUS_IMPORT_SNAPSHOT https://snapshots.mainnet.filops.net/minimal/latest
 ENV DOCKER_LOTUS_IMPORT_SNAPSHOT ${DOCKER_LOTUS_IMPORT_SNAPSHOT}
@@ -89,7 +90,7 @@ USER fc
 
 EXPOSE 1234
 
-ENTRYPOINT ["/docker-lotus-entrypoint.sh"]
+ENTRYPOINT ["/docker-eudico-entrypoint.sh"]
 
 CMD ["-help"]
 
@@ -103,6 +104,7 @@ ENV LOTUS_WORKER_PATH /var/lib/lotus-worker
 ENV WALLET_PATH /var/lib/lotus-wallet
 
 COPY --from=lotus-builder /opt/filecoin/lotus          /usr/local/bin/
+COPY --from=lotus-builder /opt/filecoin/eudico         /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/lotus-seed     /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/lotus-shed     /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/lotus-wallet   /usr/local/bin/
