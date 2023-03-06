@@ -1037,9 +1037,9 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	ens.DisconnectMirValidators(ctx, validators[:MirFaultyValidatorNumber])
 
 	for _, node := range nodes[:MirFaultyValidatorNumber] {
-		ps, err := node.NetPeers(ctx)
+		peers, err := node.NetPeers(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 0, len(ps))
+		require.Equal(t, 0, kit.CountPeerIDs(peers))
 	}
 
 	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)

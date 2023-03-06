@@ -35,7 +35,7 @@ var (
 	PeerDiscoveryInterval = 300 * time.Millisecond
 	PeerDiscoveryTimeout  = 3 * time.Minute
 
-	WaitForHeightTimeout = 60 * time.Second
+	WaitForHeightTimeout = 180 * time.Second
 )
 
 type Message []byte
@@ -285,18 +285,16 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if err := sm.ctx.Err(); err != nil {
 		return nil
 	}
-	base, err := sm.api.ChainHead(sm.ctx)
+
+	base, err := sm.api.ChainGetTipSetByHeight(sm.ctx, sm.height-1, types.EmptyTSK)
 	if err != nil {
 		return xerrors.Errorf("validator %v failed to get chain head: %w", sm.id, err)
 	}
 	log.With("validator", sm.id).Debugf("Trying to mine new block over base: %s", base.Key())
 
-	nextHeight := base.Height() + 1
-	log.With("validator", sm.id).Debugf("Getting new batch from Mir to assemble a new block for height: %d", nextHeight)
-
 	msgs := sm.getSignedMessages(mirMsgs)
 	log.With("validator", sm.id).With("epoch", sm.currentEpoch).
-		With("height", nextHeight).Infof("try to create a block: msgs - %d", len(msgs))
+		With("height", sm.height).Infof("try to create a block: msgs - %d", len(msgs))
 
 	// include checkpoint in VRF proof field?
 	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
@@ -310,7 +308,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		if err != nil {
 			return xerrors.Errorf("validator %v failed to set vrfproof from checkpoint: %w", sm.id, err)
 		}
-		log.With("validator", sm.id).Infof("Including Mir checkpoint for in block %d", nextHeight)
+		log.With("validator", sm.id).Infof("Including Mir checkpoint for in block %d", sm.height)
 	}
 
 	bh, err := sm.api.MinerCreateBlock(sm.ctx, &lapi.BlockTemplate{
@@ -320,8 +318,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		BeaconValues:     nil,
 		Ticket:           vrfCheckpoint,
 		Eproof:           eproofCheckpoint,
-		Epoch:            base.Height() + 1,
-		Timestamp:        uint64(base.Height() + 1),
+		Epoch:            sm.height,
+		Timestamp:        uint64(sm.height),
 		WinningPoStProof: nil,
 		Messages:         msgs,
 	})
@@ -329,7 +327,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return xerrors.Errorf("validator %v failed to create a block: %w", sm.id, err)
 	}
 	if bh == nil {
-		log.With("validator", sm.id).With("epoch", nextHeight).Debug("created a nil block")
+		log.With("validator", sm.id).With("epoch", sm.height).Debug("created a nil block")
 		return nil
 	}
 
@@ -511,8 +509,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		// In Mir tipsets have a single block, so we can access directly the block for
 		// the tipset by accessing the first position.
 		ch.BlockCids = append(ch.BlockCids, ts.Blocks()[0].Cid())
-		i--
 		log.With("validator", sm.id).Infof("Getting Cid for block height %d and cid %s to include in snapshot", i, ts.Blocks()[0].Cid())
+		i--
 	}
 
 	b, err := ch.Bytes()
