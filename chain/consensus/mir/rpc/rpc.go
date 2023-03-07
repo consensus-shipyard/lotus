@@ -9,6 +9,12 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
+type JSONRPCRequestSender interface {
+	SendRequest(method string, params interface{}, reply interface{}) error
+}
+
+var _ JSONRPCRequestSender = &JSONRPCClient{}
+
 type JSONRPCClient struct {
 	ctx   context.Context
 	token string
@@ -19,6 +25,15 @@ func NewJSONRPCClient(url, token string) *JSONRPCClient {
 	return &JSONRPCClient{
 		ctx:   context.Background(),
 		token: token,
+		url:   url,
+	}
+}
+
+// NewInsecureJSONRPCClient creates a JSON RPC client with empty credentials.
+func NewInsecureJSONRPCClient(url string) *JSONRPCClient {
+	return &JSONRPCClient{
+		ctx:   context.Background(),
+		token: "",
 		url:   url,
 	}
 }

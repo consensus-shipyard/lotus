@@ -39,11 +39,13 @@ func (e EnvMembership) GetValidatorSet() (*Set, error) {
 
 // -----
 
+const JSONRPCServerURL = "http://127.0.0.1:3030"
+
 type ActorMembership struct {
-	client *rpc.JSONRPCClient
+	client rpc.JSONRPCRequestSender
 }
 
-func NewActorMembershipClient(client *rpc.JSONRPCClient) *ActorMembership {
+func NewActorMembershipClient(client rpc.JSONRPCRequestSender) *ActorMembership {
 	return &ActorMembership{
 		client: client,
 	}

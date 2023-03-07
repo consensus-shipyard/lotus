@@ -13,6 +13,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/rpc"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
@@ -59,6 +60,10 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "init-checkpoint",
 			Usage: "pass initial checkpoint as a file (it overwrites 'init-height' flag)",
+		},
+		&cli.BoolFlag{
+			Name:  "use-file-membership",
+			Usage: "use file membership for reconfiguration",
 		},
 		&cli.StringFlag{
 			Name:  "restore-configuration-number",
@@ -168,7 +173,13 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		membership := validator.NewFileMembership(membershipFile)
+		var membership validator.Reader
+		if cctx.Bool("use-file-membership") {
+			membership = validator.NewFileMembership(membershipFile)
+		} else {
+			cl := rpc.NewJSONRPCClient("", "")
+			membership = validator.NewActorMembershipClient(cl)
+		}
 
 		var netLogger = mir.NewLogger(validatorID.String())
 		netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(validatorID.String()), h, netLogger)
