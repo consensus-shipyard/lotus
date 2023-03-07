@@ -1526,6 +1526,21 @@ func (mr *MockFullNodeMockRecorder) IPCAddSubnetActor(arg0, arg1, arg2 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IPCAddSubnetActor), arg0, arg1, arg2)
 }
 
+// IPCGetCheckpoint mocks base method.
+func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetCheckpoint", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetCheckpoint indicates an expected call of IPCGetCheckpoint.
+func (mr *MockFullNodeMockRecorder) IPCGetCheckpoint(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpoint), arg0, arg1, arg2)
+}
+
 // IPCGetCheckpointTemplate mocks base method.
 func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	m.ctrl.T.Helper()
@@ -1554,6 +1569,21 @@ func (m *MockFullNode) IPCGetPrevCheckpointForChild(arg0 context.Context, arg1 a
 func (mr *MockFullNodeMockRecorder) IPCGetPrevCheckpointForChild(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetPrevCheckpointForChild", reflect.TypeOf((*MockFullNode)(nil).IPCGetPrevCheckpointForChild), arg0, arg1, arg2)
+}
+
+// IPCGetVotesForCheckpoint mocks base method.
+func (m *MockFullNode) IPCGetVotesForCheckpoint(arg0 context.Context, arg1 address.Address, arg2 cid.Cid) (*subnetactor.Votes, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetVotesForCheckpoint", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*subnetactor.Votes)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetVotesForCheckpoint indicates an expected call of IPCGetVotesForCheckpoint.
+func (mr *MockFullNodeMockRecorder) IPCGetVotesForCheckpoint(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetVotesForCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCGetVotesForCheckpoint), arg0, arg1, arg2)
 }
 
 // IPCListChildSubnets mocks base method.

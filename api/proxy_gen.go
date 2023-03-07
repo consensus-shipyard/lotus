@@ -321,9 +321,13 @@ type FullNodeMethods struct {
 
 	IPCAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
 
+	IPCGetCheckpoint func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
+
 	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
+
+	IPCGetVotesForCheckpoint func(p0 context.Context, p1 address.Address, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
 
 	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) `perm:"read"`
 
@@ -2433,6 +2437,17 @@ func (s *FullNodeStub) IPCAddSubnetActor(p0 context.Context, p1 address.Address,
 	return *new(address.Address), ErrNotSupported
 }
 
+func (s *FullNodeStruct) IPCGetCheckpoint(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	if s.Internal.IPCGetCheckpoint == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpoint(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetCheckpoint(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	return nil, ErrNotSupported
+}
+
 func (s *FullNodeStruct) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	if s.Internal.IPCGetCheckpointTemplate == nil {
 		return nil, ErrNotSupported
@@ -2453,6 +2468,17 @@ func (s *FullNodeStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 add
 
 func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
 	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCGetVotesForCheckpoint(p0 context.Context, p1 address.Address, p2 cid.Cid) (*subnetactor.Votes, error) {
+	if s.Internal.IPCGetVotesForCheckpoint == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCGetVotesForCheckpoint(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetVotesForCheckpoint(p0 context.Context, p1 address.Address, p2 cid.Cid) (*subnetactor.Votes, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
