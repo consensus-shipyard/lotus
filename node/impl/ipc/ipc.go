@@ -146,6 +146,40 @@ func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
 }
 
+// IPCGetVotesForCheckpoint returns if there is an active voting for a checkpoint with a specific cid.
+// If no active votings are found for a checkpoints is because the checkpoint has already been committed
+// or because no one has votes that checkpoint yet.
+func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, addr address.Address, c cid.Cid) (*subnetactor.Votes, error) {
+	st, err := a.IPCReadSubnetActorState(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	v, found, err := st.GetCheckpointVotes(a.Chain.ActorStore(ctx), c)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting votes from actor store: %w", err)
+	}
+	if !found {
+		return &subnetactor.Votes{make([]address.Address, 0)}, nil
+	}
+	return v, nil
+}
+
+// IPCGetCheckpoint returns the checkpoint committed in the subnet actor for an epoch.
+func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, addr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	st, err := a.IPCReadSubnetActorState(ctx, addr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), epoch)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting checkpoint from actor store: %w", err)
+	}
+	if !found {
+		return nil, xerrors.Errorf("no checkpoint committed for epoch %v", epoch)
+	}
+	return ch, nil
+}
+
 // IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
 // peers in a subnet can deterministically generate the genesis block for the subnet.
 func (a *IPCAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID) ([]byte, error) {
