@@ -35,6 +35,13 @@
       "Meta": {
           "Owner": "t12zjpclnis2uytmcydrx7i5jcbvehs5ut3x6mvvq"
       }
+  },
+      {
+      "Type": "account",
+      "Balance": "500000000000000000000000000",
+      "Meta": {
+          "Owner": "f1jlm55oqkdalh2l3akqfsaqmpjxgjd36pob34dqy"
+      }
   }
   ],
   "Miners": [
