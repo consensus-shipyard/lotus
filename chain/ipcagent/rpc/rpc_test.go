@@ -71,7 +71,7 @@ func TestClientCompatibleWithIPCAgent(t *testing.T) {
 
 		result := "{\"jsonrpc\":\"2.0\",\"result\":{\"Result\":4},\"id\":5577006791947779410}"
 
-		_, err = fmt.Fprintf(w, result)
+		_, err = fmt.Fprint(w, result)
 		require.NoError(t, err)
 	}))
 	defer srv.Close()
