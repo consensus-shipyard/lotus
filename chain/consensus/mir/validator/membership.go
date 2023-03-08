@@ -1,7 +1,7 @@
 package validator
 
 import (
-	"github.com/filecoin-project/lotus/chain/consensus/mir/rpc"
+	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
 type FileMembership struct {
@@ -54,7 +54,7 @@ func NewActorMembershipClient(client rpc.JSONRPCRequestSender) *ActorMembership 
 // GetValidatorSet gets the membership config from the actor state.
 func (c *ActorMembership) GetValidatorSet() (*Set, error) {
 	var set Set
-	err := c.client.SendRequest("Filecoin.GetValidatorSet", nil, &set)
+	err := c.client.SendRequest("ipc_queryValidatorSet", nil, &set)
 	if err != nil {
 		return nil, err
 	}

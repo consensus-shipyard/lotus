@@ -3,8 +3,8 @@ package kit
 import (
 	"encoding/json"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir/rpc"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
 var _ rpc.JSONRPCRequestSender = &StubJSONRPCClient{}
