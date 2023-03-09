@@ -8,7 +8,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 )
 
-func TestCacheLen(t *testing.T) {
+func TestMembership(t *testing.T) {
 	v1, err := validator.NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
 	require.NoError(t, err)
 	v2, err := validator.NewValidatorFromString("t12zjpclnis2uytmcydrx7i5jcbvehs5ut3x6mvvq@/ip4/127.0.0.1/tcp/10001/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
