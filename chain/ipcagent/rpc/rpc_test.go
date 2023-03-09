@@ -81,12 +81,12 @@ func TestClientCompatibleWithIPCAgent(t *testing.T) {
 			"validators": [{
 					"addr": "f1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq",
 					"net_addr": "/ip4/127.0.0.1/tcp/38443/p2p/12D3KooWM4Z6tymWBUC9LQ7NNJ2RtzoakV1vDSyzehzC17Dpo367",
-					"weight": 0
+					"weight": "1"
 				},
 				{
 					"addr": "f1akaouty2buxxwb46l27pzrhl3te2lw5jem67xuy",
 					"net_addr": "/ip4/127.0.0.1/tcp/40315/p2p/12D3KooWD9DHVsaPvBN5H16aWZ9KDChyrDSKVCnZegsJguuwd76E",
-					"weight": 0
+					"weight": "0"
 				}
 			]
 		}
