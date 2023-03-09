@@ -10,6 +10,8 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"github.com/stretchr/testify/require"
+
+	addr "github.com/filecoin-project/go-address"
 )
 
 type TestService struct{}
@@ -20,11 +22,11 @@ type TestServiceRequest struct {
 }
 
 type TestServiceResponse struct {
-	Result int
+	O int
 }
 
 func (t *TestService) Multiply(_ *http.Request, req *TestServiceRequest, res *TestServiceResponse) error {
-	res.Result = req.A * req.B
+	res.O = req.A * req.B
 	return nil
 }
 
@@ -51,7 +53,22 @@ func TestClient(t *testing.T) {
 	var resp *TestServiceResponse
 	err = c.SendRequest("TestService.Multiply", &TestServiceRequest{A: 1, B: 4}, &resp)
 	require.NoError(t, err)
-	require.Equal(t, 4, resp.Result)
+	require.Equal(t, 4, resp.O)
+}
+
+type Validator struct {
+	Addr    addr.Address `json:"addr"`
+	NetAddr string       `json:"net_addr"`
+	W       int64        `json:"weight"`
+}
+
+type Set struct {
+	ConfigurationNumber uint64      `json:"config_number"`
+	Validators          []Validator `json:"validators"`
+}
+
+type confServiceResponse struct {
+	ValidatorSet Set `json:"validator_set"`
 }
 
 func TestClientCompatibleWithIPCAgent(t *testing.T) {
@@ -66,18 +83,50 @@ func TestClientCompatibleWithIPCAgent(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "2.0", obj["jsonrpc"])
-		require.Equal(t, "TestService.Multiply", obj["method"])
-		require.Equal(t, map[string]interface{}{"A": float64(1), "B": float64(4)}, obj["params"])
+		require.NotEqual(t, "", obj["id"])
+		require.NotEqual(t, "", obj["params"])
+		require.Equal(t, "ipc_queryValidatorSet", obj["method"])
 
-		result := "{\"jsonrpc\":\"2.0\",\"result\":{\"Result\":4},\"id\":5577006791947779410}"
-
+		var result = `
+{
+	"jsonrpc": "2.0",
+	"result": {
+		"validator_set": {
+			"config_number": 22,
+			"validators": [{
+					"addr": "f1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq",
+					"net_addr": "/ip4/127.0.0.1/tcp/38443/p2p/12D3KooWM4Z6tymWBUC9LQ7NNJ2RtzoakV1vDSyzehzC17Dpo367",
+					"weight": 0
+				},
+				{
+					"addr": "f1akaouty2buxxwb46l27pzrhl3te2lw5jem67xuy",
+					"net_addr": "/ip4/127.0.0.1/tcp/40315/p2p/12D3KooWD9DHVsaPvBN5H16aWZ9KDChyrDSKVCnZegsJguuwd76E",
+					"weight": 0
+				}
+			]
+		}
+	},
+	"id": "5577006791947779410"
+}
+`
 		_, err = fmt.Fprint(w, result)
 		require.NoError(t, err)
 	}))
 	defer srv.Close()
 
-	var resp *TestServiceResponse
+	req := struct {
+		subnet string
+		tipSet string
+	}{
+		subnet: "/root/test",
+		tipSet: "QmPK1s3pNYLi9ERiq3BDxKa3XosgWwFRQUydHUtz4YgpqB",
+	}
+
+	var resp *confServiceResponse
 	c := NewJSONRPCClient(srv.URL, "")
-	err := c.SendRequest("TestService.Multiply", &TestServiceRequest{A: 1, B: 4}, &resp)
+	err := c.SendRequest("ipc_queryValidatorSet", req, &resp)
 	require.NoError(t, err)
+
+	require.Equal(t, uint64(22), resp.ValidatorSet.ConfigurationNumber)
+	require.Equal(t, 2, len(resp.ValidatorSet.Validators))
 }
