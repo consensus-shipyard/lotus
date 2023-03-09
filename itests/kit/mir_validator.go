@@ -13,7 +13,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	mirlibp2pnet "github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	mirtypes "github.com/filecoin-project/mir/pkg/types"
@@ -55,7 +55,7 @@ type MirValidator struct {
 	stop             context.CancelFunc
 	db               *TestDB
 	membershipString string
-	membership       validator.Reader
+	membership       membership.Reader
 	config           *MirConfig
 }
 
@@ -79,16 +79,16 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 			return nil, fmt.Errorf("empty membership string")
 		}
 		v.membershipString = cfg.MembershipString
-		v.membership = validator.StringMembership(cfg.MembershipString)
+		v.membership = membership.StringMembership(cfg.MembershipString)
 	case FileMembership:
 		if cfg.MembershipFileName == "" {
 			return nil, fmt.Errorf("membership file is not specified")
 		}
-		v.membership = validator.FileMembership{FileName: cfg.MembershipFileName}
+		v.membership = membership.FileMembership{FileName: cfg.MembershipFileName}
 	case OnChainMembership:
 		cl := NewStubJSONRPCClient()
 		cl.nextSet = cfg.MembershipString
-		v.membership = validator.NewActorMembershipClient(cl)
+		v.membership = membership.NewActorMembershipClient(cl)
 	default:
 		return nil, fmt.Errorf("unknown membership type")
 	}

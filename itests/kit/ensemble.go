@@ -25,6 +25,7 @@ import (
 	"golang.org/x/xerrors"
 
 	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-address"
 	cborutil "github.com/filecoin-project/go-cbor-util"
@@ -41,7 +42,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/messagepool"
@@ -1063,7 +1063,7 @@ func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
 }
 
 func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile string, validators ...*TestValidator) {
-	var vs []validator.Validator
+	var vs []*validator.Validator
 
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)

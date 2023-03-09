@@ -3,7 +3,8 @@ package kit
 import (
 	"encoding/json"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
