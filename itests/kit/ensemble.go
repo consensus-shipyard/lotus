@@ -965,14 +965,14 @@ func (n *Ensemble) DisconnectNodes(from []*TestFullNode, to []*TestFullNode) *En
 	return n
 }
 
-func (n *Ensemble) DisconnectMirValidators(ctx context.Context, faultyValidators []*TestValidator) {
+func (n *Ensemble) DisconnectMirValidators(_ context.Context, faultyValidators []*TestValidator) {
 	for _, v := range faultyValidators {
 		v.mirValidator.mockedNet.Disable()
 		n.t.Log(">>> ", v.mirAddr, " disconnected")
 	}
 }
 
-func (n *Ensemble) ConnectMirValidators(ctx context.Context, faultyValidators []*TestValidator) {
+func (n *Ensemble) ConnectMirValidators(_ context.Context, faultyValidators []*TestValidator) {
 	for _, v := range faultyValidators {
 		v.mirValidator.mockedNet.Enable()
 		n.t.Log(">>> ", v.mirAddr, " connected")
@@ -1133,7 +1133,7 @@ func (n *Ensemble) BeginMirMiningWithConfig(
 
 		g.Go(func() error {
 			err = nv.MineBlocks(ctx)
-			if xerrors.Is(mapi.ErrStopped, err) {
+			if xerrors.Is(mapi.ErrStopped, err) { // nolint
 				return nil
 			}
 			return err
@@ -1172,7 +1172,7 @@ func (n *Ensemble) RestoreMirValidatorsWithOptions(ctx context.Context, g *errgr
 			}
 			v.mirValidator = mv
 			err = mv.MineBlocks(ctx)
-			if xerrors.Is(mapi.ErrStopped, err) {
+			if xerrors.Is(mapi.ErrStopped, err) { // nolint
 				return nil
 			}
 			return err
@@ -1180,7 +1180,7 @@ func (n *Ensemble) RestoreMirValidatorsWithOptions(ctx context.Context, g *errgr
 	}
 }
 
-func (n *Ensemble) CrashMirValidators(ctx context.Context, delay int, validators ...*TestValidator) {
+func (n *Ensemble) CrashMirValidators(_ context.Context, delay int, validators ...*TestValidator) {
 	for _, v := range validators {
 		v.mirValidator.stop()
 		v.mirValidator.db = NewTestDB()
@@ -1195,7 +1195,7 @@ func (n *Ensemble) CrashMirValidators(ctx context.Context, delay int, validators
 	}
 }
 
-func (n *Ensemble) RestartMirValidators(ctx context.Context, delay int, validators ...*TestValidator) {
+func (n *Ensemble) RestartMirValidators(_ context.Context, delay int, validators ...*TestValidator) {
 	for _, v := range validators {
 		v.mirValidator.stop()
 		// FIXME: Mir won't close the transport correctly,
@@ -1209,7 +1209,7 @@ func (n *Ensemble) RestartMirValidators(ctx context.Context, delay int, validato
 	}
 }
 
-func (n *Ensemble) StopMirValidators(ctx context.Context, validators ...*TestValidator) {
+func (n *Ensemble) StopMirValidators(_ context.Context, validators ...*TestValidator) {
 	for _, v := range validators {
 		v.mirValidator.stop()
 		// FIXME: Mir won't close the transport correctly,

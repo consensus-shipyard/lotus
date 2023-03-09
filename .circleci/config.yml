@@ -237,6 +237,9 @@ jobs:
   test-chain-unit:
     <<: *basic_test
 
+  test-ipcagent-unit:
+    <<: *basic_test
+
   test-mir-basic:
     <<: *basic_test
 
@@ -574,6 +577,10 @@ workflows:
           name: chain-unit-tests
           suite: consensus
           target: "./chain/consensus/..."
+      - test-ipcagent-unit:
+          name: ipcagent-unit-tests
+          suite: consensus
+          target: "./chain/ipcagent/..."
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
