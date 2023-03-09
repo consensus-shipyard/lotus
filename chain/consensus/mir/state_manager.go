@@ -34,7 +34,7 @@ var (
 	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
 	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
 
-	PeerDiscoveryInterval = 300 * time.Millisecond
+	PeerDiscoveryInterval = 600 * time.Millisecond
 	PeerDiscoveryTimeout  = 3 * time.Minute
 
 	WaitForHeightTimeout = 180 * time.Second
@@ -145,6 +145,9 @@ func NewStateManager(
 
 // syncFromPeers sync the chain from Filecoin peers.
 func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
+	log.With("validator", sm.id).Infof("syncFromPeers for TSK %s started", tsk.String())
+	defer log.With("validator", sm.id).Infof("syncFromPeers for TSK %s finished", tsk.String())
+
 	// From all the peers of my daemon try to get the latest tipset.
 	timeout := time.After(PeerDiscoveryTimeout)
 	attempt := time.NewTicker(PeerDiscoveryInterval)
@@ -156,31 +159,31 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		if err != nil {
 			return xerrors.Errorf("failed to get peers: %w", err)
 		}
-		if len(connPeers) > 0 {
-			break
+
+		if len(connPeers) == 0 {
+			log.With("validator", sm.id).Warn("no connected peers")
 		}
 
-		log.With("validator", sm.id).Warn("no connected peers")
+		for _, p := range connPeers {
+			ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, p.ID, tsk)
+			if err != nil {
+				log.With("validator", sm.id).Errorf("failed to get the latest tipset from peer %s: %v", p.ID, err)
+				continue
+			}
+			// wait for full-sync before returning from restoreState.
+			err = sm.waitForHeight(ts.Height())
+			if err != nil {
+				log.With("validator", sm.id).Warnf("failed to wait for block %d: %v", ts.Height(), err)
+				continue
+			}
+			return nil
+		}
+
 		select {
 		case <-timeout:
 			return xerrors.Errorf("syncing from peers timeout exceeded")
 		case <-attempt.C:
 		}
-	}
-
-	for _, p := range connPeers {
-		ts, err := sm.api.SyncFetchTipSetFromPeer(sm.ctx, p.ID, tsk)
-		if err != nil {
-			log.With("validator", sm.id).Errorf("failed to get the latest tipset from peer %s: %v", p.ID, err)
-			continue
-		}
-		// wait for full-sync before returning from restoreState.
-		err = sm.waitForHeight(ts.Height())
-		if err != nil {
-			log.With("validator", sm.id).Warnf("failed to wait for block %d: %v", ts.Height(), err)
-			continue
-		}
-		return nil
 	}
 
 	return xerrors.Errorf("couldn't sync from peers")
@@ -252,7 +255,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// once synced we deliver the checkpoint to our mining process, so it can be
 		// included in the next block (as the rest of Mir validators will do before
 		// accepting the next batch), and we persist it locally.
-		log.With("validator", sm.id).Infof("Delivering checkpoint for height %d to mining process after sync", ch.Height)
 		err = sm.deliverCheckpoint(checkpoint, &ch)
 		if err != nil {
 			return xerrors.Errorf("validator %v failed to deliver checkpoint to lotus from mir after restoreState: %w", sm.id, err)
@@ -553,6 +555,9 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 // deliver checkpoint receives a checkpoint, persists it locally in the local block store, and delivers
 // it to the mining process to include it in a new block.
 func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoint, snapshot *Checkpoint) error {
+	log.With("validator", sm.id).Infof("deliverCheckpoint for height %d started", snapshot.Height)
+	defer log.With("validator", sm.id).Infof("deliverCheckpoint for height %d finished", snapshot.Height)
+
 	// if we deserialized it correctly, we can persist it directly in the data store.
 	if err := sm.ds.Put(sm.ctx, LatestCheckpointKey, checkpoint.Snapshot.AppData); err != nil {
 		return xerrors.Errorf("error flushing latest checkpoint in datastore: %w", err)
@@ -783,7 +788,7 @@ func WaitForHeight(ctx context.Context, height abi.ChainEpoch, api v1api.FullNod
 		case <-ctx.Done():
 			return xerrors.Errorf("context cancelled while waiting for height %v", height)
 		case <-timeout:
-			return xerrors.Errorf("time exceeded while waiting for height %v", height)
+			return xerrors.Errorf("time exceeded while waiting for target height %v beginning with %d", height, head)
 		default:
 			base, err := api.ChainHead(ctx)
 			if err != nil {
