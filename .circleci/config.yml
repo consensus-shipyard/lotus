@@ -579,6 +579,11 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 10m -run TestMirSmoke"
           target: "./itests/mir_test.go"
+      - test-ipc-basic:
+          name: ipc-basic-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 10m -run TestIPC"
+          target: "./itests/ipc_test.go"
       - test-mir-basic:
           name: mir-basic-tests
           suite: consensus

@@ -1527,7 +1527,7 @@ func (mr *MockFullNodeMockRecorder) IPCAddSubnetActor(arg0, arg1, arg2 interface
 }
 
 // IPCGetCheckpoint mocks base method.
-func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCGetCheckpoint", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*gateway.Checkpoint)
@@ -1572,7 +1572,7 @@ func (mr *MockFullNodeMockRecorder) IPCGetPrevCheckpointForChild(arg0, arg1, arg
 }
 
 // IPCGetVotesForCheckpoint mocks base method.
-func (m *MockFullNode) IPCGetVotesForCheckpoint(arg0 context.Context, arg1 address.Address, arg2 cid.Cid) (*subnetactor.Votes, error) {
+func (m *MockFullNode) IPCGetVotesForCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 cid.Cid) (*subnetactor.Votes, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCGetVotesForCheckpoint", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*subnetactor.Votes)
@@ -1617,7 +1617,7 @@ func (mr *MockFullNodeMockRecorder) IPCReadGatewayState(arg0, arg1, arg2 interfa
 }
 
 // IPCReadSubnetActorState mocks base method.
-func (m *MockFullNode) IPCReadSubnetActorState(arg0 context.Context, arg1 address.Address, arg2 types.TipSetKey) (*subnetactor.State, error) {
+func (m *MockFullNode) IPCReadSubnetActorState(arg0 context.Context, arg1 sdk.SubnetID, arg2 types.TipSetKey) (*subnetactor.State, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCReadSubnetActorState", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*subnetactor.State)

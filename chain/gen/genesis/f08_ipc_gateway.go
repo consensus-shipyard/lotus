@@ -23,6 +23,7 @@ import (
 const (
 	// Default checkpoint period for the IPC gateway.
 	DefaultCheckpointPeriod = 10
+	DefaultIPCGatewayAddrID = 64
 
 	bitWidth  = 5
 	minStake  = 1000000000000000000
@@ -31,7 +32,7 @@ const (
 
 var (
 	// DefaultIPCGatewayAddr used to deploy the gateway in genesis.
-	DefaultIPCGatewayAddr, _ = address.NewIDAddress(64)
+	DefaultIPCGatewayAddr, _ = address.NewIDAddress(DefaultIPCGatewayAddrID)
 )
 
 func constructState(store adt.Store, network ipctypes.SubnetID, checkPeriod int64) (*gateway.State, error) {

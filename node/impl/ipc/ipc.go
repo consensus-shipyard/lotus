@@ -109,9 +109,9 @@ func (a *IPCAPI) IPCReadGatewayState(ctx context.Context, actor address.Address,
 	return &st, nil
 }
 
-func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
+func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error) {
 	st := subnetactor.State{}
-	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
+	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
 	return &st, nil
@@ -149,8 +149,8 @@ func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 // IPCGetVotesForCheckpoint returns if there is an active voting for a checkpoint with a specific cid.
 // If no active votings are found for a checkpoints is because the checkpoint has already been committed
 // or because no one has votes that checkpoint yet.
-func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, addr address.Address, c cid.Cid) (*subnetactor.Votes, error) {
-	st, err := a.IPCReadSubnetActorState(ctx, addr, types.EmptyTSK)
+func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error) {
+	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +165,8 @@ func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, addr address.Addr
 }
 
 // IPCGetCheckpoint returns the checkpoint committed in the subnet actor for an epoch.
-func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, addr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
-	st, err := a.IPCReadSubnetActorState(ctx, addr, types.EmptyTSK)
+func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
