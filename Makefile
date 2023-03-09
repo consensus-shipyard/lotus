@@ -92,7 +92,7 @@ spacenet-test:
 
 ipc-test: GOFLAGS+=-tags=spacenet
 ipc-test:
-	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=60m -run TestIPC ./itests/ipc_test.go
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m -run TestIPC ./itests/ipc_test.go
 .PHONY: ipc-test
 
 spacenet-mangling-test: GOFLAGS+=-tags=spacenet
