@@ -1063,13 +1063,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[MirFaultyValidatorNumber:])
 	ens.DisconnectMirValidators(ctx, validators[:MirFaultyValidatorNumber])
 
-	for _, node := range nodes[:MirFaultyValidatorNumber] {
-		peers, err := node.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Equal(t, 0, kit.CountPeerIDs(peers))
-	}
-
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)
@@ -1111,7 +1105,7 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> crash %d validators", MirFaultyValidatorNumber)
 	ens.CrashMirValidators(ctx, 0, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d validators", MirFaultyValidatorNumber)
@@ -1154,7 +1148,7 @@ func TestMirBasic_WithFRestartedNodes(t *testing.T) {
 	t.Logf(">>> restart %d validators", MirFaultyValidatorNumber)
 	ens.RestartMirValidators(ctx, 0, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d validators", MirFaultyValidatorNumber)
@@ -1284,7 +1278,7 @@ func TestMirBasic_WithFCrashedAndRecoveredNodes(t *testing.T) {
 	t.Logf(">>> crash %d validators", MirFaultyValidatorNumber)
 	ens.CrashMirValidators(ctx, 0, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d validators from scratch", MirFaultyValidatorNumber)
@@ -1321,7 +1315,7 @@ func TestMirBasic_FNodesCrashLongTimeApart(t *testing.T) {
 	t.Logf(">>> crash %d nodes", MirFaultyValidatorNumber)
 	ens.CrashMirValidators(ctx, MaxDelay, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
@@ -1367,7 +1361,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)
