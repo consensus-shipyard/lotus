@@ -90,6 +90,11 @@ spacenet-test:
 	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=60m -run TestMir ./itests/mir_test.go
 .PHONY: spacenet-test
 
+ipc-test: GOFLAGS+=-tags=spacenet
+ipc-test:
+	go test $(GOFLAGS) -shuffle=on -v -count=1 -timeout=10m -run TestIPC ./itests/ipc_test.go
+.PHONY: ipc-test
+
 spacenet-mangling-test: GOFLAGS+=-tags=spacenet
 spacenet-mangling-test:
 	export MIR_INTERCEPTOR_OUTPUT="/tmp/mir-logs-`date +%s`" && echo "Interceptor output: $$MIR_INTERCEPTOR_OUTPUT"; \

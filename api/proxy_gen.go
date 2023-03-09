@@ -321,19 +321,19 @@ type FullNodeMethods struct {
 
 	IPCAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
 
-	IPCGetCheckpoint func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
+	IPCGetCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
-	IPCGetVotesForCheckpoint func(p0 context.Context, p1 address.Address, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
+	IPCGetVotesForCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
 
 	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) `perm:"read"`
 
 	IPCReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) `perm:"read"`
 
-	IPCReadSubnetActorState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
+	IPCReadSubnetActorState func(p0 context.Context, p1 sdk.SubnetID, p2 types.TipSetKey) (*subnetactor.State, error) `perm:"read"`
 
 	MarketAddBalance func(p0 context.Context, p1 address.Address, p2 address.Address, p3 types.BigInt) (cid.Cid, error) `perm:"sign"`
 
@@ -2437,14 +2437,14 @@ func (s *FullNodeStub) IPCAddSubnetActor(p0 context.Context, p1 address.Address,
 	return *new(address.Address), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCGetCheckpoint(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (s *FullNodeStruct) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	if s.Internal.IPCGetCheckpoint == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.IPCGetCheckpoint(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IPCGetCheckpoint(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (s *FullNodeStub) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	return nil, ErrNotSupported
 }
 
@@ -2470,14 +2470,14 @@ func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 addre
 	return *new(cid.Cid), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCGetVotesForCheckpoint(p0 context.Context, p1 address.Address, p2 cid.Cid) (*subnetactor.Votes, error) {
+func (s *FullNodeStruct) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) {
 	if s.Internal.IPCGetVotesForCheckpoint == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.IPCGetVotesForCheckpoint(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IPCGetVotesForCheckpoint(p0 context.Context, p1 address.Address, p2 cid.Cid) (*subnetactor.Votes, error) {
+func (s *FullNodeStub) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) {
 	return nil, ErrNotSupported
 }
 
@@ -2503,14 +2503,14 @@ func (s *FullNodeStub) IPCReadGatewayState(p0 context.Context, p1 address.Addres
 	return nil, ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
+func (s *FullNodeStruct) IPCReadSubnetActorState(p0 context.Context, p1 sdk.SubnetID, p2 types.TipSetKey) (*subnetactor.State, error) {
 	if s.Internal.IPCReadSubnetActorState == nil {
 		return nil, ErrNotSupported
 	}
 	return s.Internal.IPCReadSubnetActorState(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IPCReadSubnetActorState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*subnetactor.State, error) {
+func (s *FullNodeStub) IPCReadSubnetActorState(p0 context.Context, p1 sdk.SubnetID, p2 types.TipSetKey) (*subnetactor.State, error) {
 	return nil, ErrNotSupported
 }
 

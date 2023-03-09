@@ -109,9 +109,12 @@ func (a *IPCAPI) IPCReadGatewayState(ctx context.Context, actor address.Address,
 	return &st, nil
 }
 
-func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error) {
+func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error) {
+	if err := a.checkParent(ctx, sn); err != nil {
+		return nil, err
+	}
 	st := subnetactor.State{}
-	if err := a.readActorState(ctx, actor, tsk, &st); err != nil {
+	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
 	return &st, nil
@@ -149,8 +152,11 @@ func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 // IPCGetVotesForCheckpoint returns if there is an active voting for a checkpoint with a specific cid.
 // If no active votings are found for a checkpoints is because the checkpoint has already been committed
 // or because no one has votes that checkpoint yet.
-func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, addr address.Address, c cid.Cid) (*subnetactor.Votes, error) {
-	st, err := a.IPCReadSubnetActorState(ctx, addr, types.EmptyTSK)
+func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error) {
+	if err := a.checkParent(ctx, sn); err != nil {
+		return nil, err
+	}
+	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +171,11 @@ func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, addr address.Addr
 }
 
 // IPCGetCheckpoint returns the checkpoint committed in the subnet actor for an epoch.
-func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, addr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
-	st, err := a.IPCReadSubnetActorState(ctx, addr, types.EmptyTSK)
+func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+	if err := a.checkParent(ctx, sn); err != nil {
+		return nil, err
+	}
+	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
@@ -222,4 +231,18 @@ func (a *IPCAPI) readActorState(ctx context.Context, actor address.Address, tsk 
 
 	return stateType.UnmarshalCBOR(bytes.NewReader(blk.RawData()))
 
+}
+
+// check that the current network is the right parent for subnetID
+func (a *IPCAPI) checkParent(ctx context.Context, sn sdk.SubnetID) error {
+	netName, err := a.StateAPI.StateNetworkName(ctx)
+	if err != nil {
+		return err
+	}
+
+	if string(netName) != sn.Parent {
+		return xerrors.Errorf("wrong subnet being called: the current network is not the parent of subnet provided: %s, %s",
+			netName, sn.Parent)
+	}
+	return nil
 }

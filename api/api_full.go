@@ -867,12 +867,12 @@ type FullNode interface {
 	// IPCAddSubnetActor deploys a new subnet actor.
 	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)   //perm:write
 	IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)                  //perm:read
-	IPCReadSubnetActorState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*subnetactor.State, error)          //perm:read
+	IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error)                //perm:read
 	IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)          //perm:read
 	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) //perm:read
 	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)                               //perm:read
-	IPCGetVotesForCheckpoint(ctx context.Context, addr address.Address, c cid.Cid) (*subnetactor.Votes, error)                    //perm:read
-	IPCGetCheckpoint(ctx context.Context, addr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error)                //perm:read
+	IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error)                         //perm:read
+	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error)                     //perm:read
 }
 
 // reverse interface to the client, called after EthSubscribe

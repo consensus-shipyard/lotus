@@ -3150,7 +3150,10 @@ Perms: read
 Inputs:
 ```json
 [
-  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
   10101
 ]
 ```
@@ -3291,7 +3294,10 @@ Perms: read
 Inputs:
 ```json
 [
-  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
   {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   }
@@ -3440,7 +3446,10 @@ Perms: read
 Inputs:
 ```json
 [
-  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
   [
     {
       "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
@@ -3477,12 +3486,16 @@ Response:
   "WindowChecks": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
-  "ValidatorSet": [
-    {
-      "Addr": "f01234",
-      "NetAddr": "string value"
-    }
-  ],
+  "ValidatorSet": {
+    "validators": [
+      {
+        "addr": "f01234",
+        "net_addr": "string value",
+        "weight": "0"
+      }
+    ],
+    "configuration_number": 42
+  },
   "MinValidators": 42
 }
 ```
