@@ -10,8 +10,8 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"github.com/stretchr/testify/require"
-
-	addr "github.com/filecoin-project/go-address"
+	
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 )
 
 type TestService struct{}
@@ -56,21 +56,6 @@ func TestClient(t *testing.T) {
 	require.Equal(t, 4, resp.O)
 }
 
-type Validator struct {
-	Addr    addr.Address `json:"addr"`
-	NetAddr string       `json:"net_addr"`
-	W       int64        `json:"weight"`
-}
-
-type Set struct {
-	ConfigurationNumber uint64      `json:"config_number"`
-	Validators          []Validator `json:"validators"`
-}
-
-type confServiceResponse struct {
-	ValidatorSet Set `json:"validator_set"`
-}
-
 func TestClientCompatibleWithIPCAgent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)
@@ -92,7 +77,7 @@ func TestClientCompatibleWithIPCAgent(t *testing.T) {
 	"jsonrpc": "2.0",
 	"result": {
 		"validator_set": {
-			"config_number": 22,
+			"configuration_number": 22,
 			"validators": [{
 					"addr": "f1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq",
 					"net_addr": "/ip4/127.0.0.1/tcp/38443/p2p/12D3KooWM4Z6tymWBUC9LQ7NNJ2RtzoakV1vDSyzehzC17Dpo367",
@@ -122,7 +107,9 @@ func TestClientCompatibleWithIPCAgent(t *testing.T) {
 		tipSet: "QmPK1s3pNYLi9ERiq3BDxKa3XosgWwFRQUydHUtz4YgpqB",
 	}
 
-	var resp *confServiceResponse
+	var resp *struct {
+		ValidatorSet validator.Set `json:"validator_set"`
+	}
 	c := NewJSONRPCClient(srv.URL, "")
 	err := c.SendRequest("ipc_queryValidatorSet", req, &resp)
 	require.NoError(t, err)
