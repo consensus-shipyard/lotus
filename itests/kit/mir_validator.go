@@ -20,9 +20,10 @@ import (
 )
 
 const (
-	FakeMembership   = 0
-	StringMembership = 1
-	FileMembership   = 2
+	FakeMembership    = 0
+	StringMembership  = 1
+	FileMembership    = 2
+	OnChainMembership = 3
 )
 
 type MirConfig struct {
@@ -84,6 +85,10 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 			return nil, fmt.Errorf("membership file is not specified")
 		}
 		v.membership = validator.FileMembership{FileName: cfg.MembershipFileName}
+	case OnChainMembership:
+		cl := NewStubJSONRPCClient()
+		cl.nextSet = cfg.MembershipString
+		v.membership = validator.NewActorMembershipClient(cl)
 	default:
 		return nil, fmt.Errorf("unknown membership type")
 	}

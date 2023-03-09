@@ -18,7 +18,6 @@ type Validator struct {
 }
 
 // NewValidatorFromString parses a validator address from the string.
-// OpaqueNetAddr can contain GRPC or libp2p addresses.
 //
 // Examples of validator strings:
 //   - t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ

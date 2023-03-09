@@ -143,6 +143,32 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	}
 }
 
+// TestMirReconfigurationOnChain_RunSubnet tests that the membership can be received using a stub JSON RPC client.
+func TestMirReconfigurationOnChain_RunSubnetWithStubJSONRPC(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+1)
+
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
+		&kit.MirConfig{
+			MembershipType: kit.OnChainMembership,
+		})
+
+	err := kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+}
+
 // TestMirReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
 // if a new validator joins the network that have produced 100 blocks.
 func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	t "github.com/filecoin-project/mir/pkg/types"
@@ -23,6 +23,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
@@ -59,6 +60,16 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "init-checkpoint",
 			Usage: "pass initial checkpoint as a file (it overwrites 'init-height' flag)",
+		},
+		&cli.StringFlag{
+			Name:  "membership",
+			Usage: "membership type: onchain, file",
+			Value: "file",
+		},
+		&cli.StringFlag{
+			Name:  "membership-file",
+			Usage: "membership type: onchain, file",
+			Value: MembershipCfgPath,
 		},
 		&cli.StringFlag{
 			Name:  "restore-configuration-number",
@@ -128,10 +139,6 @@ var runCmd = &cli.Command{
 			return err
 		}
 
-		// Membership config.
-		// TODO: Make this configurable.
-		membershipFile := filepath.Join(cctx.String("repo"), MembershipCfgPath)
-
 		// Segment length period.
 		segmentLength := cctx.Int("segment-length")
 
@@ -168,7 +175,14 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		membership := validator.NewFileMembership(membershipFile)
+		var membership validator.Reader
+		switch cctx.String("membership") {
+		case "file":
+			mf := filepath.Join(cctx.String("repo"), cctx.String("membership-file"))
+			membership = validator.NewFileMembership(mf)
+		default:
+			return xerrors.Errorf("membership is currently only supported with file")
+		}
 
 		var netLogger = mir.NewLogger(validatorID.String())
 		netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(validatorID.String()), h, netLogger)
@@ -185,25 +199,25 @@ var runCmd = &cli.Command{
 
 func validatorIDFromFlag(ctx context.Context, cctx *cli.Context, nodeApi api.FullNode) (address.Address, error) {
 	var (
-		validator address.Address
-		err       error
+		addr address.Address
+		err  error
 	)
 
 	if cctx.Bool("default-key") {
-		validator, err = nodeApi.WalletDefaultAddress(ctx)
+		addr, err = nodeApi.WalletDefaultAddress(ctx)
 		if err != nil {
 			return address.Undef, err
 		}
 	}
 	if cctx.String("from") != "" {
-		validator, err = address.NewFromString(cctx.String("from"))
+		addr, err = address.NewFromString(cctx.String("from"))
 		if err != nil {
 			return address.Undef, err
 		}
 	}
-	if validator == address.Undef {
+	if addr == address.Undef {
 		return address.Undef, xerrors.Errorf("no validator address specified as first argument for validator")
 	}
 
-	return validator, nil
+	return addr, nil
 }
