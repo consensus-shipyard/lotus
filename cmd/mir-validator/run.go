@@ -18,7 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
@@ -164,7 +164,7 @@ var runCmd = &cli.Command{
 
 		log.Infow("Starting mining with validator", "validator", validatorID)
 
-		membership := validator.NewFileMembership(membershipFile)
+		membership := membership.NewFileMembership(membershipFile)
 
 		var netLogger = mir.NewLogger(validatorID.String())
 		netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(validatorID.String()), h, netLogger)

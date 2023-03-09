@@ -12,14 +12,16 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/xerrors"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -379,8 +381,8 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 	return nil
 }
 
-func (sm *StateManager) updateNextMembership(valSet *validator.Set) error {
-	_, mbs, err := validator.Membership(valSet.GetValidators())
+func (sm *StateManager) updateNextMembership(set *validator.Set) error {
+	_, mbs, err := membership.Membership(set.GetValidators())
 	if err != nil {
 		return err
 	}

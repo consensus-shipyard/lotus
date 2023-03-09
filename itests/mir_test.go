@@ -20,9 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
 )
@@ -141,6 +142,32 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
 	}
+}
+
+// TestMirReconfigurationOnChain_RunSubnet tests that the membership can be received using a stub JSON RPC client.
+func TestMirReconfigurationOnChain_RunSubnetWithStubJSONRPC(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+1)
+
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
+		&kit.MirConfig{
+			MembershipType: kit.OnChainMembership,
+		})
+
+	err := kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
 }
 
 // TestMirReconfiguration_AddOneValidatorAtHeight tests that the reconfiguration mechanism operates normally
@@ -1036,13 +1063,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[MirFaultyValidatorNumber:])
 	ens.DisconnectMirValidators(ctx, validators[:MirFaultyValidatorNumber])
 
-	for _, node := range nodes[:MirFaultyValidatorNumber] {
-		peers, err := node.NetPeers(ctx)
-		require.NoError(t, err)
-		require.Equal(t, 0, kit.CountPeerIDs(peers))
-	}
-
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)
@@ -1084,7 +1105,7 @@ func TestMirBasic_WithFCrashedNodes(t *testing.T) {
 	t.Logf(">>> crash %d validators", MirFaultyValidatorNumber)
 	ens.CrashMirValidators(ctx, 0, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d validators", MirFaultyValidatorNumber)
@@ -1127,7 +1148,7 @@ func TestMirBasic_WithFRestartedNodes(t *testing.T) {
 	t.Logf(">>> restart %d validators", MirFaultyValidatorNumber)
 	ens.RestartMirValidators(ctx, 0, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d validators", MirFaultyValidatorNumber)
@@ -1257,7 +1278,7 @@ func TestMirBasic_WithFCrashedAndRecoveredNodes(t *testing.T) {
 	t.Logf(">>> crash %d validators", MirFaultyValidatorNumber)
 	ens.CrashMirValidators(ctx, 0, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d validators from scratch", MirFaultyValidatorNumber)
@@ -1294,7 +1315,7 @@ func TestMirBasic_FNodesCrashLongTimeApart(t *testing.T) {
 	t.Logf(">>> crash %d nodes", MirFaultyValidatorNumber)
 	ens.CrashMirValidators(ctx, MaxDelay, validators[:MirFaultyValidatorNumber]...)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> restore %d nodes", MirFaultyValidatorNumber)
@@ -1340,7 +1361,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	t.Logf(">>> delay")
 	kit.RandomDelay(MaxDelay)
 
-	err = kit.NoProgressForFaultyNodes(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:], nodes[:MirFaultyValidatorNumber]...)
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)

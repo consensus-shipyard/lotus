@@ -9,7 +9,7 @@ import (
 
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
 func Mine(ctx context.Context,
@@ -17,7 +17,7 @@ func Mine(ctx context.Context,
 	transport mirlibp2p.Transport,
 	api v1api.FullNode,
 	db db.DB,
-	membership validator.Reader,
+	membership membership.Reader,
 	cfg *Config,
 ) error {
 	m, err := NewManager(ctx, addr, transport, api, db, membership, cfg)

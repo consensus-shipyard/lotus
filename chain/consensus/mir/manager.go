@@ -13,6 +13,8 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
@@ -30,9 +32,9 @@ import (
 
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	mirmembership "github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
@@ -72,7 +74,7 @@ type Manager struct {
 
 	// Reconfiguration types.
 	initialValidatorSet *validator.Set
-	membership          validator.Reader
+	membership          mirmembership.Reader
 }
 
 func NewManager(ctx context.Context,
@@ -80,7 +82,7 @@ func NewManager(ctx context.Context,
 	net mirlibp2p.Transport,
 	api v1api.FullNode,
 	ds db.DB,
-	membership validator.Reader,
+	membership mirmembership.Reader,
 	cfg *Config,
 ) (*Manager, error) {
 	netName, err := api.StateNetworkName(ctx)
@@ -105,7 +107,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v: empty validator set", id)
 	}
 
-	_, initialMembership, err := validator.Membership(initialValidatorSet.Validators)
+	_, initialMembership, err := mirmembership.Membership(initialValidatorSet.Validators)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to build node membership: %w", id, err)
 	}

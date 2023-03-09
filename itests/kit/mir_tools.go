@@ -16,11 +16,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -76,39 +77,6 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 	}
 
 	return g.Wait()
-}
-
-// NoProgressForFaultyNodes checks that the heights of the faulty nodes are not changed after advancing the chain.
-func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
-	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))
-
-	time.Sleep(1 * time.Second)
-
-	for i, fn := range faultyNodes {
-		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
-		if err != nil {
-			return err
-		}
-		oldHeights[i] = ts.Height()
-	}
-
-	err := AdvanceChain(ctx, blocks, nodes...)
-	if err != nil {
-		return err
-	}
-
-	for i, fn := range faultyNodes {
-		ts, err := ChainHeadWithCtx(ctx, fn.FullNode)
-		if err != nil {
-			return err
-		}
-		newHeight := ts.Height()
-		if newHeight != oldHeights[i] {
-			return fmt.Errorf("validator %d chain height updated: new - %d, old - %d", i, newHeight, oldHeights[i])
-		}
-	}
-
-	return nil
 }
 
 // WaitForMessageWithAvailable is a wrapper on StateWaitMsg that looks back up to limit epochs in the chain for a message.
