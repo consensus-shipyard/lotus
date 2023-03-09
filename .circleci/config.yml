@@ -574,6 +574,10 @@ workflows:
           name: chain-unit-tests
           suite: consensus
           target: "./chain/consensus/..."
+      - test-ipcagent-unit:
+          name: ipcagent-unit-tests
+          suite: consensus
+          target: "./chain/ipcagent/..."
       - test-mir-smoke:
           name: mir-smoke-tests
           suite: consensus
