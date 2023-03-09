@@ -23,7 +23,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
@@ -175,11 +175,11 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		var membership validator.Reader
+		var mb membership.Reader
 		switch cctx.String("membership") {
 		case "file":
 			mf := filepath.Join(cctx.String("repo"), cctx.String("membership-file"))
-			membership = validator.NewFileMembership(mf)
+			mb = membership.NewFileMembership(mf)
 		default:
 			return xerrors.Errorf("membership is currently only supported with file")
 		}
@@ -193,7 +193,7 @@ var runCmd = &cli.Command{
 			initCh,
 			cctx.String("checkpoints-repo"),
 			segmentLength)
-		return mir.Mine(ctx, validatorID, netTransport, nodeApi, ds, membership, cfg)
+		return mir.Mine(ctx, validatorID, netTransport, nodeApi, ds, mb, cfg)
 	},
 }
 

@@ -11,7 +11,8 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir/validator"
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
