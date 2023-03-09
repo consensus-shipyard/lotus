@@ -294,10 +294,17 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		return nil
 	}
 
+	head, err := sm.api.ChainHead(sm.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get head: %w", sm.id, err)
+	}
+
 	base, err := sm.api.ChainGetTipSetByHeight(sm.ctx, sm.height-1, types.EmptyTSK)
 	if err != nil {
 		return xerrors.Errorf("validator %v failed to get chain head: %w", sm.id, err)
 	}
+	log.With("validator", sm.id).Infof(">>> Mir height %d, prev height %d, head height %d", sm.height, base.Height(), head.Height())
+
 	log.With("validator", sm.id).Debugf("Trying to mine new block over base: %s", base.Key())
 
 	msgs := sm.getSignedMessages(mirMsgs)
