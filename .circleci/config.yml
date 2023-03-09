@@ -233,7 +233,7 @@ jobs:
 
   test-mir-smoke:
     <<: *basic_test
-  
+
   test-ipc-basic:
     <<: *basic_test
 
