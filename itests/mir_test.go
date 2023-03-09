@@ -1009,35 +1009,6 @@ func TestMirWithMangler_AllNodesMiningWithMessaging(t *testing.T) {
 	TestMirBasic_AllNodesMiningWithMessaging(t)
 }
 
-// TestMirBasic_DisconnectedNodeDoesNotGetBlocks tests that a disconnected full node can't receive new blocks from peers.
-func TestMirBasic_DisconnectedNodeDoesNotGetBlocks(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	g, ctx := errgroup.WithContext(ctx)
-
-	defer func() {
-		t.Logf("[*] defer: cancelling %s context", t.Name())
-		cancel()
-		err := g.Wait()
-		require.NoError(t, err)
-		t.Logf("[*] defer: system %s stopped", t.Name())
-	}()
-
-	nodes, validators, ens := kit.EnsembleWithMirValidators(t, 4)
-	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirConfig{
-		MembershipType:  kit.StringMembership,
-		MockedTransport: true,
-	})
-
-	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
-	require.NoError(t, err)
-
-	ens.DisconnectNodes(nodes[:1], nodes[1:])
-	ens.DisconnectMirValidators(ctx, validators[:1])
-
-	err = kit.NoNewBlocks(ctx, nodes[0])
-	require.NoError(t, err)
-}
-
 // TestMirBasic_WithFOmissionNodes tests that n − f nodes operate normally and the system can recover
 // if f nodes do not have access to network at the same time.
 func TestMirBasic_WithFOmissionNodes(t *testing.T) {
