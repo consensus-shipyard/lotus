@@ -185,8 +185,6 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		case <-attempt.C:
 		}
 	}
-
-	return xerrors.Errorf("couldn't sync from peers")
 }
 
 // RestoreState is called by Mir when the validator goes out-of-sync, and it requires
