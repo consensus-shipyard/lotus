@@ -21,6 +21,7 @@ func NewTransport(params libp2p.Params, ownID t.NodeID, h host.Host, logger logg
 	tr := libp2p.NewTransport(params, ownID, h, logger)
 
 	return &MockedTransport{
+		id:             ownID,
 		transport:      tr,
 		logger:         logger,
 		h:              h,
@@ -31,6 +32,7 @@ func NewTransport(params libp2p.Params, ownID t.NodeID, h host.Host, logger logg
 }
 
 type MockedTransport struct {
+	id             t.NodeID
 	stop           chan struct{}
 	h              host.Host
 	transport      *libp2p.Transport
@@ -69,7 +71,7 @@ func (m *MockedTransport) Stop() {
 
 func (m *MockedTransport) Send(dest t.NodeID, msg *messagepb.Message) error {
 	if m.disconnected {
-		return nil // fmt.Errorf("no connection")
+		return fmt.Errorf("no connection")
 	}
 	return m.transport.Send(dest, msg)
 }
@@ -117,6 +119,7 @@ func (m *MockedTransport) EventsOut() <-chan *events.EventList {
 				return
 			case msg := <-m.transportChan:
 				if !m.disconnected {
+					fmt.Println("@@@ received msg", m.id)
 					m.controlledChan <- msg
 				}
 			}

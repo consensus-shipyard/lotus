@@ -78,6 +78,36 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 	return g.Wait()
 }
 
+// NoNewBlocks checks that the heights of the faulty nodes are not changed after advancing the chain.
+func NoNewBlocks(ctx context.Context, node *TestFullNode) error {
+	newHeads, err := node.ChainNotify(ctx)
+	if err != nil {
+		return err
+	}
+	n := 0
+	after := time.After(20 * time.Second)
+
+	for {
+		select {
+		case h := <-newHeads:
+			fmt.Println(">>> disconnected node has received block", h[0].Val.Height(), h[0].Val.Cids())
+			ps, err := node.NetPeers(ctx)
+			if err != nil {
+				return err
+			}
+			if len(ps) != 0 {
+				return fmt.Errorf("the node is connected to %d peers", len(ps))
+			}
+			n++
+		case <-after:
+			if n != 0 {
+				return fmt.Errorf("received %d blocks", n)
+			}
+			return nil
+		}
+	}
+}
+
 // NoProgressForFaultyNodes checks that the heights of the faulty nodes are not changed after advancing the chain.
 func NoProgressForFaultyNodes(ctx context.Context, blocks int, nodes []*TestFullNode, faultyNodes ...*TestFullNode) error {
 	oldHeights := make([]abi.ChainEpoch, len(faultyNodes))

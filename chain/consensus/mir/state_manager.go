@@ -267,6 +267,14 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	var mirMsgs []Message
 
+	/*
+		rand.Seed(time.Now().UnixNano())
+		n := rand.Intn(8000) // n will be between 0 and 10
+		fmt.Printf("Sleeping %d Millisecond...\n", n)
+		time.Sleep(time.Duration(n) * time.Millisecond)
+
+	*/
+
 	sm.height++
 
 	// For each request in the batch
@@ -339,6 +347,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if err != nil {
 		return xerrors.Errorf("validator %v unable to sync a block: %w", sm.id, err)
 	}
+
+	// fmt.Println(">>>", bh.Header.Cid(), sm.id, bh.Header.ParentWeight, bh.Header.Parents, bh.Header.Ticket, bh.Header.ElectionProof)
 
 	log.With("validator", sm.id).With("epoch", sm.currentEpoch).Infof("mined block %d : %v ", bh.Header.Height, bh.Header.Cid())
 
