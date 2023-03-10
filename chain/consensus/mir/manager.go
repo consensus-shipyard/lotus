@@ -15,7 +15,6 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
-	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -78,24 +77,22 @@ type Manager struct {
 }
 
 func NewManager(ctx context.Context,
-	addr address.Address,
 	net mirlibp2p.Transport,
-	api v1api.FullNode,
+	node v1api.FullNode,
 	ds db.DB,
 	membership mirmembership.Reader,
 	cfg *Config,
 ) (*Manager, error) {
-	netName, err := api.StateNetworkName(ctx)
+	netName, err := node.StateNetworkName(ctx)
 	if err != nil {
 		return nil, err
 	}
-	id := addr.String()
-
 	if cfg == nil {
 		return nil, fmt.Errorf("nil config")
 	}
+	id := cfg.ID.String()
 
-	if cfg.SegmentLength < 0 {
+	if cfg.Consensus.SegmentLength < 0 {
 		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
 	}
 
@@ -125,7 +122,7 @@ func NewManager(ctx context.Context,
 	}
 	net.Connect(initialMembership)
 
-	cryptoManager, err := NewCryptoManager(addr, api)
+	cryptoManager, err := NewCryptoManager(cfg.ID, node)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", id, err)
 	}
@@ -140,7 +137,7 @@ func NewManager(ctx context.Context,
 		id:                  id,
 		ds:                  ds,
 		netName:             netName,
-		lotusNode:           api,
+		lotusNode:           node,
 		stopChan:            make(chan struct{}),
 		readyForTxsChan:     make(chan chan []*mirproto.Request),
 		requestPool:         fifo.New(),
@@ -151,7 +148,7 @@ func NewManager(ctx context.Context,
 		membership:          membership,
 	}
 
-	m.stateManager, err = NewStateManager(ctx, addr, initialMembership, m.confManager, api, ds, m.requestPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, initialMembership, m.confManager, node, ds, m.requestPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
@@ -164,7 +161,7 @@ func NewManager(ctx context.Context,
 	)
 
 	params := trantor.DefaultParams(initialMembership)
-	params.Iss.SegmentLength = cfg.SegmentLength // Segment length determining the checkpoint period.
+	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
 	params.Mempool.MaxTransactionsInBatch = 1024
 	params.Iss.AdjustSpeed(1 * time.Second)
 	params.Iss.ConfigOffset = ConfigOffset

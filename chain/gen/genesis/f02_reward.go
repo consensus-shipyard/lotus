@@ -37,7 +37,7 @@ func SetupRewardActor(ctx context.Context, bs bstore.Blockstore, qaPower big.Int
 		return nil, xerrors.Errorf("failed to get reward actor code ID for actors version %d", av)
 	}
 
-	// For IPC and spacenet, rewards are handled by the IPC gateway in subnets,
+	// For IPCAgent and spacenet, rewards are handled by the IPCAgent gateway in subnets,
 	// let's not allocate any initial balance into the reward actor if this is not
 	// the rootnet.
 	balance := abi.NewTokenAmount(0)

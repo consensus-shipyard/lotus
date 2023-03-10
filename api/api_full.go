@@ -11,7 +11,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	blocks "github.com/ipfs/go-libipfs/blocks"
+	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/filecoin-project/go-address"
@@ -862,7 +862,7 @@ type FullNode interface {
 	RaftState(ctx context.Context) (*RaftStateData, error) //perm:read
 	RaftLeader(ctx context.Context) (peer.ID, error)       //perm:read
 
-	// IPC-specific methods //
+	// IPCAgent-specific methods //
 
 	// IPCAddSubnetActor deploys a new subnet actor.
 	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)   //perm:write

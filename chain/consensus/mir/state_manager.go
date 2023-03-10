@@ -14,7 +14,6 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
-	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -97,7 +96,6 @@ type StateManager struct {
 
 func NewStateManager(
 	ctx context.Context,
-	addr addr.Address,
 	initialMembership map[t.NodeID]t.NodeAddress,
 	cm *ConfigurationManager,
 	api v1api.FullNode,
@@ -113,7 +111,7 @@ func NewStateManager(
 		requestPool:             pool,
 		currentEpoch:            0,
 		api:                     api,
-		id:                      addr.String(),
+		id:                      cfg.ID.String(),
 		nextConfigurationNumber: 1,
 		checkpointRepo:          cfg.CheckpointRepo,
 	}
@@ -216,8 +214,8 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	// Set memberships for the current epoch and ConfigOffset following ones.
 	// Note that sm.memberships[i+sm.currentEpoch] will almost immediately be overwritten by the first call to NewEpoch.
 	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
-	for i, membership := range config.Memberships {
-		sm.memberships[t.EpochNr(i)+sm.currentEpoch] = t.Membership(membership)
+	for i, mb := range config.Memberships {
+		sm.memberships[t.EpochNr(i)+sm.currentEpoch] = t.Membership(mb)
 	}
 
 	// The next membership is the last known membership. It may be replaced by another one during this epoch.

@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	// Default checkpoint period for the IPC gateway.
+	// Default checkpoint period for the IPCAgent gateway.
 	DefaultCheckpointPeriod = 10
 	DefaultIPCGatewayAddrID = 64
 

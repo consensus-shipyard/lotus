@@ -86,7 +86,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 	// this api call is sync and waits for the message to go through, we are adding a
 	// timeout to avoid it getting stuck.
 	// TODO: This API rpc is currently for testing purposes and for its use through the cli
-	// if we end up adopting this method as critical for the operation of IPC we should
+	// if we end up adopting this method as critical for the operation of IPCAgent we should
 	// probably make it async and let the user determine if the deployment was successful or not.
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
