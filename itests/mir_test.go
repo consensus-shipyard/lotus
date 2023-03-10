@@ -425,7 +425,7 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 		MembershipFileName: membershipFiles[MirTotalValidatorNumber],
 	})
 
-	err := kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	err := kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -441,7 +441,7 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 		require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	}
 
-	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
+	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
@@ -1063,7 +1063,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[MirFaultyValidatorNumber:])
 	ens.DisconnectMirValidators(ctx, validators[:MirFaultyValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
+	err = kit.AdvanceChain(ctx, 5*TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)

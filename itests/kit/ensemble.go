@@ -1083,7 +1083,7 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Grou
 }
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, validators ...*TestValidator) {
-	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{MembershipType: StringMembership})
+	n.BeginMirMiningWithConfig(ctx, g, validators, DefaultMirConfig())
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
