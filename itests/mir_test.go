@@ -1063,7 +1063,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	ens.DisconnectNodes(nodes[:MirFaultyValidatorNumber], nodes[MirFaultyValidatorNumber:])
 	ens.DisconnectMirValidators(ctx, validators[:MirFaultyValidatorNumber])
 
-	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
+	err = kit.AdvanceChain(ctx, 5*TestedBlockNumber, nodes[MirFaultyValidatorNumber:]...)
 	require.NoError(t, err)
 
 	t.Logf(">>> reconnecting %d nodes", MirFaultyValidatorNumber)

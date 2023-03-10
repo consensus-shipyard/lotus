@@ -178,6 +178,8 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		}
 
 		select {
+		case <-sm.ctx.Done():
+			return xerrors.Errorf("syncFromPeers context cancelled")
 		case <-timeout:
 			return xerrors.Errorf("syncing from peers timeout exceeded")
 		case <-attempt.C:
