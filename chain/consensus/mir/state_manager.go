@@ -36,8 +36,6 @@ var (
 
 	PeerDiscoveryInterval = 600 * time.Millisecond
 	PeerDiscoveryTimeout  = 3 * time.Minute
-
-	WaitForHeightTimeout = 180 * time.Second
 )
 
 type Message []byte
@@ -753,11 +751,7 @@ func parseTx(tx []byte) (interface{}, error) {
 	return msg, nil
 }
 
-// WaitForHeight waits for the syncer to see as the head of the chain
-// the block for the height determined as an input.
-//
-// The timeout to determine how much to wait before aborting is
-// determined by the number of blocks to sync.
+// WaitForHeight waits for the syncer to see as the head of the chain the block for the height determined as an input.
 func WaitForHeight(ctx context.Context, height abi.ChainEpoch, api v1api.FullNode) error {
 	// get base to determine the gap to sync and configure timeout.
 	if err := ctx.Err(); err != nil {
@@ -768,15 +762,7 @@ func WaitForHeight(ctx context.Context, height abi.ChainEpoch, api v1api.FullNod
 		return err
 	}
 	head := base.Height()
-	if head >= height {
-		return nil
-	}
 
-	d := WaitForHeightTimeout + time.Duration(height-head)*time.Second
-	timeout := time.After(d)
-
-	// poll until we get the desired height.
-	// TODO: We may be able to add a slight sleep here if needed.
 	for {
 		if head >= height {
 			return nil
@@ -785,8 +771,6 @@ func WaitForHeight(ctx context.Context, height abi.ChainEpoch, api v1api.FullNod
 		select {
 		case <-ctx.Done():
 			return xerrors.Errorf("context cancelled while waiting for height %v", height)
-		case <-timeout:
-			return xerrors.Errorf("time exceeded while waiting for target height %v beginning with %d", height, head)
 		default:
 			base, err := api.ChainHead(ctx)
 			if err != nil {

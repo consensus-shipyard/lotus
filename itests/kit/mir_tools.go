@@ -19,7 +19,6 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -49,14 +48,6 @@ func CheckNodesInSync(ctx context.Context, from abi.ChainEpoch, baseNode *TestFu
 	return err
 }
 
-func ChainHeightCheckForBlocks(ctx context.Context, n int, api lapi.FullNode) error {
-	base, err := ChainHeadWithCtx(ctx, api)
-	if err != nil {
-		return err
-	}
-	return mir.WaitForHeight(ctx, base.Height()+abi.ChainEpoch(n), api)
-}
-
 // AdvanceChain advances the chain and verifies that an amount of arbitrary blocks was added to
 // the chain. This check is used to ensure that the chain keeps advances but
 // performs no deeper check into the blocks created. We don't check if all
@@ -69,13 +60,13 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 	for _, node := range nodes {
 		node := node
 		g.Go(func() error {
-			if err := ChainHeightCheckForBlocks(ctx, blocks, node); err != nil {
+			base, err := ChainHeadWithCtx(ctx, node)
+			if err != nil {
 				return err
 			}
-			return nil
+			return mir.WaitForHeight(ctx, base.Height()+abi.ChainEpoch(blocks), node)
 		})
 	}
-
 	return g.Wait()
 }
 
