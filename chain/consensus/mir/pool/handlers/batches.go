@@ -2,16 +2,17 @@ package handlers
 
 import (
 	"github.com/filecoin-project/mir/pkg/dsl"
-	mpdsl "github.com/filecoin-project/mir/pkg/mempool/dsl"
-	"github.com/filecoin-project/mir/pkg/pb/mempoolpb"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	mpdsl "github.com/filecoin-project/mir/pkg/pb/mempoolpb/dsl"
+	mempoolpb "github.com/filecoin-project/mir/pkg/pb/mempoolpb/types"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
+	requestpbtypes "github.com/filecoin-project/mir/pkg/pb/requestpb/types"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/types"
 )
 
 type requestTxIDsContext struct {
-	txs    []*requestpb.Request
+	txs    []*requestpbtypes.Request
 	origin *mempoolpb.RequestBatchOrigin
 }
 
@@ -19,24 +20,29 @@ type requestTxIDsContext struct {
 func IncludeBatchCreation(
 	m dsl.Module,
 	mc *types.ModuleConfig,
-	params *types.ModuleParams,
+	_ *types.ModuleParams,
 	state *types.State,
 ) {
 	mpdsl.UponTransactionIDsResponse(m, func(txIDs []t.TxID, context *requestTxIDsContext) error {
-		var txs []*requestpb.Request
+		var txs []*requestpbtypes.Request
 		for i := range txIDs {
 			tx := context.txs[i]
 			txs = append(txs, tx)
 		}
-		mpdsl.NewBatch(m, t.ModuleID(context.origin.Module), txIDs, txs, context.origin)
+		mpdsl.NewBatch(m, context.origin.Module, txIDs, txs, context.origin)
 		return nil
 	})
 
 	mpdsl.UponRequestBatch(m, func(origin *mempoolpb.RequestBatchOrigin) error {
-		inputChan := make(chan []*requestpb.Request)
+		inputChan := make(chan []*mirproto.Request)
 		state.ReadyForTxsChan <- inputChan
-		receivedRequests := <-inputChan
-		mpdsl.RequestTransactionIDs(m, mc.Self, receivedRequests, &requestTxIDsContext{receivedRequests, origin})
+		var txs []*requestpbtypes.Request
+
+		for _, r := range <-inputChan {
+			tx := requestpbtypes.RequestFromPb(r)
+			txs = append(txs, tx)
+		}
+		mpdsl.RequestTransactionIDs(m, mc.Self, txs, &requestTxIDsContext{txs, origin})
 		return nil
 	})
 }

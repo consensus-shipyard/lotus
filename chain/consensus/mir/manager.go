@@ -309,7 +309,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)
 			}
-			log.With("validator", m.id).Debugf("selecting messages from mempool from base: %v", base.Key())
+			log.With("validator", m.id).Debugf("selecting messages from mempool for base: %v", base.Key())
 			msgs, err := m.lotusNode.MpoolSelect(ctx, base.Key(), 1)
 			if err != nil {
 				log.With("validator", m.id).With("epoch", base.Height()).

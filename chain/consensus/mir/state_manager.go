@@ -684,7 +684,7 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 }
 
 func (sm *StateManager) waitForHeight(height abi.ChainEpoch) error {
-	log.With("validator", sm.id).Debugf("waitForGeight %v started", height)
+	log.With("validator", sm.id).Debugf("waitForHeight %v started", height)
 	defer log.With("validator", sm.id).Debugf("waitForHeight %v finished", height)
 
 	if err := WaitForHeight(sm.ctx, height, sm.api); err != nil {
