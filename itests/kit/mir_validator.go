@@ -110,7 +110,7 @@ func (v *MirValidator) MineBlocks(ctx context.Context) error {
 			SegmentLength: 1,
 		},
 		BaseConfig: &mir.BaseConfig{
-			ID:        v.addr,
+			Addr:      v.addr,
 			GroupName: v.t.Name(),
 		},
 	}

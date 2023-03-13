@@ -862,7 +862,7 @@ type FullNode interface {
 	RaftState(ctx context.Context) (*RaftStateData, error) //perm:read
 	RaftLeader(ctx context.Context) (peer.ID, error)       //perm:read
 
-	// IPCAgent-specific methods //
+	// IPC-specific methods //
 
 	// IPCAddSubnetActor deploys a new subnet actor.
 	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)   //perm:write

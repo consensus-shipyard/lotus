@@ -17,7 +17,7 @@ import (
 
 var ipcCmds = &cli.Command{
 	Name:  "ipc",
-	Usage: "Commands to interact with IPCAgent actors",
+	Usage: "Commands to interact with IPC actors",
 	Subcommands: []*cli.Command{
 		addCmd,
 	},

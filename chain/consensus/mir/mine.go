@@ -20,7 +20,7 @@ func Mine(ctx context.Context,
 ) error {
 	m, err := NewManager(ctx, transport, node, db, membership, cfg)
 	if err != nil {
-		return fmt.Errorf("%v failed to create manager: %w", cfg.ID, err)
+		return fmt.Errorf("%v failed to create manager: %w", cfg.Addr, err)
 	}
 	return m.Serve(ctx)
 }

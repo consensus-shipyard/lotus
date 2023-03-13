@@ -18,7 +18,7 @@ import (
 )
 
 // TestIPCAccessorsNoErr tests all the basic accessors after just initializing
-// the IPCAgent actors to double-check that the basic serialization between Go
+// the IPC actors to double-check that the basic serialization between Go
 // and Rust works
 //
 // The only check from this test is that the accessors do not fail or that

@@ -11,13 +11,12 @@ import (
 	"go.opencensus.io/tag"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
-
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	t "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -25,6 +24,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
+	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
@@ -83,7 +83,7 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "ipcagent-url",
-			Usage: "The URL of IPCAgent Agent interface",
+			Usage: "The URL of IPC Agent interface",
 		},
 	},
 	Action: func(cctx *cli.Context) error {

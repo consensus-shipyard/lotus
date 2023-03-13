@@ -111,7 +111,7 @@ func NewStateManager(
 		requestPool:             pool,
 		currentEpoch:            0,
 		api:                     api,
-		id:                      cfg.ID.String(),
+		id:                      cfg.Addr.String(),
 		nextConfigurationNumber: 1,
 		checkpointRepo:          cfg.CheckpointRepo,
 	}

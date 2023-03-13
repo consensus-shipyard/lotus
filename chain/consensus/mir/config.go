@@ -11,7 +11,9 @@ import (
 // ---
 
 type BaseConfig struct {
-	ID            address.Address
+	// Validator address.
+	Addr address.Address
+	// Persistent storage file path.
 	DatastorePath string
 	// InitialCheckpoint from which to start the validator.
 	InitialCheckpoint *checkpoint.StableCheckpoint
@@ -38,7 +40,7 @@ type Config struct {
 }
 
 func NewConfig(
-	validatorID address.Address,
+	addr address.Address,
 	dbPath string,
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
@@ -46,7 +48,7 @@ func NewConfig(
 	rpcServerURL string,
 ) *Config {
 	base := BaseConfig{
-		ID:                validatorID,
+		Addr:              addr,
 		DatastorePath:     dbPath,
 		InitialCheckpoint: initCheck,
 		CheckpointRepo:    checkpointRepo,

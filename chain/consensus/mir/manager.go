@@ -90,7 +90,7 @@ func NewManager(ctx context.Context,
 	if cfg == nil {
 		return nil, fmt.Errorf("nil config")
 	}
-	id := cfg.ID.String()
+	id := cfg.Addr.String()
 
 	if cfg.Consensus.SegmentLength < 0 {
 		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
@@ -122,7 +122,7 @@ func NewManager(ctx context.Context,
 	}
 	net.Connect(initialMembership)
 
-	cryptoManager, err := NewCryptoManager(cfg.ID, node)
+	cryptoManager, err := NewCryptoManager(cfg.Addr, node)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", id, err)
 	}
