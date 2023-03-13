@@ -5,8 +5,9 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
-	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 	t "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
 type Reader interface {
@@ -48,20 +49,18 @@ func (e EnvMembership) GetValidatorSet() (*validator.Set, error) {
 
 // -----
 
-const JSONRPCServerURL = "http://127.0.0.1:3030"
-
-type ActorMembership struct {
+type OnChainMembership struct {
 	client rpc.JSONRPCRequestSender
 }
 
-func NewActorMembershipClient(client rpc.JSONRPCRequestSender) *ActorMembership {
-	return &ActorMembership{
+func NewOnChainMembershipClient(client rpc.JSONRPCRequestSender) *OnChainMembership {
+	return &OnChainMembership{
 		client: client,
 	}
 }
 
 // GetValidatorSet gets the membership config from the actor state.
-func (c *ActorMembership) GetValidatorSet() (*validator.Set, error) {
+func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
 	var set validator.Set
 	err := c.client.SendRequest("ipc_queryValidatorSet", nil, &set)
 	if err != nil {

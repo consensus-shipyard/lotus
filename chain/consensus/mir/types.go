@@ -41,33 +41,6 @@ func (e CtxCanceledWhileWaitingForBlockError) Error() string {
 	return fmt.Sprintf("validator %s context canceled while waiting for a snapshot", e.ID)
 }
 
-type Config struct {
-	DatastorePath string
-	// InitialCheckpoint from which to start the validator.
-	InitialCheckpoint *checkpoint.StableCheckpoint
-	// CheckpointRepo determines the path where Mir checkpoints
-	// will be (optionally) persisted.
-	CheckpointRepo string
-	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
-	SegmentLength int
-	// The name of the group of validators.
-	GroupName string
-}
-
-func NewConfig(
-	dbPath string,
-	initCheck *checkpoint.StableCheckpoint,
-	checkpointRepo string,
-	segmentLength int,
-) *Config {
-	return &Config{
-		DatastorePath:     dbPath,
-		InitialCheckpoint: initCheck,
-		CheckpointRepo:    checkpointRepo,
-		SegmentLength:     segmentLength,
-	}
-}
-
 type ManglerParams struct {
 	MinDelay time.Duration `json:"min_delay"`
 	MaxDelay time.Duration `json:"max_delay"`

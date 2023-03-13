@@ -11,7 +11,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	blocks "github.com/ipfs/go-libipfs/blocks"
+	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/filecoin-project/go-address"

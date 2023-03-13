@@ -11,12 +11,12 @@ import (
 	"go.opencensus.io/tag"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	t "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -24,6 +24,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
+	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/eudico-core/global"
 	"github.com/filecoin-project/lotus/lib/ulimit"
@@ -68,7 +69,7 @@ var runCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "membership-file",
-			Usage: "membership type: onchain, file",
+			Usage: "membership file with configuration",
 			Value: MembershipCfgPath,
 		},
 		&cli.StringFlag{
@@ -79,6 +80,10 @@ var runCmd = &cli.Command{
 			Name:  "segment-length",
 			Usage: "The length of an ISS segment. Must not be negative",
 			Value: 1,
+		},
+		&cli.StringFlag{
+			Name:  "ipcagent-url",
+			Usage: "The URL of IPC Agent interface",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -175,11 +180,23 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
+		cfg := mir.NewConfig(
+			validatorID,
+			dbPath,
+			initCh,
+			cctx.String("checkpoints-repo"),
+			segmentLength,
+			cctx.String("ipcagent-url"),
+		)
+
 		var mb membership.Reader
 		switch cctx.String("membership") {
 		case "file":
 			mf := filepath.Join(cctx.String("repo"), cctx.String("membership-file"))
 			mb = membership.NewFileMembership(mf)
+		case "onchain":
+			cl := rpc.NewJSONRPCClientWithConfig(cfg.IPCConfig())
+			mb = membership.NewOnChainMembershipClient(cl)
 		default:
 			return xerrors.Errorf("membership is currently only supported with file")
 		}
@@ -188,12 +205,7 @@ var runCmd = &cli.Command{
 		netTransport := mirlibp2p.NewTransport(mirlibp2p.DefaultParams(), t.NodeID(validatorID.String()), h, netLogger)
 
 		log.Infow("Starting mining with validator", "validator", validatorID)
-		cfg := mir.NewConfig(
-			dbPath,
-			initCh,
-			cctx.String("checkpoints-repo"),
-			segmentLength)
-		return mir.Mine(ctx, validatorID, netTransport, nodeApi, ds, mb, cfg)
+		return mir.Mine(ctx, netTransport, nodeApi, ds, mb, cfg)
 	},
 }
 

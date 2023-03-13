@@ -9,6 +9,21 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
+const DefaultJSONRPCServerURL = "http://127.0.0.1:3030"
+
+type Config struct {
+	ServerURL string
+}
+
+func NewConfig(url string) *Config {
+	if url == "" {
+		url = DefaultJSONRPCServerURL
+	}
+	return &Config{
+		ServerURL: url,
+	}
+}
+
 type JSONRPCRequestSender interface {
 	SendRequest(method string, params interface{}, reply interface{}) error
 }
@@ -26,6 +41,14 @@ func NewJSONRPCClient(url, token string) *JSONRPCClient {
 		ctx:   context.Background(),
 		token: token,
 		url:   url,
+	}
+}
+
+func NewJSONRPCClientWithConfig(cfg *Config) *JSONRPCClient {
+	return &JSONRPCClient{
+		ctx:   context.Background(),
+		token: "",
+		url:   cfg.ServerURL,
 	}
 }
 

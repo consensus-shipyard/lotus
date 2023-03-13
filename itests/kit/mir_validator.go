@@ -88,7 +88,7 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 	case OnChainMembership:
 		cl := NewStubJSONRPCClient()
 		cl.nextSet = cfg.MembershipString
-		v.membership = membership.NewActorMembershipClient(cl)
+		v.membership = membership.NewOnChainMembershipClient(cl)
 	default:
 		return nil, fmt.Errorf("unknown membership type")
 	}
@@ -106,14 +106,19 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 
 func (v *MirValidator) MineBlocks(ctx context.Context) error {
 	cfg := mir.Config{
-		SegmentLength: 1,
-		GroupName:     v.t.Name(),
+		Consensus: &mir.ConsensusConfig{
+			SegmentLength: 1,
+		},
+		BaseConfig: &mir.BaseConfig{
+			Addr:      v.addr,
+			GroupName: v.t.Name(),
+		},
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	v.stop = cancel
 
-	return mir.Mine(ctx, v.addr, v.net, v.miner.FullNode, v.db, v.membership, &cfg)
+	return mir.Mine(ctx, v.net, v.miner.FullNode, v.db, v.membership, &cfg)
 }
 
 func (v *MirValidator) GetRawDB() map[datastore.Key][]byte {
