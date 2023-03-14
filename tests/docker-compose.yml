@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  node0:
+    container_name: node0
+    image: "lotus"
+    command: "/usr/local/bin/eudico mir daemon --genesis=/build/genesis/spacenet.car --bootstrap=false"
+    ports:
+      - "1230:1234"
+    volumes:
+      - ../_data/0:/var/lib/lotus
+      - ../build:/build
+    networks:
+      localnet:
+        ipv4_address: 192.167.10.2
+
+networks:
+  localnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        -
+          subnet: 192.167.10.0/16
