@@ -893,8 +893,11 @@ func TestMirBasic_MessageFromLearner(t *testing.T) {
 
 	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
+	from, err := nodes[0].IsSyncedWith(ctx, 0, nodes[1:]...)
+	require.NoError(t, err)
 
 	// Send funds to learners, so they can send a message themselves
+	var cids []cid.Cid
 	for _, l := range learners {
 		src, err := nodes[0].WalletDefaultAddress(ctx)
 		require.NoError(t, err)
@@ -909,14 +912,20 @@ func TestMirBasic_MessageFromLearner(t *testing.T) {
 			Value: types.FromFil(10),
 		}, nil)
 		require.NoError(t, err)
-
-		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
-		require.NoError(t, err)
+		cids = append(cids, smsg.Cid())
 	}
 
 	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
 	require.NoError(t, err)
+	from, err = nodes[0].IsSyncedWith(ctx, from, nodes[1:]...)
+	require.NoError(t, err)
 
+	for _, id := range cids {
+		err = kit.WaitForMsg(ctx, id, nodes[0])
+		require.NoError(t, err)
+	}
+
+	cids = nil // clear slice of CIDs
 	for range learners {
 		rand.Seed(time.Now().UnixNano())
 		j := rand.Intn(len(learners))
@@ -934,14 +943,17 @@ func TestMirBasic_MessageFromLearner(t *testing.T) {
 			Value: types.FromFil(1),
 		}, nil)
 		require.NoError(t, err)
-
-		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
-		require.NoError(t, err)
+		cids = append(cids, smsg.Cid())
 
 		// no message pending in message pool
 		pend, err := learners[j].MpoolPending(ctx, types.EmptyTSK)
 		require.NoError(t, err)
 		require.Equal(t, len(pend), 0)
+	}
+
+	for _, id := range cids {
+		err = kit.WaitForMsg(ctx, id, nodes[0])
+		require.NoError(t, err)
 	}
 }
 
@@ -1039,7 +1051,7 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, id := range cids {
-		err = kit.MirNodesWaitMsg(ctx, id, nodes[0])
+		err = kit.WaitForMsg(ctx, id, nodes[0], nodes[1])
 		require.NoError(t, err)
 	}
 }

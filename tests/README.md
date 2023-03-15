@@ -1,5 +1,5 @@
 # Eudico End-to-End Tests
-TBD
+Creates and run end-to-end test suites using in Docker Compose.
 
 ## Docker
 
