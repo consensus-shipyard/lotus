@@ -20,10 +20,18 @@ func getAuthToken(id string) (string, error) {
 	return string(b), nil
 }
 
+func getAuthToken2(id string) (string, error) {
+	b, err := ioutil.ReadFile("/Users/alpha/.lotus-local-net" + id + "/token")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
 func Test_ChainGrows(t *testing.T) {
 	ctx := context.Background()
 
-	token, err := getAuthToken("0")
+	token, err := getAuthToken2("0")
 	require.NoError(t, err)
 
 	headers := http.Header{"Authorization": []string{"Bearer " + string(token)}}
