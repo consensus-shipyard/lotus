@@ -1,4 +1,4 @@
-#####################################
+# lotus-builder ================================================================
 FROM golang:1.18.8-buster AS lotus-builder
 MAINTAINER Lotus Development Team
 
@@ -47,7 +47,9 @@ ARG GOFLAGS=""
 RUN make buildall
 
 RUN make spacenet
-#####################################
+
+
+# lotus-base ===================================================================
 FROM ubuntu:20.04 AS lotus-base
 MAINTAINER Lotus Development Team
 
@@ -66,7 +68,8 @@ RUN useradd -r -u 532 -U fc \
  && mkdir -p /etc/OpenCL/vendors \
  && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
-#####################################
+
+# lotus ========================================================================
 FROM lotus-base AS lotus
 MAINTAINER Lotus Development Team
 
@@ -94,7 +97,8 @@ ENTRYPOINT ["/docker-eudico-entrypoint.sh"]
 
 CMD ["-help"]
 
-#####################################
+
+# lotus-all-in-one =============================================================
 FROM lotus-base AS lotus-all-in-one
 
 ENV FILECOIN_PARAMETER_CACHE /var/tmp/filecoin-proof-parameters

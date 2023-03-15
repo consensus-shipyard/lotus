@@ -46,7 +46,7 @@ func ClientsFor(ctx context.Context, t *testing.T, ids ...string) (clients []api
 }
 
 func ClientFor(ctx context.Context, t *testing.T, id string) api.FullNode {
-	token, err := getAuthToken2(id)
+	token, err := getAuthToken(id)
 	require.NoError(t, err)
 
 	headers := http.Header{"Authorization": []string{"Bearer " + string(token)}}

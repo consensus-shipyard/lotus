@@ -9,4 +9,10 @@ generator:
 runner:
 	go build -o build/runner ./runner
 
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
 .PHONY: all node docker generator runner
