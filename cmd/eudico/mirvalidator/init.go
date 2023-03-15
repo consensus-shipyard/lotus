@@ -51,22 +51,25 @@ var initCmd = &cli.Command{
 			return fmt.Errorf("couldn't initialize libp2p config: %s", err)
 		}
 
+		var validators *validator.Set
 		// TODO: Pass validator set for initialization
 		mp := path.Join(cctx.String("repo"), MembershipCfgPath)
 		if cctx.String("membership") != "" {
-			validators, err := validator.NewValidatorSetFromFile(cctx.String("membership"))
+			validators, err = validator.NewValidatorSetFromFile(cctx.String("membership"))
 			if err != nil {
 				return fmt.Errorf("error importing membership config specified: %s", err)
-			}
-			// persist validator config in the right path.
-			if err := validators.Save(mp); err != nil {
-				return fmt.Errorf("error exporting membership config: %s", err)
 			}
 		} else {
 			log.Infof("Creating empty membership cfg at %s. Remember to run ./eudico mir validator add-validator to add more membership validators", mp)
 			if _, err := os.Create(mp); err != nil {
 				return fmt.Errorf("error creating empty membership config in %s", mp)
 			}
+			validators = validator.NewEmptyValidatorSet()
+		}
+
+		// persist validator config in the right path.
+		if err := validators.Save(mp); err != nil {
+			return fmt.Errorf("error exporting membership config: %s", err)
 		}
 
 		// initialize database path
