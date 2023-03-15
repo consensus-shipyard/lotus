@@ -114,6 +114,9 @@ COPY --from=lotus-builder /opt/filecoin/lotus-worker   /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/lotus-stats    /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/lotus-fountain /usr/local/bin/
 
+# Copy subnets genesis template
+COPY --from=lotus-builder /opt/filecoin/eudico-core/genesis/genesis.json /
+
 RUN mkdir /var/tmp/filecoin-proof-parameters
 RUN mkdir /var/lib/lotus
 RUN mkdir /var/lib/lotus-miner
@@ -125,6 +128,8 @@ RUN chown fc: /var/lib/lotus-miner
 RUN chown fc: /var/lib/lotus-worker
 RUN chown fc: /var/lib/lotus-wallet
 
+# tmux to bundle daemon and validator
+RUN apt-get update && apt-get install -y tmux
 
 VOLUME /var/tmp/filecoin-proof-parameters
 VOLUME /var/lib/lotus

@@ -192,7 +192,10 @@ func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch ab
 // IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
 // peers in a subnet can deterministically generate the genesis block for the subnet.
 func (a *IPCAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID) ([]byte, error) {
-	tmpl, err := genesis.MakeGenesisTemplate(subnet.String())
+	// make genesis with default subnet template.
+	// TODO: This will fail if eudico not run in the default path,
+	// we should pass a path as an input or remove this endpoint.
+	tmpl, err := genesis.MakeGenesisTemplate(subnet.String(), "")
 	if err != nil {
 		return nil, err
 	}
