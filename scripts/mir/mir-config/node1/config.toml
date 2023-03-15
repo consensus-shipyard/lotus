@@ -3,7 +3,7 @@
   #
   # type: string
   # env var: LOTUS_API_LISTENADDRESS
-  ListenAddress = "/ip4/0.0.0.0/tcp/1234/http"
+  ListenAddress = "/ip4/0.0.0.0/tcp/1231/http"
 
   # type: string
   # env var: LOTUS_API_REMOTELISTENADDRESS

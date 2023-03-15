@@ -8,15 +8,17 @@ then
 fi
 
 INDEX=$1
+EUDICO=${EUDICO:-./eudico}
 
 # Config envs
-export LOTUS_PATH=~/.lotus-local-net$INDEX
-export LOTUS_MINER_PATH=~/.lotus-miner-local-net$INDEX
+export LOTUS_PATH=${LOTUS_PATH:-~/.lotus-local-net$INDEX}
+export LOTUS_MINER_PATH=${LOTUS_MINER_PATH:-~/.lotus-miner-local-net$INDEX}
 export LOTUS_SKIP_GENESIS_CHECK=_yes_
 export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
+cp -r ./scripts/mir/mir-config/node$INDEX/config.toml $LOTUS_PATH
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json
@@ -30,5 +32,5 @@ rm -rf $LOTUS_PATH
 #    rm ./scripts/mir/devgen.car
 #    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
-./eudico mir daemon --genesis=./build/genesis/spacenet.car --bootstrap=false --api=123$INDEX
+$EUDICO mir daemon --genesis=./build/genesis/spacenet.car --bootstrap=false #--api=123$INDEX
 # fi

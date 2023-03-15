@@ -7,28 +7,29 @@ then
 fi
 
 INDEX=$1
+EUDICO=${EUDICO:-./eudico}
 
 LOG_LEVEL="info,mir-consensus=info,mir-manager=error"
 
 # Config envs
-export LOTUS_PATH=~/.lotus-local-net$INDEX
-export LOTUS_MINER_PATH=~/.lotus-miner-local-net$INDEX
+export LOTUS_PATH=${LOTUS_PATH:-~/.lotus-local-net$INDEX}
+export LOTUS_MINER_PATH=${LOTUS_MINER_PATH:-~/.lotus-miner-local-net$INDEX}
 export LOTUS_SKIP_GENESIS_CHECK=_yes_
 export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 export GOLOG_LOG_LEVEL=$LOG_LEVEL
 
-./eudico wait-api
+$EUDICO wait-api --timeout 120s
 
 # Copy mir config and import keys
-./eudico wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
+$EUDICO wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
 cp ./scripts/mir/mir-config/node$INDEX/* $LOTUS_PATH
 mkdir $LOTUS_PATH/mir.db
 
 # Set interceptor output
-n=$(cat mir-event-logs/counter)
-export MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run-${n}"
-echo $((n + 1)) > mir-event-logs/counter
+#n=$(cat mir-event-logs/counter)
+#export MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run-${n}"
+#echo $((n + 1)) > mir-event-logs/counter
 
 # Run validator
-./eudico mir validator run --nosync
+$EUDICO mir validator run --nosync
