@@ -142,7 +142,7 @@ var _ membership.Reader = &fakeMembership{}
 type fakeMembership struct {
 }
 
-func (f fakeMembership) GetValidatorSet(_, _ string) (*validator.Set, error) {
+func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
 	return nil, fmt.Errorf("no validators")
 }
 

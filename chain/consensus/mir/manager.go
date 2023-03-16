@@ -93,16 +93,11 @@ func NewManager(ctx context.Context,
 	}
 	id := cfg.Addr.String()
 
-	ts, err := node.ChainHead(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	if cfg.Consensus.SegmentLength < 0 {
 		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
 	}
 
-	initialValidatorSet, err := membership.GetValidatorSet(string(netName), ts.String())
+	initialValidatorSet, err := membership.GetValidatorSet()
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to get validator set: %w", id, err)
 	}
@@ -289,12 +284,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 			return nil
 
 		case <-reconfigure.C:
-			ts, err := m.lotusNode.ChainHead(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get tipset for RPC call: %v", err)
-			}
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newSet, err := m.membership.GetValidatorSet(string(m.netName), ts.String())
+			newSet, err := m.membership.GetValidatorSet()
 			if err != nil {
 				log.With("validator", m.id).Warnf("failed to get subnet validators: %v", err)
 				continue

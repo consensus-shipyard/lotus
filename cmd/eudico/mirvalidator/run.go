@@ -5,6 +5,7 @@ import (
 	_ "net/http/pprof"
 	"path/filepath"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
@@ -196,7 +197,15 @@ var runCmd = &cli.Command{
 			mb = membership.NewFileMembership(mf)
 		case "onchain":
 			cl := rpc.NewJSONRPCClientWithConfig(cfg.IPCConfig())
-			mb = membership.NewOnChainMembershipClient(cl)
+			netName, err := nodeApi.StateNetworkName(ctx)
+			if err != nil {
+				return xerrors.Errorf("error getting network name: %w", err)
+			}
+			sn, err := sdk.NewSubnetIDFromString(string(netName))
+			if err != nil {
+				return err
+			}
+			mb = membership.NewOnChainMembershipClient(cl, sn)
 		default:
 			return xerrors.Errorf("membership is currently only supported with file")
 		}

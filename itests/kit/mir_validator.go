@@ -88,7 +88,7 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 	case OnChainMembership:
 		cl := NewStubJSONRPCClient()
 		cl.nextSet = cfg.MembershipString
-		v.membership = membership.NewOnChainMembershipClient(cl)
+		v.membership = membership.NewOnChainMembershipClient(cl, ITestSubnet)
 	default:
 		return nil, fmt.Errorf("unknown membership type")
 	}

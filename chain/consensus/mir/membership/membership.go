@@ -3,6 +3,7 @@ package membership
 import (
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	t "github.com/filecoin-project/mir/pkg/types"
@@ -11,7 +12,7 @@ import (
 )
 
 type Reader interface {
-	GetValidatorSet(subnet, tipset string) (*validator.Set, error)
+	GetValidatorSet() (*validator.Set, error)
 }
 
 var _ Reader = &FileMembership{}
@@ -27,7 +28,7 @@ func NewFileMembership(fileName string) FileMembership {
 }
 
 // GetValidatorSet gets the membership config from a file.
-func (f FileMembership) GetValidatorSet(_, _ string) (*validator.Set, error) {
+func (f FileMembership) GetValidatorSet() (*validator.Set, error) {
 	return validator.NewValidatorSetFromFile(f.FileName)
 }
 
@@ -38,7 +39,7 @@ var _ Reader = new(StringMembership)
 type StringMembership string
 
 // GetValidatorSet gets the membership config from the input string.
-func (s StringMembership) GetValidatorSet(_, _ string) (*validator.Set, error) {
+func (s StringMembership) GetValidatorSet() (*validator.Set, error) {
 	return validator.NewValidatorSetFromString(string(s))
 }
 
@@ -48,7 +49,7 @@ var _ Reader = new(EnvMembership)
 type EnvMembership string
 
 // GetValidatorSet gets the membership config from the input environment variable.
-func (e EnvMembership) GetValidatorSet(_, _ string) (*validator.Set, error) {
+func (e EnvMembership) GetValidatorSet() (*validator.Set, error) {
 	return validator.NewValidatorSetFromEnv(string(e))
 }
 
@@ -57,22 +58,22 @@ var _ Reader = &OnChainMembership{}
 
 type OnChainMembership struct {
 	client rpc.JSONRPCRequestSender
+	Subnet sdk.SubnetID
 }
 
-func NewOnChainMembershipClient(client rpc.JSONRPCRequestSender) *OnChainMembership {
+func NewOnChainMembershipClient(client rpc.JSONRPCRequestSender, subnet sdk.SubnetID) *OnChainMembership {
 	return &OnChainMembership{
 		client: client,
+		Subnet: subnet,
 	}
 }
 
 // GetValidatorSet gets the membership config from the actor state.
-func (c *OnChainMembership) GetValidatorSet(sunbet, tipset string) (*validator.Set, error) {
+func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
 	req := struct {
-		subnet string
-		tipSet string
+		Subnet string `json:"subnet"`
 	}{
-		subnet: sunbet,
-		tipSet: tipset,
+		Subnet: c.Subnet.String(),
 	}
 	var set validator.Set
 	err := c.client.SendRequest("ipc_queryValidatorSet", &req, &set)
