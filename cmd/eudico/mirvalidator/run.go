@@ -5,12 +5,13 @@ import (
 	_ "net/http/pprof"
 	"path/filepath"
 
-	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"golang.org/x/xerrors"
+
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
@@ -148,7 +149,7 @@ var runCmd = &cli.Command{
 		// Segment length period.
 		segmentLength := cctx.Int("segment-length")
 
-		h, err := newLp2pHost(cctx.String("repo"))
+		h, err := getLibP2PHost(cctx.String("repo"))
 		if err != nil {
 			return err
 		}

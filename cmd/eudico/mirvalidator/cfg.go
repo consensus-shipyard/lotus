@@ -22,6 +22,7 @@ const (
 	MaddrPath         = "mir.maddr"
 	MembershipCfgPath = "mir.validators"
 	LevelDSPath       = "mir.db"
+	DefaultLibP2PPort = 1347
 )
 
 var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath, LevelDSPath}

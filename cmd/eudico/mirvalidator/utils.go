@@ -120,7 +120,7 @@ func genLibp2pKey() (crypto.PrivKey, error) {
 }
 
 // TODO: Should we make multiaddrs configurable?
-func newLp2pHost(dir string) (host.Host, error) {
+func newLibP2PHost(dir string, port int) (host.Host, error) {
 	pk, err := lp2pID(dir)
 	if err != nil {
 		return nil, err
@@ -138,10 +138,11 @@ func newLp2pHost(dir string) (host.Host, error) {
 			libp2p.Identity(pk),
 			libp2p.DefaultTransports,
 			libp2p.ListenAddrStrings(
-				"/ip4/0.0.0.0/tcp/0",
-				"/ip6/::/tcp/0",
-				"/ip4/0.0.0.0/udp/0/quic",
-				"/ip6/::/udp/0/quic"),
+				fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port),
+				fmt.Sprintf("/ip6/::/tcp/%d", port),
+				fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port),
+				fmt.Sprintf("/ip6/::/udp/%d/quic", port),
+			),
 		)
 		if err != nil {
 			return nil, err
@@ -160,6 +161,38 @@ func newLp2pHost(dir string) (host.Host, error) {
 		}
 		return h, nil
 	}
+	bMaddr, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading multiaddr from file: %w", err)
+	}
+
+	addrs, err := unmarshalMultiAddrSlice(bMaddr)
+	if err != nil {
+		return nil, err
+	}
+	return libp2p.New(
+		libp2p.Identity(pk),
+		libp2p.DefaultTransports,
+		libp2p.ListenAddrs(addrs...),
+	)
+}
+
+func getLibP2PHost(dir string) (host.Host, error) {
+	pk, err := lp2pID(dir)
+	if err != nil {
+		return nil, err
+	}
+	// See if mutiaddr exists.
+	path := filepath.Join(dir, MaddrPath)
+	// if it doesn't exist create a new key
+	exists, err := fileExists(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("libp2p file not found: %w", err)
+	}
+
 	bMaddr, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("error reading multiaddr from file: %w", err)
