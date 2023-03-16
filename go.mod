@@ -368,4 +368,4 @@ replace github.com/filecoin-project/test-vectors => ./extern/test-vectors
 // replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types
 
 // uncomment for local development. Keeping it here for now for convenience.
-// replace github.com/filecoin-project/mir => ../mir
+ replace github.com/filecoin-project/mir => ../tmp/mir

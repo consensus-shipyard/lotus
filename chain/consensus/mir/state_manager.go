@@ -197,8 +197,8 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 // - And we flag the mining process that we are synced, and it can start accepting new
 // batches from Mir and assembling new blocks.
 func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) error {
-	log.With("validator", sm.id).Infof("RestoreState for epoch %d started", sm.currentEpoch)
-	defer log.With("validator", sm.id).Infof("RestoreState for epoch %d finished", sm.currentEpoch)
+	log.With("validator", sm.id).Infof("applogic RestoreState for epoch %d started", sm.currentEpoch)
+	defer log.With("validator", sm.id).Infof("applogic RestoreState for epoch %d finished", sm.currentEpoch)
 	// release any previous checkpoint delivered and pending
 	// to sync, as we are syncing again. This prevents a deadlock.
 	sm.releaseNextCheckpointChan()
@@ -251,10 +251,10 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// once synced we deliver the checkpoint to our mining process, so it can be
 		// included in the next block (as the rest of Mir validators will do before
 		// accepting the next batch), and we persist it locally.
-		err = sm.deliverCheckpoint(checkpoint, &ch)
-		if err != nil {
-			return xerrors.Errorf("validator %v failed to deliver checkpoint to lotus from mir after restoreState: %w", sm.id, err)
-		}
+		// err = sm.deliverCheckpoint(checkpoint, &ch)
+		// if err != nil {
+		//	return xerrors.Errorf("validator %v failed to deliver checkpoint to lotus from mir after restoreState: %w", sm.id, err)
+		// }
 	} else {
 		log.With("validator", sm.id).Infof("Snapshot len is zero")
 	}
@@ -265,6 +265,9 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
+	log.With("validator", sm.id).Info("applogic applytxs started")
+	defer log.With("validator", sm.id).Info("applogic applytxs finished")
+
 	var mirMsgs []Message
 
 	sm.height++
@@ -440,7 +443,8 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	log.With("validator", sm.id).Infof("New epoch: updating %d to %d", sm.currentEpoch, nr)
+	log.With("validator", sm.id).Infof("applogic New epoch started: updating %d to %d", sm.currentEpoch, nr)
+	defer log.With("validator", sm.id).Infof("applogic New epoch finished: updating %d to %d", sm.currentEpoch, nr)
 
 	// Sanity check. Generally, the new epoch is always the current epoch plus 1.
 	// At initialization and right after state transfer, sm.currentEpoch already has been initialized
@@ -474,8 +478,8 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 // in our local state, and it collects the cids for all the blocks verified
 // by the checkpoint.
 func (sm *StateManager) Snapshot() ([]byte, error) {
-	log.With("validator", sm.id).Infof("Snapshot for epoch %d started", sm.currentEpoch)
-	defer log.With("validator", sm.id).Infof("Snapshot for epoch %d finished", sm.currentEpoch)
+	log.With("validator", sm.id).Infof("applogic Snapshot for epoch %d started", sm.currentEpoch)
+	defer log.With("validator", sm.id).Infof("applogic Snapshot for epoch %d finished", sm.currentEpoch)
 
 	if sm.currentEpoch == 0 {
 		return nil, xerrors.Errorf("validator %v tried to make a snapshot in epoch %d", sm.id, sm.currentEpoch)
@@ -528,8 +532,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 // TODO: RestoreState and the persistence of the latest checkpoint locally may
 // be redundant, we may be able to remove the latter.
 func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) error {
-	log.With("validator", sm.id).Infof("Checkpoint for epoch %d started", sm.currentEpoch)
-	defer log.With("validator", sm.id).Infof("Checkpoint for epoch %d finished", sm.currentEpoch)
+	log.With("validator", sm.id).Infof("applogic Checkpoint for epoch %d started", sm.currentEpoch)
+	defer log.With("validator", sm.id).Infof("applogic Checkpoint for epoch %d finished", sm.currentEpoch)
 	// deserialize checkpoint data from Mir checkpoint to check that is the
 	// right format.
 	ch := &Checkpoint{}

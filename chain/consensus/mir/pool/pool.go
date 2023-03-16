@@ -5,6 +5,7 @@ import (
 	"github.com/filecoin-project/mir/pkg/dsl"
 	"github.com/filecoin-project/mir/pkg/modules"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	requestpbtypes "github.com/filecoin-project/mir/pkg/pb/requestpb/types"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/handlers"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/types"
@@ -44,4 +45,27 @@ func NewModule(ch chan chan []*requestpb.Request, mc *ModuleConfig, p *ModulePar
 	handlers.IncludeBatchCreation(m, mc, p, state)
 
 	return m
+}
+
+type Fetcher struct {
+	ReadyForTxsChan chan chan []*requestpb.Request
+}
+
+func NewFetcher(ch chan chan []*requestpb.Request) *Fetcher {
+	return &Fetcher{
+		ReadyForTxsChan: ch,
+	}
+}
+
+func (f *Fetcher) Fetch() []*requestpbtypes.Request {
+	inputChan := make(chan []*requestpb.Request)
+	f.ReadyForTxsChan <- inputChan
+	var txs []*requestpbtypes.Request
+
+	for _, r := range <-inputChan {
+		tx := requestpbtypes.RequestFromPb(r)
+		txs = append(txs, tx)
+	}
+
+	return txs
 }
