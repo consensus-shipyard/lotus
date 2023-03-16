@@ -16,6 +16,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"

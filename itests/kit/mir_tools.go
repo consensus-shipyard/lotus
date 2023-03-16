@@ -21,6 +21,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -135,6 +136,8 @@ func RandomDelay(seconds int) {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
 }
+
+var _ membership.Reader = &fakeMembership{}
 
 type fakeMembership struct {
 }

@@ -119,6 +119,9 @@ func init() {
 //	kit.EnsembleMinimal()
 //	kit.EnsembleOneTwo()
 //	kit.EnsembleTwoOne()
+
+var ITestSubnet = ipctypes.RootSubnet
+
 type Ensemble struct {
 	t            *testing.T
 	bootstrapped bool
@@ -1234,7 +1237,7 @@ func (n *Ensemble) generateGenesis() *genesis.Template {
 		NetworkVersion:   n.genesis.version,
 		Accounts:         n.genesis.accounts,
 		Miners:           n.genesis.miners,
-		NetworkName:      ipctypes.RootSubnet.String(),
+		NetworkName:      ITestSubnet.String(),
 		Timestamp:        uint64(time.Now().Unix() - int64(n.options.pastOffset.Seconds())),
 		VerifregRootKey:  verifRoot,
 		RemainderAccount: gen.DefaultRemainderAccountActor,
