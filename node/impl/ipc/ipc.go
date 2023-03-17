@@ -117,6 +117,28 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
+
+	ts := new(types.TipSet)
+	if tsk != types.EmptyTSK {
+		tsCid, err := tsk.Cid()
+		if err != nil {
+			return nil, err
+		}
+		ts, err = a.Chain.GetTipSetByCid(ctx, tsCid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Resolve on-chain IDs of validators to f1/f3 addresses
+	for i, v := range st.ValidatorSet.Validators {
+		var err error
+		st.ValidatorSet.Validators[i].Addr, err = a.StateManagerAPI.ResolveToDeterministicAddress(ctx, v.Addr, ts)
+		if err != nil {
+			return nil, err
+		}
+
+	}
 	return &st, nil
 }
 
