@@ -37,6 +37,7 @@ var (
 
 	PeerDiscoveryInterval = 800 * time.Millisecond
 	PeerDiscoveryTimeout  = 3 * time.Minute
+	WaitForHeightTimeout  = 30 * time.Second
 )
 
 type Message []byte
@@ -697,10 +698,10 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 }
 
 func (sm *StateManager) waitForHeightWithTimeout(height abi.ChainEpoch) error {
-	log.With("validator", sm.id).Infof("waitForHeight %v started", height)
-	defer log.With("validator", sm.id).Infof("waitForHeight %v finished", height)
+	log.With("validator", sm.id).Debugf("waitForHeight %v started", height)
+	defer log.With("validator", sm.id).Debugf("waitForHeight %v finished", height)
 
-	ctx, cancel := context.WithDeadline(sm.ctx, time.Now().Add(5*time.Second))
+	ctx, cancel := context.WithTimeout(sm.ctx, WaitForHeightTimeout)
 	defer cancel()
 
 	if err := WaitForHeight(ctx, height, sm.api); err != nil {
