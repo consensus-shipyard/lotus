@@ -247,14 +247,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		if err = sm.syncFromPeers(types.NewTipSetKey(ch.BlockCids[0])); err != nil {
 			return xerrors.Errorf("validator %v couldn't sync from peers to recover from checkpoint at %d: %w", sm.id, ch.Height, err)
 		}
-
-		// once synced we deliver the checkpoint to our mining process, so it can be
-		// included in the next block (as the rest of Mir validators will do before
-		// accepting the next batch), and we persist it locally.
-		// err = sm.deliverCheckpoint(checkpoint, &ch)
-		// if err != nil {
-		//	return xerrors.Errorf("validator %v failed to deliver checkpoint to lotus from mir after restoreState: %w", sm.id, err)
-		// }
 	} else {
 		log.With("validator", sm.id).Infof("Snapshot len is zero")
 	}
