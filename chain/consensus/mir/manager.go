@@ -153,14 +153,6 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
 
-	// FIXME DENIS
-	// Create SMR modules.
-	// mpool := pool.NewModule(
-	//	m.readyForTxsChan,
-	//	pool.DefaultModuleConfig(),
-	//	pool.DefaultModuleParams(),
-	// )
-
 	params := trantor.DefaultParams(initialMembership)
 	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
 	params.Mempool.MaxTransactionsInBatch = 1024
@@ -192,10 +184,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create SMR system: %w", id, err)
 	}
 
-	// FIXME DENIS
-	smrSystem = smrSystem.
-		//	WithModule("mempool", mpool).
-		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
+	smrSystem = smrSystem.WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
 	mirManglerParams := os.Getenv(ManglerEnv)
 	if mirManglerParams != "" {
