@@ -114,6 +114,7 @@ require (
 	github.com/ipld/go-ipld-prime v0.18.0
 	github.com/ipld/go-ipld-selector-text-lite v0.0.1
 	github.com/ipni/index-provider v0.10.0
+	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/koalacxr/quantile v0.0.1
 	github.com/libp2p/go-buffer-pool v0.1.0
@@ -261,7 +262,6 @@ require (
 	github.com/jessevdk/go-flags v1.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
 	github.com/klauspost/compress v1.15.10 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect

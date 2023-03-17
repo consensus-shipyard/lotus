@@ -9,6 +9,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/jpillora/backoff"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/xerrors"
 
@@ -35,9 +36,9 @@ var (
 	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
 	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
 
-	PeerDiscoveryInterval = 800 * time.Millisecond
-	PeerDiscoveryTimeout  = 3 * time.Minute
-	WaitForHeightTimeout  = 30 * time.Second
+	PeerDiscoveryInterval   = 800 * time.Millisecond
+	PeerDiscoveryTimeout    = 3 * time.Minute
+	WaitForHeightMinTimeout = 30 * time.Second
 )
 
 type Message []byte
@@ -152,8 +153,14 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 	attempt := time.NewTicker(PeerDiscoveryInterval)
 	defer attempt.Stop()
 
+	b := backoff.Backoff{
+		Min:    WaitForHeightMinTimeout,
+		Factor: 2,
+	}
 	var connPeers []peer.AddrInfo
 	for {
+		heightTimeout := b.Duration()
+
 		connPeers, err = sm.api.NetPeers(sm.ctx)
 		if err != nil {
 			return xerrors.Errorf("failed to get peers syncing to TSK %s: %w", tsk, err)
@@ -173,7 +180,7 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 			// Wait for full-sync before returning from restoreState.
 			// Here we use the timeout-based waitForWeight to be able to switch to another available peer if needed.
 			// If we used timeout free function then we could choose a malicious node that has sent us an incorrect tipset.
-			err = sm.waitForHeightWithTimeout(ts.Height())
+			err = sm.waitForHeightWithTimeout(heightTimeout, ts.Height())
 			if err != nil {
 				log.With("validator", sm.id).Warnf("waitForHeightWithTimeout at %d error: %v", ts.Height(), err)
 				continue
@@ -697,11 +704,20 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 	}
 }
 
-func (sm *StateManager) waitForHeightWithTimeout(height abi.ChainEpoch) error {
+func (sm *StateManager) waitForHeightWithTimeout(timeout time.Duration, height abi.ChainEpoch) error {
 	log.With("validator", sm.id).Debugf("waitForHeight %v started", height)
 	defer log.With("validator", sm.id).Debugf("waitForHeight %v finished", height)
 
-	ctx, cancel := context.WithTimeout(sm.ctx, WaitForHeightTimeout)
+	base, err := sm.api.ChainHead(sm.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get chain head: %w", err)
+	}
+
+	if base.Height() < height {
+		timeout += time.Duration(height-base.Height()) * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(sm.ctx, timeout)
 	defer cancel()
 
 	if err := WaitForHeight(ctx, height, sm.api); err != nil {
