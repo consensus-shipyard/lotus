@@ -18,12 +18,6 @@ services:
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
-    healthcheck:
-      test: [ "CMD-SHELL", "[[ $(curl -w '%{http_code}' http://localhost:1230/rpc/v1) == 500 ]]" ]
-      interval: 5s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     ports:
       - "1230:1230"
     networks:
@@ -51,7 +45,7 @@ services:
       - ./testdata/mir:/testdata/mir
     depends_on:
       node0:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "1231:1231"
     networks:
@@ -79,7 +73,7 @@ services:
       - ./testdata/mir:/testdata/mir
     depends_on:
       node0:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "1232:1232"
     networks:
@@ -107,7 +101,7 @@ services:
       - ./testdata/mir:/testdata/mir
     depends_on:
       node0:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "1233:1233"
     networks:

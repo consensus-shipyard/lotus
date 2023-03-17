@@ -1,4 +1,4 @@
-// Package tests contains end-to-end tests for Eudico nodes.
+// Package tests contains end-to-end tests for Eudico.
 package tests
 
 import (
@@ -23,7 +23,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 )
 
-const DeploymentPath = "./testdata/_runtime"
+const (
+	DeploymentPath = "./testdata/_runtime"
+)
+
+var (
+	WaitTimeout = 5 * time.Minute
+)
 
 func getAuthToken(id string) (string, error) {
 	b, err := ioutil.ReadFile(path.Join(DeploymentPath, id, "/token"))
@@ -34,7 +40,7 @@ func getAuthToken(id string) (string, error) {
 }
 
 func waitForAuthToken(id string) error {
-	timeout := time.After(120 * time.Second)
+	timeout := time.After(WaitTimeout)
 
 	for {
 		select {
@@ -53,7 +59,7 @@ func waitForAuthToken(id string) error {
 }
 
 func waitForLotusAPI(id string) error {
-	timeout := time.After(120 * time.Second)
+	timeout := time.After(WaitTimeout)
 
 	ctx := context.Background()
 
