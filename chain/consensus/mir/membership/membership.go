@@ -75,12 +75,15 @@ func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
 	}{
 		Subnet: c.Subnet.String(),
 	}
-	var set validator.Set
-	err := c.client.SendRequest("ipc_queryValidatorSet", &req, &set)
+	resp := struct {
+		ValidatorSet validator.Set `json:"validator_set"`
+	}{}
+
+	err := c.client.SendRequest("ipc_queryValidatorSet", &req, &resp)
 	if err != nil {
 		return nil, err
 	}
-	return &set, err
+	return &resp.ValidatorSet, err
 }
 
 // ----

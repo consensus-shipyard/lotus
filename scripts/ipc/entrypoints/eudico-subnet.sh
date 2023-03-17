@@ -4,7 +4,7 @@ set -e
 
 if [ $# -ne 2 ]
 then
-    echo "Provide the subnet ID as first argument and the default validator script as the second one"
+    echo "Provide the subnet ID as first argument and the default validator key as the second one"
     exit 1
 fi
 

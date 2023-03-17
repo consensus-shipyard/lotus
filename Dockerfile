@@ -140,6 +140,7 @@ VOLUME /var/lib/lotus-worker
 VOLUME /var/lib/lotus-wallet
 
 EXPOSE 1234
+EXPOSE 1347
 EXPOSE 2345
 EXPOSE 3456
 EXPOSE 1777

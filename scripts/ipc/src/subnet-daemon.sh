@@ -11,7 +11,8 @@ fi
 SUBNETID=$1
 echo "[*] Populating config"
 
-echo '[API]
+echo '
+[API]
   ListenAddress = "/ip4/0.0.0.0/tcp/1234/http"
 ' > $LOTUS_PATH/config.toml
 

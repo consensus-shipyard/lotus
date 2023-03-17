@@ -13,8 +13,9 @@ VAL_KEY=$1
 # Right now lets use the default one
 # AGENT=$2
 
-sleep 20
-eudico wait-api
+eudico wait-api --timeout=300
 echo "[*] Importing validator key"
-eudico wallet import --format=hex-lotus --as-default <<< $VAL_KEY
-eudico mir validator run --membership=onchain --nosync
+eudico wallet import --as-default --format=hex-lotus <<< $VAL_KEY
+eudico mir validator config init
+# eudico mir validator config validator-addr
+# eudico mir validator run --membership=onchain --nosync

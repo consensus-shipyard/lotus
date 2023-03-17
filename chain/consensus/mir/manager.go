@@ -101,6 +101,7 @@ func NewManager(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to get validator set: %w", id, err)
 	}
+	// TODO: Check here the minimum number of validators for the subnet
 	if initialValidatorSet.Size() == 0 {
 		return nil, fmt.Errorf("validator %v: empty validator set", id)
 	}

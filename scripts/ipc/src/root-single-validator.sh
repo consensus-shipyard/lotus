@@ -5,8 +5,8 @@ set -e
 # echo "[*] Generate a new wallet for validator and make default address"
 # eudico wallet set-default `eudico wallet new`
 # echo "[*] Importing wallet with funds in root"
-sleep 20
-eudico wait-api
+
+eudico wait-api --timeout=300
 eudico wallet import --as-default --format=json-lotus  /scripts/ipc/src/wallet.key
 echo "[*] Initializing validator config and adding validator"
 eudico mir validator config init
