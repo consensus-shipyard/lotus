@@ -68,6 +68,10 @@ func NewOnChainMembershipClient(client rpc.JSONRPCRequestSender, subnet sdk.Subn
 	}
 }
 
+type AgentReponse struct {
+	ValidatorSet validator.Set `json:"validator_set"`
+}
+
 // GetValidatorSet gets the membership config from the actor state.
 func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
 	req := struct {
@@ -75,9 +79,7 @@ func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
 	}{
 		Subnet: c.Subnet.String(),
 	}
-	resp := struct {
-		ValidatorSet validator.Set `json:"validator_set"`
-	}{}
+	resp := AgentReponse{}
 
 	err := c.client.SendRequest("ipc_queryValidatorSet", &req, &resp)
 	if err != nil {
