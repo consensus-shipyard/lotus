@@ -1,2 +1,3 @@
 testdata/mir/node*
 docker.log
+testdata/_runtime

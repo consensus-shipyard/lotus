@@ -6,28 +6,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/filecoin-project/go-state-types/abi"
 )
 
-func TestSmoke_NetworkStarted(t *testing.T) {
-	ctx := context.Background()
-
-	nodes := ClientsFor(ctx, t, "0", "1", "2", "3")
-
-	err := waitForNodes(ctx, nodes...)
-	require.NoError(t, err)
-}
-
-func TestSmoke_ChainStarted(t *testing.T) {
-	ctx := context.Background()
-
-	c := ClientFor(ctx, t, "0")
-
-	head, err := c.ChainHead(ctx)
-	require.NoError(t, err)
-
-	require.Greater(t, head.Height(), abi.ChainEpoch(1))
+func TestMain(m *testing.M) {
+	err := waitForAuthToken("0")
+	if err != nil {
+		panic(err)
+	}
+	err = waitForLotusAPI("0")
+	if err != nil {
+		panic(err)
+	}
+	m.Run()
 }
 
 func TestMirSmoke_AllNodesMine(t *testing.T) {

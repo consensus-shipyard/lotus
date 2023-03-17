@@ -12,7 +12,7 @@ gen:
 	go run ./generator/cmd -ip=192.168.10.2 -n=4 -output="./testdata/mir/"
 
 tests:
-	go test -v -count=1 -timeout=60m ./tests
+	go test -v -count=1 -timeout=20m ./tests
 
 up:
 	docker compose up -d
@@ -21,6 +21,6 @@ down:
 	docker compose down
 
 clean:
-	rm -rf ./testdata
+	rm -rf ./testdata/mir/node*
 
 .PHONY: all docker gen up down tests clean

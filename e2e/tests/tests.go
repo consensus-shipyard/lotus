@@ -3,9 +3,12 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -20,12 +23,68 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 )
 
+const DeploymentPath = "./testdata/_runtime"
+
 func getAuthToken(id string) (string, error) {
-	b, err := ioutil.ReadFile("../_data/" + id + "/token")
+	b, err := ioutil.ReadFile(path.Join(DeploymentPath, id, "/token"))
 	if err != nil {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func waitForAuthToken(id string) error {
+	timeout := time.After(120 * time.Second)
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("time exceeded")
+		default:
+		}
+
+		if _, err := os.Stat(path.Join(DeploymentPath, id, "/token")); errors.Is(err, os.ErrNotExist) {
+			time.Sleep(1 * time.Second)
+			fmt.Println("wait for Lotus Token...")
+			continue
+		}
+		return nil
+	}
+}
+
+func waitForLotusAPI(id string) error {
+	timeout := time.After(120 * time.Second)
+
+	ctx := context.Background()
+
+	token, err := getAuthToken(id)
+	if err != nil {
+		return err
+	}
+
+	headers := http.Header{"Authorization": []string{"Bearer " + string(token)}}
+
+	c, closer, err := client.NewFullNodeRPCV1(ctx, "ws://127.0.0.1:123"+id+"/rpc/v1", headers)
+	if err != nil {
+		return err
+	}
+	defer closer()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("time exceeded")
+		default:
+		}
+
+		if _, err := c.Version(ctx); errors.Is(err, os.ErrNotExist) {
+			time.Sleep(1 * time.Second)
+			fmt.Printf("wait for node %s Lotus API...\n", id)
+			continue
+		}
+
+		return nil
+	}
 }
 
 func ClientsFor(ctx context.Context, t *testing.T, ids ...string) (clients []api.FullNode) {

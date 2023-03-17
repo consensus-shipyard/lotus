@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   node0:
     container_name: node0
@@ -14,12 +12,18 @@ services:
       LOTUS_MINER_PATH: /var/lib/lotus-miner
       CONFIG_DATA: /testdata/mir
     volumes:
-      - ../_data/logs:/logs
-      - ../_data/0:/var/lib/lotus
-      - ../_data/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/0:/var/lib/lotus
+      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
+    healthcheck:
+      test: [ "CMD-SHELL", "[[ $(curl -w '%{http_code}' http://localhost:1230/rpc/v1) == 500 ]]" ]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     ports:
       - "1230:1230"
     networks:
@@ -39,14 +43,15 @@ services:
       LOTUS_MINER_PATH: /var/lib/lotus-miner
       CONFIG_DATA: /testdata/mir
     volumes:
-      - ../_data/logs:/logs
-      - ../_data/1:/var/lib/lotus
-      - ../_data/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/1:/var/lib/lotus
+      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
     depends_on:
-      - node0
+      node0:
+        condition: service_healthy
     ports:
       - "1231:1231"
     networks:
@@ -66,14 +71,15 @@ services:
       LOTUS_MINER_PATH: /var/lib/lotus-miner
       CONFIG_DATA: /testdata/mir
     volumes:
-      - ../_data/logs:/logs
-      - ../_data/2:/var/lib/lotus
-      - ../_data/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/2:/var/lib/lotus
+      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
     depends_on:
-      - node0
+      node0:
+        condition: service_healthy
     ports:
       - "1232:1232"
     networks:
@@ -93,14 +99,15 @@ services:
       LOTUS_MINER_PATH: /var/lib/lotus-miner
       CONFIG_DATA: /testdata/mir
     volumes:
-      - ../_data/logs:/logs
-      - ../_data/3:/var/lib/lotus
-      - ../_data/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/3:/var/lib/lotus
+      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
     depends_on:
-      - node0
+      node0:
+        condition: service_healthy
     ports:
       - "1233:1233"
     networks:
@@ -113,5 +120,4 @@ networks:
     ipam:
       driver: default
       config:
-        -
-          subnet: 192.168.10.0/16
+        - subnet: 192.168.10.0/16
