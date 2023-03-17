@@ -120,7 +120,7 @@ func genLibp2pKey() (crypto.PrivKey, error) {
 }
 
 // TODO: Should we make multiaddrs configurable?
-func newLibP2PHost(dir string, port int) (host.Host, error) {
+func newLibP2PHost(dir string, tcpPort, quicPort int) (host.Host, error) {
 	pk, err := lp2pID(dir)
 	if err != nil {
 		return nil, err
@@ -138,10 +138,10 @@ func newLibP2PHost(dir string, port int) (host.Host, error) {
 			libp2p.Identity(pk),
 			libp2p.DefaultTransports,
 			libp2p.ListenAddrStrings(
-				fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port),
-				fmt.Sprintf("/ip6/::/tcp/%d", port),
-				fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", port),
-				fmt.Sprintf("/ip6/::/udp/%d/quic", port),
+				fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", tcpPort),
+				fmt.Sprintf("/ip6/::/tcp/%d", tcpPort),
+				fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic", quicPort),
+				fmt.Sprintf("/ip6/::/udp/%d/quic", quicPort),
 			),
 		)
 		if err != nil {

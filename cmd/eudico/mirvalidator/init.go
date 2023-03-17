@@ -27,9 +27,14 @@ var initCmd = &cli.Command{
 			Usage: "Pass membership config with the list of validator in the validator set",
 		},
 		&cli.IntFlag{
-			Name:  "init-libp2p-port",
-			Usage: "Listening libp2p port",
-			Value: DefaultLibP2PPort,
+			Name:  "tcp-libp2p-port",
+			Usage: "Listening TCP libp2p port",
+			Value: DefaultTCPLibP2PPort,
+		},
+		&cli.IntFlag{
+			Name:  "quic-libp2p-port",
+			Usage: "Listening QUIC libp2p port",
+			Value: DefaultQuicLibP2PPort,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -50,8 +55,7 @@ var initCmd = &cli.Command{
 			}
 		}
 
-		// TODO: Allow passing libp2p ID config as a parameter.
-		_, err := newLibP2PHost(cctx.String("repo"), cctx.Int("init-libp2p-port"))
+		_, err := newLibP2PHost(cctx.String("repo"), cctx.Int("tcp-libp2p-port"), cctx.Int("quic-libp2p-port"))
 		if err != nil {
 			return fmt.Errorf("couldn't initialize libp2p config: %s", err)
 		}
