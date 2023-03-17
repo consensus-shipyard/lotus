@@ -18,10 +18,12 @@ import (
 
 // TODO: Make these config files configurable.
 const (
-	PrivKeyPath       = "mir.key"
-	MaddrPath         = "mir.maddr"
-	MembershipCfgPath = "mir.validators"
-	LevelDSPath       = "mir.db"
+	PrivKeyPath           = "mir.key"
+	MaddrPath             = "mir.maddr"
+	MembershipCfgPath     = "mir.validators"
+	LevelDSPath           = "mir.db"
+	DefaultTCPLibP2PPort  = 1347
+	DefaultQuicLibP2PPort = 1348
 )
 
 var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath, LevelDSPath}
