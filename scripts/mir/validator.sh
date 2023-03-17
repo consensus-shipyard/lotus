@@ -8,6 +8,7 @@ fi
 
 INDEX=$1
 EUDICO=${EUDICO:-./eudico}
+CONFIG_DATA=${CONFIG_DATA:-./scripts/mir/mir-config}
 
 LOG_LEVEL="info,mir-consensus=info,mir-manager=error"
 
@@ -22,8 +23,8 @@ export GOLOG_LOG_LEVEL=$LOG_LEVEL
 $EUDICO wait-api --timeout 120s
 
 # Copy mir config and import keys
-$EUDICO wallet import --as-default --format=json-lotus  ./scripts/mir/mir-config/node$INDEX/wallet.key
-cp ./scripts/mir/mir-config/node$INDEX/* $LOTUS_PATH
+$EUDICO wallet import --as-default --format=json-lotus  $CONFIG_DATA/node$INDEX/wallet.key
+cp $CONFIG_DATA/node$INDEX/* $LOTUS_PATH
 mkdir $LOTUS_PATH/mir.db
 
 # Set interceptor output

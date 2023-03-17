@@ -9,6 +9,7 @@ fi
 
 INDEX=$1
 EUDICO=${EUDICO:-./eudico}
+CONFIG_DATA=${CONFIG_DATA:-./scripts/mir/mir-config}
 
 # Config envs
 export LOTUS_PATH=${LOTUS_PATH:-~/.lotus-local-net$INDEX}
@@ -19,7 +20,7 @@ export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
 mkdir $LOTUS_PATH
-cp -r ./scripts/mir/mir-config/node$INDEX/config.toml $LOTUS_PATH/
+cp -r $CONFIG_DATA/node$INDEX/config.toml $LOTUS_PATH/
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json

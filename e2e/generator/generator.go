@@ -1,10 +1,9 @@
-package main
+package generator
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -16,25 +15,32 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	addr "github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 )
 
 type Validator struct {
-	N             int
+	N int
+
+	Addr    addr.Address
+	NetAddr string
+	Weight  *abi.TokenAmount
+
 	APIPort       string
 	LibP2PKey     crypto.PrivKey
 	WalletPrivKey *types.KeyInfo
-	WalletPubKey  addr.Address
 	LibP2PTCPAddr multiaddr.Multiaddr
 	LibP2PUDPAddr multiaddr.Multiaddr
-	NetAddr       string
-	Set           *ValidatorSet
+
+	Set *ValidatorSet
 }
 
 type ValidatorData struct {
-	Addr    addr.Address `json:"addr"`
-	NetAddr string       `json:"net_addr"`
+	Addr    addr.Address     `json:"addr"`
+	NetAddr string           `json:"net_addr"`
+	Weight  *abi.TokenAmount `json:"weight"`
 }
 
 type ValidatorSetData struct {
@@ -43,9 +49,11 @@ type ValidatorSetData struct {
 }
 
 func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
+	w := big.NewInt(0)
 	v := Validator{
 		N:       n,
 		APIPort: fmt.Sprintf("123%d", n),
+		Weight:  &w,
 	}
 	err := v.newWalletKey()
 	if err != nil {
@@ -70,12 +78,13 @@ func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
 		return nil, err
 	}
 	v.NetAddr = ddd[0].String()
+
 	return &v, nil
 }
 
 func (v *Validator) Data() *ValidatorData {
 	return &ValidatorData{
-		Addr:    v.WalletPubKey,
+		Addr:    v.Addr,
 		NetAddr: v.NetAddr,
 	}
 }
@@ -158,7 +167,7 @@ func (v *Validator) SaveToFile(outDir string) error {
 		return fmt.Errorf("error writing validators in file: %w", err)
 	}
 
-	tmpl, err := template.ParseFiles("./tests/generator/config.toml")
+	tmpl, err := template.ParseFiles("./generator/config.toml")
 	// Capture any error
 	if err != nil {
 		return err
@@ -194,8 +203,8 @@ func marshalMultiAddrSlice(ma []multiaddr.Multiaddr) ([]byte, error) {
 }
 
 func (v *Validator) newLibP2P(ip string, ports ...string) error {
-	tcp := "1347"
-	udp := "1348"
+	tcp := fmt.Sprintf("1334%d", v.N)
+	udp := fmt.Sprintf("1444%d", v.N)
 	if len(ports) == 2 {
 		tcp = ports[0]
 		udp = ports[1]
@@ -213,7 +222,7 @@ func (v *Validator) newLibP2P(ip string, ports ...string) error {
 		return err
 	}
 
-	v.LibP2PUDPAddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/udp/%s", ip, udp))
+	v.LibP2PUDPAddr, err = multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/udp/%s/quic", ip, udp))
 	if err != nil {
 		return err
 	}
@@ -247,7 +256,7 @@ func (v *Validator) newWalletKey() error {
 		return err
 	}
 
-	v.WalletPubKey = kaddr
+	v.Addr = kaddr
 	v.WalletPrivKey = ki
 
 	return nil
@@ -272,7 +281,7 @@ type ValidatorSet struct {
 	ConfigurationNumber int
 }
 
-func NewValidatorSet(startIP string, size int, nonce int) (*ValidatorSet, error) {
+func NewValidatorSet(startIP string, size int, nonce int, ports ...string) (*ValidatorSet, error) {
 	set := ValidatorSet{
 		Size:                size,
 		ConfigurationNumber: nonce,
@@ -305,27 +314,4 @@ func nextIP(ip string) string {
 	ipAddr = net.IPv4(ipv4Addr[0], ipv4Addr[1], ipv4Addr[2], ipv4Addr[3])
 
 	return ipAddr.String()
-}
-
-func main() {
-	firstIP := flag.String("ip", "127.0.0.1", "IP address of the first validator node")
-	n := flag.Int("N", 4, "amount of node validators")
-	nonce := flag.Int("nonce", 0, "configuration number")
-	outputDir := flag.String("output", "./tmmmmmm", "output directory")
-
-	validatorSet, err := NewValidatorSet(*firstIP, *n, *nonce)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(validatorSet)
-
-	for i, v := range validatorSet.Validators {
-		nodeConfigDir := path.Join(*outputDir, fmt.Sprintf("node%d", i))
-
-		err = v.SaveToFile(nodeConfigDir)
-		if err != nil {
-			panic(err)
-		}
-	}
 }
