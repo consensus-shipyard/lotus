@@ -2,14 +2,13 @@
 
 set -e
 
-if [ $# -ne 2 ]
+if [ $# -ne 1 ]
 then
-    echo "Provide the subnet ID as first argument and the default validator key as the second one"
+    echo "Provide the subnet ID as first argument"
     exit 1
 fi
 
 SUBNETID=$1
-VAL_KEY=$2
 
 tmux new-session -d -s "mir" \; \
      new-window   -t "mir" \; \
@@ -18,6 +17,6 @@ tmux new-session -d -s "mir" \; \
      send-keys -t "mir:0" "
         /scripts/ipc/src/subnet-daemon.sh $SUBNETID" Enter \; \
             send-keys -t "mir:0.0" "
-        /scripts/ipc/src/subnet-validator.sh $VAL_KEY" Enter \; \
+        /scripts/ipc/src/subnet-validator.sh" Enter \; \
             \
             attach-session -t "mir:0"
