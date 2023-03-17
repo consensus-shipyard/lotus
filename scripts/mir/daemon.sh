@@ -18,7 +18,8 @@ export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
-cp -r ./scripts/mir/mir-config/node$INDEX/config.toml $LOTUS_PATH
+mkdir $LOTUS_PATH
+cp -r ./scripts/mir/mir-config/node$INDEX/config.toml $LOTUS_PATH/
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json
