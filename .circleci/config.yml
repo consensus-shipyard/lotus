@@ -647,3 +647,24 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
+      - nightly-e2e-test-mir-basic:
+          name: nightly-mir-e2e-basic-tests
+          working_directory: ~/go/src/github.com/filecoin-project/lotus/e2e
+          steps:
+            - install-deps
+            - prepare
+            - run:
+                command: make deps lotus
+                no_output_timeout: 30m
+            - download-params
+            - run:
+                command: |
+                  make test
+            - run:
+                command: |
+                  dates="$(date +%s)"
+                  mkdir -p /tmp/e2e-artifacts/"$dates"
+                  [ -d "./testdata/_runtime/logs" ] && cp -R ./testdata/_runtime/logs/* /tmp/e2e-artifacts/"$dates" || echo "E2E logs directory not found"
+                when: on_fail
+            - store_artifacts:
+                path: /tmp/e2e-artifacts/
