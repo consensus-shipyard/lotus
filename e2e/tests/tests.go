@@ -68,7 +68,7 @@ func waitForLotusAPI(id string) error {
 		return err
 	}
 
-	headers := http.Header{"Authorization": []string{"Bearer " + string(token)}}
+	headers := http.Header{"Authorization": []string{"Bearer " + token}}
 
 	c, closer, err := client.NewFullNodeRPCV1(ctx, "ws://127.0.0.1:123"+id+"/rpc/v1", headers)
 	if err != nil {
@@ -104,7 +104,7 @@ func ClientFor(ctx context.Context, t *testing.T, id string) api.FullNode {
 	token, err := getAuthToken(id)
 	require.NoError(t, err)
 
-	headers := http.Header{"Authorization": []string{"Bearer " + string(token)}}
+	headers := http.Header{"Authorization": []string{"Bearer " + token}}
 
 	c, closer, err := client.NewFullNodeRPCV1(ctx, "ws://127.0.0.1:123"+id+"/rpc/v1", headers)
 	require.NoError(t, err)
