@@ -14,10 +14,16 @@ services:
     volumes:
       - ./testdata/_runtime/logs:/logs
       - ./testdata/_runtime/0:/var/lib/lotus
-      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
+    healthcheck:
+      test: [ "CMD-SHELL", "[ $(curl -w '%{http_code}' http://localhost:1230/rpc/v1) -eq 500 ]" ]
+      interval: 8s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
     ports:
       - "1230:1230"
     networks:
@@ -39,13 +45,13 @@ services:
     volumes:
       - ./testdata/_runtime/logs:/logs
       - ./testdata/_runtime/1:/var/lib/lotus
-      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
     depends_on:
       node0:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "1231:1231"
     networks:
@@ -67,13 +73,13 @@ services:
     volumes:
       - ./testdata/_runtime/logs:/logs
       - ./testdata/_runtime/2:/var/lib/lotus
-      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
     depends_on:
       node0:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "1232:1232"
     networks:
@@ -95,13 +101,13 @@ services:
     volumes:
       - ./testdata/_runtime/logs:/logs
       - ./testdata/_runtime/3:/var/lib/lotus
-      - ./testdata/_runtime/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
       - ../build:/build
       - ../scripts/mir:/scripts/mir/
       - ./testdata/mir:/testdata/mir
     depends_on:
       node0:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "1233:1233"
     networks:

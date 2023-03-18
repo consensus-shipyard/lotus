@@ -169,7 +169,7 @@ RUN <<EOF
     set -e
 
     apt-get update
-    apt-get install -y tmux
+    apt-get install -y tmux curl
 EOF
 
 ENV FILECOIN_PARAMETER_CACHE /var/tmp/filecoin-proof-parameters
