@@ -278,8 +278,8 @@ jobs:
           command: |
             dates="$(date +%s)"
             mkdir -p /tmp/e2e-artifacts/"$dates"
-              [ -d "./testdata/_runtime/logs" ] && cp -R ./testdata/_runtime/logs/* /tmp/e2e-artifacts/"$dates" || echo "E2E logs directory not found"
-            when: on_fail
+            [ -d "./testdata/_runtime/logs" ] && cp -R ./testdata/_runtime/logs/* /tmp/e2e-artifacts/"$dates" || echo "E2E logs directory not found"
+          when: on_fail
       - store_artifacts:
           path: /tmp/e2e-artifacts/
 
