@@ -157,7 +157,9 @@ func NewManager(ctx context.Context,
 
 	params := trantor.DefaultParams(initialMembership)
 	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
-	params.Iss.MaxProposeDelay = cfg.Consensus.MaxProposeDelay * time.Second
+	if cfg.Consensus.MaxProposeDelay != 0 {
+		params.Iss.MaxProposeDelay = cfg.Consensus.MaxProposeDelay * time.Second
+	}
 	params.Iss.ConfigOffset = cfg.Consensus.ConfigOffset
 	params.Iss.AdjustSpeed(1 * time.Second)
 	params.Iss.PBFTViewChangeSNTimeout = 6 * time.Second

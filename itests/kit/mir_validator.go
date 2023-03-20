@@ -101,6 +101,7 @@ func (v *MirValidator) MineBlocks(ctx context.Context) error {
 	cfg := mir.Config{
 		Consensus: &mir.ConsensusConfig{
 			SegmentLength: 1,
+			ConfigOffset:  2,
 		},
 		BaseConfig: &mir.BaseConfig{
 			Addr:      v.addr,
