@@ -19,18 +19,11 @@ import (
 	mirtypes "github.com/filecoin-project/mir/pkg/types"
 )
 
-const (
-	FakeMembership    = 0
-	StringMembership  = 1
-	FileMembership    = 2
-	OnChainMembership = 3
-)
-
 type MirConfig struct {
 	Delay              int
 	MembershipFileName string
 	MembershipString   string
-	MembershipType     int
+	MembershipType     membership.MembershipType
 	MembershipFilename string
 	Databases          map[string]*TestDB
 	MockedTransport    bool
@@ -38,7 +31,7 @@ type MirConfig struct {
 
 func DefaultMirConfig() *MirConfig {
 	return &MirConfig{
-		MembershipType: StringMembership,
+		MembershipType: membership.StringType,
 	}
 }
 
@@ -72,20 +65,20 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 	}
 
 	switch cfg.MembershipType {
-	case FakeMembership:
+	case membership.FakeType:
 		v.membership = fakeMembership{}
-	case StringMembership:
+	case membership.StringType:
 		if cfg.MembershipString == "" {
 			return nil, fmt.Errorf("empty membership string")
 		}
 		v.membershipString = cfg.MembershipString
 		v.membership = membership.StringMembership(cfg.MembershipString)
-	case FileMembership:
+	case membership.FileType:
 		if cfg.MembershipFileName == "" {
 			return nil, fmt.Errorf("membership file is not specified")
 		}
 		v.membership = membership.FileMembership{FileName: cfg.MembershipFileName}
-	case OnChainMembership:
+	case membership.OnChainType:
 		cl := NewStubJSONRPCClient()
 		cl.nextSet = cfg.MembershipString
 		v.membership = membership.NewOnChainMembershipClient(cl, ITestSubnet)

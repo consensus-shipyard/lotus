@@ -1,8 +1,9 @@
 package mir
 
 import (
-	"github.com/filecoin-project/go-address"
+	"time"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
@@ -22,11 +23,24 @@ type BaseConfig struct {
 	CheckpointRepo string
 	// The name of the group of validators.
 	GroupName string
+	// The type of membership.
+	MembershipTypeValue string
 }
+
+const (
+	DefaultMembershipType = "file"
+	// ConfigOffset is the number of epochs by which to delay configuration changes.
+	// If a configuration is agreed upon in epoch e, it will take effect in epoch e + 1 + configOffset.
+	ConfigOffset    = 2
+	MaxProposeDelay = time.Duration(15)
+	SegmentLength   = 1
+)
 
 type ConsensusConfig struct {
 	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
-	SegmentLength int
+	SegmentLength   int
+	MaxProposeDelay time.Duration
+	ConfigOffset    int
 }
 
 // ---
@@ -44,17 +58,37 @@ func NewConfig(
 	dbPath string,
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
-	segmentLength int,
+	segmentLength, configOffset int,
+	maxProposeDelay time.Duration,
 	rpcServerURL string,
+	membershipType string,
+
 ) *Config {
+	if membershipType == "" {
+		membershipType = DefaultMembershipType
+	}
+
 	base := BaseConfig{
-		Addr:              addr,
-		DatastorePath:     dbPath,
-		InitialCheckpoint: initCheck,
-		CheckpointRepo:    checkpointRepo,
+		Addr:                addr,
+		DatastorePath:       dbPath,
+		InitialCheckpoint:   initCheck,
+		CheckpointRepo:      checkpointRepo,
+		MembershipTypeValue: membershipType,
+	}
+
+	if maxProposeDelay <= 0 {
+		maxProposeDelay = MaxProposeDelay
+	}
+	if configOffset <= 0 {
+		configOffset = ConfigOffset
+	}
+	if segmentLength <= 0 {
+		segmentLength = SegmentLength
 	}
 	cns := ConsensusConfig{
-		SegmentLength: segmentLength,
+		SegmentLength:   segmentLength,
+		ConfigOffset:    configOffset,
+		MaxProposeDelay: maxProposeDelay,
 	}
 
 	cfg := Config{

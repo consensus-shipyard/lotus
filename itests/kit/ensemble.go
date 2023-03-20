@@ -42,6 +42,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/messagepool"
@@ -1101,7 +1102,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	validators []*TestValidator,
 	faultyValidators ...*TestValidator,
 ) {
-	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: StringMembership}, faultyValidators...)
+	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: membership.StringType}, faultyValidators...)
 }
 
 func (n *Ensemble) BeginMirMiningWithConfig(

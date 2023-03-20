@@ -81,7 +81,14 @@ var runCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "segment-length",
 			Usage: "The length of an ISS segment. Must not be negative",
-			Value: 1,
+		},
+		&cli.DurationFlag{
+			Name:  "blocks-delay",
+			Usage: "The maximum delay in seconds between two blocks",
+		},
+		&cli.IntFlag{
+			Name:  "config-offset",
+			Usage: "Number of epochs by which to delay configuration changes",
 		},
 		&cli.StringFlag{
 			Name:  "ipcagent-url",
@@ -146,9 +153,6 @@ var runCmd = &cli.Command{
 			return err
 		}
 
-		// Segment length period.
-		segmentLength := cctx.Int("segment-length")
-
 		h, err := getLibP2PHost(cctx.String("repo"))
 		if err != nil {
 			return err
@@ -187,12 +191,15 @@ var runCmd = &cli.Command{
 			dbPath,
 			initCh,
 			cctx.String("checkpoints-repo"),
-			segmentLength,
+			cctx.Int("segment-length"),
+			cctx.Int("config-offset"),
+			cctx.Duration("blocks-interval"),
 			cctx.String("ipcagent-url"),
+			cctx.String("membership"),
 		)
 
 		var mb membership.Reader
-		switch cctx.String("membership") {
+		switch cfg.MembershipTypeValue {
 		case "file":
 			mf := filepath.Join(cctx.String("repo"), cctx.String("membership-file"))
 			mb = membership.NewFileMembership(mf)
