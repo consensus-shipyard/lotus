@@ -256,15 +256,15 @@ jobs:
     <<: *basic_test
 
   nightly-test-mir-with-mangler:
-      <<: *basic_test
+    <<: *basic_test
 
   nightly-test-mir-reconfiguration:
     <<: *basic_test
 
   e2etest: &e2e_test
-    description: |
-      Run e2e tests.
-    #working_directory: ~/go/src/github.com/filecoin-project/lotus/e2e
+    description: Run e2e tests.
+    executor: golang
+    working_directory: ~/go/src/github.com/filecoin-project/lotus/e2e
     steps:
       - install-deps
       - prepare
