@@ -286,6 +286,9 @@ jobs:
   nightly-e2e-test-mir-basic:
     <<: *e2e_test
 
+  e2e-test-mir-basic:
+    <<: *e2e_test
+
   test-conformance:
     description: |
       Run tests using a corpus of interoperable test vectors for Filecoin 
@@ -629,6 +632,8 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
+      - e2e-test-mir-basic:
+          name: e2e-mir-basic-tests
       - build-spacenet
       - build-all:
           filters:
