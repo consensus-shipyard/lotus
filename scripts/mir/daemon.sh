@@ -10,6 +10,8 @@ fi
 INDEX=$1
 EUDICO=${EUDICO:-./eudico}
 CONFIG_DATA=${CONFIG_DATA:-./scripts/mir/mir-config}
+BUILD_DATA=${BUILD_DATA:-./build}
+
 
 # Config envs
 export LOTUS_PATH=${LOTUS_PATH:-~/.lotus-local-net$INDEX}
@@ -34,5 +36,5 @@ cp -r $CONFIG_DATA/node$INDEX/config.toml $LOTUS_PATH/
 #    rm ./scripts/mir/devgen.car
 #    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
-$EUDICO mir daemon --genesis=./build/genesis/spacenet.car --bootstrap=false #--api=123$INDEX
+$EUDICO mir daemon --genesis=$BUILD_DATA/genesis/spacenet.car --bootstrap=false #--api=123$INDEX
 # fi
