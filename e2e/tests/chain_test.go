@@ -9,13 +9,15 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	err := waitForAuthToken("0")
-	if err != nil {
-		panic(err)
-	}
-	err = waitForLotusAPI("0")
-	if err != nil {
-		panic(err)
+	for _, id := range []string{"0", "1", "2", "3"} {
+		err := waitForAuthToken(id)
+		if err != nil {
+			panic(err)
+		}
+		err = waitForLotusAPI(id)
+		if err != nil {
+			panic(err)
+		}
 	}
 	m.Run()
 }
@@ -34,6 +36,6 @@ func TestMirSmoke_AllNodesMine(t *testing.T) {
 
 	nodes := ClientsFor(ctx, t, "0", "1", "2", "3")
 
-	err := waitForHeight(ctx, 10, nodes...)
+	err := waitForHeight(ctx, 20, nodes...)
 	require.NoError(t, err)
 }

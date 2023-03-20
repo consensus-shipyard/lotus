@@ -12,7 +12,7 @@ gen:
 	go run ./generator/cmd -ip=192.168.10.2 -n=4 -output="./testdata/mir/"
 
 tests:
-	go test -v -count=1 -timeout=20m ./tests
+	go test -v -count=1 -timeout=20m ./...
 
 up:
 	docker compose up -d

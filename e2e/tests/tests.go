@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	DeploymentPath = "./testdata/_runtime"
+	DeploymentPath = "../testdata/_runtime"
 )
 
 var (
@@ -32,7 +32,7 @@ var (
 )
 
 func getAuthToken(id string) (string, error) {
-	b, err := ioutil.ReadFile(path.Join(DeploymentPath, id, "/token"))
+	b, err := ioutil.ReadFile(path.Join(DeploymentPath, id, "token"))
 	if err != nil {
 		return "", err
 	}
@@ -49,9 +49,9 @@ func waitForAuthToken(id string) error {
 		default:
 		}
 
-		if _, err := os.Stat(path.Join(DeploymentPath, id, "/token")); errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(path.Join(DeploymentPath, id, "token")); errors.Is(err, os.ErrNotExist) {
 			time.Sleep(1 * time.Second)
-			fmt.Println("wait for Lotus Token...")
+			fmt.Println("wait for Lotus token...")
 			continue
 		}
 		return nil
