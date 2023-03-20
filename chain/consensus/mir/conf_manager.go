@@ -276,7 +276,7 @@ func storeConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) 
 				ConfigurationNumber: n,
 				ValSetHash:          h,
 			}
-			for n, _ := range nodeIDs {
+			for n := range nodeIDs {
 				e.VotedValidators = append(e.VotedValidators, VotedValidator{n.Pb()})
 			}
 			vs = append(vs, e)

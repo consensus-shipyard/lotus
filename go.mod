@@ -49,7 +49,7 @@ require (
 	github.com/filecoin-project/go-statemachine v1.0.2
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/go-storedcounter v0.1.0
-	github.com/filecoin-project/mir v0.2.2
+	github.com/filecoin-project/mir v0.3.1
 	github.com/filecoin-project/pubsub v1.0.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
@@ -162,9 +162,9 @@ require (
 	go.uber.org/zap v1.23.0
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
 	golang.org/x/exp v0.0.0-20220916125017-b168a2c6b86b
-	golang.org/x/net v0.0.0-20220920183852-bf014ff85ad5
+	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20220907140024-f12130a52804
-	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8
+	golang.org/x/sys v0.5.0
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9
 	golang.org/x/tools v0.1.12
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
@@ -349,8 +349,8 @@ require (
 	go.uber.org/dig v1.16.0 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.3.8 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20220505152158-f39f71e6c8f3 // indirect
 	google.golang.org/grpc v1.50.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
@@ -368,4 +368,4 @@ replace github.com/filecoin-project/test-vectors => ./extern/test-vectors
 // replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types
 
 // uncomment for local development. Keeping it here for now for convenience.
-// replace github.com/filecoin-project/mir => ../mir
+// replace github.com/filecoin-project/mir => ../tmp/mir

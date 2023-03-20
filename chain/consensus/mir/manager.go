@@ -155,13 +155,6 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
 
-	// Create SMR modules.
-	mpool := pool.NewModule(
-		m.readyForTxsChan,
-		pool.DefaultModuleConfig(),
-		pool.DefaultModuleParams(),
-	)
-
 	params := trantor.DefaultParams(initialMembership)
 	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
 	params.Mempool.MaxTransactionsInBatch = 1024
@@ -169,6 +162,7 @@ func NewManager(ctx context.Context,
 	params.Iss.ConfigOffset = ConfigOffset
 	params.Iss.PBFTViewChangeSNTimeout = 6 * time.Second
 	params.Iss.PBFTViewChangeSegmentTimeout = 6 * time.Second
+	params.Mempool.TxFetcher = pool.NewFetcher(m.readyForTxsChan).Fetch
 
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config
@@ -192,9 +186,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create SMR system: %w", id, err)
 	}
 
-	smrSystem = smrSystem.
-		WithModule("mempool", mpool).
-		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
+	smrSystem = smrSystem.WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
 	mirManglerParams := os.Getenv(ManglerEnv)
 	if mirManglerParams != "" {
@@ -311,7 +303,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)
 			}
-			log.With("validator", m.id).Debugf("selecting messages from mempool from base: %v", base.Key())
+			log.With("validator", m.id).Debugf("selecting messages from mempool for base: %v", base.Key())
 			msgs, err := m.lotusNode.MpoolSelect(ctx, base.Key(), 1)
 			if err != nil {
 				log.With("validator", m.id).With("epoch", base.Height()).

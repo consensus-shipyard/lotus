@@ -264,14 +264,6 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		if err = sm.syncFromPeers(types.NewTipSetKey(ch.BlockCids[0])); err != nil {
 			return xerrors.Errorf("%v couldn't sync from peers for checkpoint (%d, %v): %w", sm.id, ch.Height, chCID, err)
 		}
-
-		// once synced we deliver the checkpoint to our mining process, so it can be
-		// included in the next block (as the rest of Mir validators will do before
-		// accepting the next batch), and we persist it locally.
-		err = sm.deliverCheckpoint(checkpoint, &ch)
-		if err != nil {
-			return xerrors.Errorf("%v failed to deliver checkpoint (%d, %v) to lotus: %w", sm.id, ch.Height, chCID, err)
-		}
 	} else {
 		log.With("validator", sm.id).Infof("Snapshot len is zero")
 	}
@@ -282,6 +274,9 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
+	log.With("validator", sm.id).Info("applytxs started")
+	defer log.With("validator", sm.id).Info("applytxs finished")
+
 	var mirMsgs []Message
 
 	sm.height++
@@ -457,7 +452,8 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
-	log.With("validator", sm.id).Infof("New epoch: updating %d to %d", sm.currentEpoch, nr)
+	log.With("validator", sm.id).Infof("New epoch started: updating %d to %d", sm.currentEpoch, nr)
+	defer log.With("validator", sm.id).Infof("New epoch finished: updating %d to %d", sm.currentEpoch, nr)
 
 	// Sanity check. Generally, the new epoch is always the current epoch plus 1.
 	// At initialization and right after state transfer, sm.currentEpoch already has been initialized
