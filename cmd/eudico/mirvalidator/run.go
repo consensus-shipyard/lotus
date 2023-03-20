@@ -11,6 +11,8 @@ import (
 	"go.opencensus.io/tag"
 	"golang.org/x/xerrors"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
+
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	t "github.com/filecoin-project/mir/pkg/types"
@@ -147,7 +149,7 @@ var runCmd = &cli.Command{
 		// Segment length period.
 		segmentLength := cctx.Int("segment-length")
 
-		h, err := newLp2pHost(cctx.String("repo"))
+		h, err := getLibP2PHost(cctx.String("repo"))
 		if err != nil {
 			return err
 		}
@@ -196,7 +198,15 @@ var runCmd = &cli.Command{
 			mb = membership.NewFileMembership(mf)
 		case "onchain":
 			cl := rpc.NewJSONRPCClientWithConfig(cfg.IPCConfig())
-			mb = membership.NewOnChainMembershipClient(cl)
+			netName, err := nodeApi.StateNetworkName(ctx)
+			if err != nil {
+				return xerrors.Errorf("error getting network name: %w", err)
+			}
+			sn, err := sdk.NewSubnetIDFromString(string(netName))
+			if err != nil {
+				return err
+			}
+			mb = membership.NewOnChainMembershipClient(cl, sn)
 		default:
 			return xerrors.Errorf("membership is currently only supported with file")
 		}

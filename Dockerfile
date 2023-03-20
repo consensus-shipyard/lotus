@@ -43,8 +43,8 @@ RUN make clean deps
 
 ARG RUSTFLAGS=""
 ARG GOFLAGS=""
-
-RUN make buildall
+# Build only spacenet for eudico
+# RUN make buildall
 
 RUN make spacenet
 #####################################
@@ -103,16 +103,21 @@ ENV LOTUS_PATH /var/lib/lotus
 ENV LOTUS_WORKER_PATH /var/lib/lotus-worker
 ENV WALLET_PATH /var/lib/lotus-wallet
 
-COPY --from=lotus-builder /opt/filecoin/lotus          /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus          /usr/local/bin/
 COPY --from=lotus-builder /opt/filecoin/eudico         /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-seed     /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-shed     /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-wallet   /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-gateway  /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-miner    /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-worker   /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-stats    /usr/local/bin/
-COPY --from=lotus-builder /opt/filecoin/lotus-fountain /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-seed     /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-shed     /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-wallet   /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-gateway  /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-miner    /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-worker   /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-stats    /usr/local/bin/
+# COPY --from=lotus-builder /opt/filecoin/lotus-fountain /usr/local/bin/
+
+# Copy subnets genesis template
+COPY --from=lotus-builder /opt/filecoin/eudico-core/genesis/genesis.json /
+# Copy ipc scripts
+COPY --from=lotus-builder /opt/filecoin/scripts/ipc /scripts/ipc
 
 RUN mkdir /var/tmp/filecoin-proof-parameters
 RUN mkdir /var/lib/lotus
@@ -125,6 +130,8 @@ RUN chown fc: /var/lib/lotus-miner
 RUN chown fc: /var/lib/lotus-worker
 RUN chown fc: /var/lib/lotus-wallet
 
+# tmux to bundle daemon and validator
+RUN apt-get update && apt-get install -y tmux
 
 VOLUME /var/tmp/filecoin-proof-parameters
 VOLUME /var/lib/lotus
@@ -133,6 +140,8 @@ VOLUME /var/lib/lotus-worker
 VOLUME /var/lib/lotus-wallet
 
 EXPOSE 1234
+EXPOSE 1347
+EXPOSE 1348
 EXPOSE 2345
 EXPOSE 3456
 EXPOSE 1777

@@ -15,6 +15,12 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
+
+	"github.com/filecoin-project/mir/pkg/checkpoint"
+	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	t "github.com/filecoin-project/mir/pkg/types"
+
 	lapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -23,18 +29,15 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
-	t "github.com/filecoin-project/mir/pkg/types"
 )
 
 var (
 	LatestCheckpointKey   = datastore.NewKey("mir/latest-check")
 	LatestCheckpointPbKey = datastore.NewKey("mir/latest-check-pb")
 
-	PeerDiscoveryInterval = 600 * time.Millisecond
-	PeerDiscoveryTimeout  = 3 * time.Minute
+	PeerDiscoveryInterval   = 800 * time.Millisecond
+	PeerDiscoveryTimeout    = 3 * time.Minute
+	WaitForHeightMinTimeout = 30 * time.Second
 )
 
 type Message []byte
@@ -141,23 +144,24 @@ func NewStateManager(
 
 // syncFromPeers sync the chain from Filecoin peers.
 func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
-	log.With("validator", sm.id).Infof("syncFromPeers for TSK %s started", tsk.String())
-	defer log.With("validator", sm.id).Infof("syncFromPeers for TSK %s finished", tsk.String())
+	log.With("validator", sm.id).Infof("syncFromPeers for TSK %s started", tsk)
+	defer log.With("validator", sm.id).Infof("syncFromPeers for TSK %s finished", tsk)
 
 	// From all the peers of my daemon try to get the latest tipset.
 	timeout := time.After(PeerDiscoveryTimeout)
+	heightTimeout := WaitForHeightMinTimeout
 	attempt := time.NewTicker(PeerDiscoveryInterval)
 	defer attempt.Stop()
 
 	var connPeers []peer.AddrInfo
 	for {
+
 		connPeers, err = sm.api.NetPeers(sm.ctx)
 		if err != nil {
-			return xerrors.Errorf("failed to get peers: %w", err)
+			return xerrors.Errorf("failed to get peers syncing to TSK %s: %w", tsk, err)
 		}
-
 		if len(connPeers) == 0 {
-			log.With("validator", sm.id).Warn("no connected peers")
+			log.With("validator", sm.id).Warnf("syncFromPeers for TSK %s: no connected peers", tsk)
 		}
 
 		for _, p := range connPeers {
@@ -166,14 +170,22 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 				log.With("validator", sm.id).Errorf("failed to get the latest tipset from peer %s: %v", p.ID, err)
 				continue
 			}
-			// wait for full-sync before returning from restoreState.
-			err = sm.waitForHeight(ts.Height())
+
+			// Wait for full-sync before returning from restoreState.
+			// Here we use the timeout-based waitForWeight to be able to switch to another available peer if needed.
+			// If we used timeout free function then we could choose a malicious node that has sent us an incorrect tipset.
+			err = sm.waitForHeightWithTimeout(heightTimeout, ts.Height())
 			if err != nil {
-				log.With("validator", sm.id).Warnf("failed to wait for block %d: %v", ts.Height(), err)
+				log.With("validator", sm.id).Warnf("waitForHeightWithTimeout at %d error: %v", ts.Height(), err)
 				continue
 			}
+			log.With("validator", sm.id).Infof("syncFromPeers for TSK %s completed via %v", tsk, p.ID)
 			return nil
 		}
+		// Clear the list that will be updated on the next FOR step.
+		connPeers = nil
+		//
+		heightTimeout += WaitForHeightMinTimeout
 
 		select {
 		case <-sm.ctx.Done():
@@ -230,10 +242,15 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// get checkpoint from snapshot.
 		err := ch.FromBytes(snapshot)
 		if err != nil {
-			return xerrors.Errorf("validator %v error getting checkpoint from snapshot bytes: %w", sm.id, err)
+			return xerrors.Errorf("%v failed to unmarshal checkpoint: %w", sm.id, err)
 		}
 
-		log.With("validator", sm.id).Infof("Restoring state from checkpoint at height: %d", ch.Height)
+		chCID, err := ch.Cid()
+		if err != nil {
+			return xerrors.Errorf("%v failed to get checkpoint CID: %w", sm.id, err)
+		}
+
+		log.With("validator", sm.id).Infof("Restoring state from checkpoint (%d, %v)", ch.Height, chCID)
 
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
@@ -241,11 +258,11 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
-			return xerrors.Errorf("validator %v couldn't purge state to recover from checkpoint: %w", sm.id, err)
+			return xerrors.Errorf("%v couldn't purge state to recover from checkpoint: %w", sm.id, err)
 		}
 
 		if err = sm.syncFromPeers(types.NewTipSetKey(ch.BlockCids[0])); err != nil {
-			return xerrors.Errorf("validator %v couldn't sync from peers to recover from checkpoint at %d: %w", sm.id, ch.Height, err)
+			return xerrors.Errorf("%v couldn't sync from peers for checkpoint (%d, %v): %w", sm.id, ch.Height, chCID, err)
 		}
 	} else {
 		log.With("validator", sm.id).Infof("Snapshot len is zero")
@@ -679,9 +696,31 @@ func (sm *StateManager) releaseNextCheckpointChan() {
 	}
 }
 
-func (sm *StateManager) waitForHeight(height abi.ChainEpoch) error {
+func (sm *StateManager) waitForHeightWithTimeout(timeout time.Duration, height abi.ChainEpoch) error {
 	log.With("validator", sm.id).Debugf("waitForHeight %v started", height)
 	defer log.With("validator", sm.id).Debugf("waitForHeight %v finished", height)
+
+	base, err := sm.api.ChainHead(sm.ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get chain head: %w", err)
+	}
+
+	if base.Height() < height {
+		timeout += time.Duration(height-base.Height()) * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(sm.ctx, timeout)
+	defer cancel()
+
+	if err := WaitForHeight(ctx, height, sm.api); err != nil {
+		return xerrors.Errorf("failed to wait for a block: %w", err)
+	}
+	return nil
+}
+
+func (sm *StateManager) waitForHeight(height abi.ChainEpoch) error {
+	log.With("validator", sm.id).Infof("waitForHeight %v started", height)
+	defer log.With("validator", sm.id).Infof("waitForHeight %v finished", height)
 
 	if err := WaitForHeight(sm.ctx, height, sm.api); err != nil {
 		return xerrors.Errorf("failed to wait for a block: %w", err)

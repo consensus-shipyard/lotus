@@ -117,6 +117,28 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
+
+	ts := new(types.TipSet)
+	if tsk != types.EmptyTSK {
+		tsCid, err := tsk.Cid()
+		if err != nil {
+			return nil, err
+		}
+		ts, err = a.Chain.GetTipSetByCid(ctx, tsCid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Resolve on-chain IDs of validators to f1/f3 addresses
+	for i, v := range st.ValidatorSet.Validators {
+		var err error
+		st.ValidatorSet.Validators[i].Addr, err = a.StateManagerAPI.ResolveToDeterministicAddress(ctx, v.Addr, ts)
+		if err != nil {
+			return nil, err
+		}
+
+	}
 	return &st, nil
 }
 
@@ -192,7 +214,10 @@ func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch ab
 // IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
 // peers in a subnet can deterministically generate the genesis block for the subnet.
 func (a *IPCAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID) ([]byte, error) {
-	tmpl, err := genesis.MakeGenesisTemplate(subnet.String())
+	// make genesis with default subnet template.
+	// TODO: This will fail if eudico not run in the default path,
+	// we should pass a path as an input or remove this endpoint.
+	tmpl, err := genesis.MakeGenesisTemplate(subnet.String(), "")
 	if err != nil {
 		return nil, err
 	}

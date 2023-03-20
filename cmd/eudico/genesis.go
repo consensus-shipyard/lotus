@@ -31,6 +31,11 @@ var genesisNewCmd = &cli.Command{
 			Value:   "genesis.car",
 			Usage:   "write output to `FILE`",
 		},
+		&cli.StringFlag{
+			Name:    "template",
+			Aliases: []string{"tmp"},
+			Usage:   "genesis template for the subnet",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		sid := cctx.String("subnet-id")
@@ -39,7 +44,7 @@ var genesisNewCmd = &cli.Command{
 			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}
 
-		err = genesis.MakeGenesisCar(cctx.Context, cctx.String("out"), subnetID.String())
+		err = genesis.MakeGenesisCar(cctx.Context, cctx.String("template"), cctx.String("out"), subnetID.String())
 		if err != nil {
 			return xerrors.Errorf("failed to make genesis: %w", err)
 		}
