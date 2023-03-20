@@ -234,6 +234,33 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 	return st.ListSubnets(a.Chain.ActorStore(ctx))
 }
 
+// IPCGetBottomUpMsg returns the list of bottom-up messages from a specific nonce
+// to the latest one that has been committed in the subnet and not executed yet.
+func (a *IPCAPI) IPCGetBottomUpMsg(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	return st.BottomUpMsgsFromNonce(a.Chain.ActorStore(ctx), st.AppliedBottomupNonce)
+}
+
+// IPCGetTopDownMsg returns the list of top down-messages from a specific nonce
+// to the latest one that has been committed in the subnet.
+func (a *IPCAPI) IPCGetTopDownMsg(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting subnet: %w", err)
+	}
+	if !found {
+		return nil, xerrors.Errorf("subnet not found in gateway")
+	}
+	return subnet.TopDownMsgsFromNonce(a.Chain.ActorStore(ctx), nonce)
+}
+
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
 //
 // The function accepts the address actor and the tipSetKet from which to read the state as an input, along
