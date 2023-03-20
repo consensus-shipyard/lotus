@@ -160,7 +160,6 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		if err != nil {
 			return xerrors.Errorf("failed to get peers syncing to TSK %s: %w", tsk, err)
 		}
-		g
 		if len(connPeers) == 0 {
 			log.With("validator", sm.id).Warnf("syncFromPeers for TSK %s: no connected peers", tsk)
 		}
