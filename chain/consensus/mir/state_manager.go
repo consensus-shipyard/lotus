@@ -9,7 +9,6 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/jpillora/backoff"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/xerrors"
 
@@ -150,22 +149,18 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 
 	// From all the peers of my daemon try to get the latest tipset.
 	timeout := time.After(PeerDiscoveryTimeout)
+	heightTimeout := WaitForHeightMinTimeout
 	attempt := time.NewTicker(PeerDiscoveryInterval)
 	defer attempt.Stop()
 
-	b := backoff.Backoff{
-		Min:    WaitForHeightMinTimeout,
-		Factor: 2,
-	}
 	var connPeers []peer.AddrInfo
 	for {
-		heightTimeout := b.Duration()
 
 		connPeers, err = sm.api.NetPeers(sm.ctx)
 		if err != nil {
 			return xerrors.Errorf("failed to get peers syncing to TSK %s: %w", tsk, err)
 		}
-
+		g
 		if len(connPeers) == 0 {
 			log.With("validator", sm.id).Warnf("syncFromPeers for TSK %s: no connected peers", tsk)
 		}
@@ -190,6 +185,8 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		}
 		// Clear the list that will be updated on the next FOR step.
 		connPeers = nil
+		//
+		heightTimeout += WaitForHeightMinTimeout
 
 		select {
 		case <-sm.ctx.Done():
