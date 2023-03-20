@@ -261,6 +261,9 @@ jobs:
   nightly-test-mir-reconfiguration:
     <<: *basic_test
 
+  nightly-e2e-test-mir-basic:
+    <<: *basic_test
+    
   test-conformance:
     description: |
       Run tests using a corpus of interoperable test vectors for Filecoin 
