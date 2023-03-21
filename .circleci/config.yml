@@ -282,6 +282,7 @@ jobs:
       - download-params
       - run:
           command: cd e2e && make test
+          no_output_timeout: 30m
       - run:
           command: |
             dates="$(date +%s)"
