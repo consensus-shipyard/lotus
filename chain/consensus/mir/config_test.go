@@ -19,7 +19,7 @@ func TestConfigBasic(t *testing.T) {
 		"repo",
 		1,
 		2,
-		1,
+		time.Second,
 		"http://127.0.0.1",
 		"file",
 	)

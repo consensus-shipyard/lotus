@@ -78,7 +78,7 @@ func NewConfig(
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 	segmentLength, configOffset int,
-	maxBlockDelay int,
+	maxBlockDelay time.Duration,
 	rpcServerURL string,
 	membershipSource string,
 
@@ -95,14 +95,9 @@ func NewConfig(
 		MembershipSourceValue: membershipSource,
 	}
 
-	var maxBlockDelaySec time.Duration
-	if maxBlockDelay > 0 {
-		maxBlockDelaySec = time.Duration(maxBlockDelay) * time.Second
-	} else {
-		maxBlockDelaySec = DefaultMaxBlockDelay
-		maxBlockDelay = 1
+	if maxBlockDelay <= 0 {
+		maxBlockDelay = DefaultMaxBlockDelay
 	}
-
 	if configOffset <= 0 {
 		configOffset = DefaultConfigOffset
 	}
@@ -112,10 +107,10 @@ func NewConfig(
 	cns := ConsensusConfig{
 		SegmentLength:                segmentLength,
 		ConfigOffset:                 configOffset,
-		MaxProposeDelay:              maxBlockDelaySec,
+		MaxProposeDelay:              maxBlockDelay,
 		MaxTransactionsInBatch:       DefaultMaxTransactionsInBatch,
-		PBFTViewChangeSNTimeout:      max(maxBlockDelaySec+5*time.Second, 6*time.Second),
-		PBFTViewChangeSegmentTimeout: max(time.Duration((maxBlockDelay+2)*segmentLength)+3*time.Second, 6*time.Second),
+		PBFTViewChangeSNTimeout:      max(maxBlockDelay+5*time.Second, 6*time.Second),
+		PBFTViewChangeSegmentTimeout: max((maxBlockDelay+2*time.Second)*time.Duration(segmentLength)+3*time.Second, 6*time.Second),
 	}
 
 	cfg := Config{

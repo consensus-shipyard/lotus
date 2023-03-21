@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "net/http/pprof"
 	"path/filepath"
+	"time"
 
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/stats"
@@ -82,9 +83,9 @@ var runCmd = &cli.Command{
 			Name:  "segment-length",
 			Usage: "The length of an ISS segment. Must not be negative",
 		},
-		&cli.DurationFlag{
+		&cli.StringFlag{
 			Name:  "max-block-delay",
-			Usage: "The maximum delay in seconds between two blocks",
+			Usage: "The maximum delay between two blocks",
 		},
 		&cli.IntFlag{
 			Name:  "config-offset",
@@ -186,6 +187,11 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
+		maxBlockDelay, err := time.ParseDuration(cctx.String("max-block-delay"))
+		if err != nil {
+			return xerrors.Errorf("invalid max block delay string %s: %x", cctx.String("max-block-delay"), err)
+		}
+
 		cfg := mir.NewConfig(
 			validatorID,
 			dbPath,
@@ -193,7 +199,7 @@ var runCmd = &cli.Command{
 			cctx.String("checkpoints-repo"),
 			cctx.Int("segment-length"),
 			cctx.Int("config-offset"),
-			cctx.Int("max-block-delay"),
+			maxBlockDelay,
 			cctx.String("ipcagent-url"),
 			cctx.String("membership"),
 		)
