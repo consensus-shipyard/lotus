@@ -261,6 +261,23 @@ func (a *IPCAPI) IPCGetTopDownMsg(ctx context.Context, gatewayAddr address.Addre
 	return subnet.TopDownMsgsFromNonce(a.Chain.ActorStore(ctx), nonce)
 }
 
+// IPCGetBottomUpMsgFromRegistry gets a batch of bottom-up messages stored in the registry of a subnet
+// by Cid.
+func (a *IPCAPI) IPCGetBottomUpMsgFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	msgs, found, err := st.GetBottomUpMsgsFromRegistry(a.Chain.ActorStore(ctx), c)
+	if err != nil {
+		return nil, xerrors.Errorf("error fetching cross-messages from registry: %w", err)
+	}
+	if !found {
+		return nil, xerrors.Errorf("cross-messages batch for cid %s not found: %w", c, err)
+	}
+	return msgs, nil
+}
+
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
 //
 // The function accepts the address actor and the tipSetKet from which to read the state as an input, along

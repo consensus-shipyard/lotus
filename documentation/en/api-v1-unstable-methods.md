@@ -109,6 +109,7 @@
   * [ID](#ID)
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
   * [IPCGetBottomUpMsg](#IPCGetBottomUpMsg)
+  * [IPCGetBottomUpMsgFromRegistry](#IPCGetBottomUpMsgFromRegistry)
   * [IPCGetCheckpoint](#IPCGetCheckpoint)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
@@ -3168,6 +3169,54 @@ Response:
     "Fee": "0"
   }
 ]
+```
+
+### IPCGetBottomUpMsgFromRegistry
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+{
+  "Msgs": [
+    {
+      "Msg": {
+        "From": {
+          "SubnetID": {
+            "Parent": "string value",
+            "Actor": "f01234"
+          },
+          "RawAddress": "f01234"
+        },
+        "To": {
+          "SubnetID": {
+            "Parent": "string value",
+            "Actor": "f01234"
+          },
+          "RawAddress": "f01234"
+        },
+        "Method": 1,
+        "Params": {
+          "Bytes": "Ynl0ZSBhcnJheQ=="
+        },
+        "Value": "0",
+        "Nonce": 42
+      },
+      "Wrapped": true
+    }
+  ]
+}
 ```
 
 ### IPCGetCheckpoint

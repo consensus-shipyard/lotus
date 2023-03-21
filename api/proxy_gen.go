@@ -323,6 +323,8 @@ type FullNodeMethods struct {
 
 	IPCGetBottomUpMsg func(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) `perm:"read"`
 
+	IPCGetBottomUpMsgFromRegistry func(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) `perm:"read"`
+
 	IPCGetCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
@@ -2450,6 +2452,17 @@ func (s *FullNodeStruct) IPCGetBottomUpMsg(p0 context.Context, p1 address.Addres
 
 func (s *FullNodeStub) IPCGetBottomUpMsg(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
 	return *new([]*gateway.CrossMsgMeta), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCGetBottomUpMsgFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
+	if s.Internal.IPCGetBottomUpMsgFromRegistry == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCGetBottomUpMsgFromRegistry(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetBottomUpMsgFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {

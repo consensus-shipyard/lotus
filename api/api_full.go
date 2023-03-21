@@ -875,6 +875,7 @@ type FullNode interface {
 	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error)                      //perm:read
 	IPCGetBottomUpMsg(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error)                           //perm:read
 	IPCGetTopDownMsg(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) //perm:read
+	IPCGetBottomUpMsgFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error)         //perm:read
 }
 
 // reverse interface to the client, called after EthSubscribe
