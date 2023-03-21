@@ -7,9 +7,6 @@ orbs:
   aws-cli: circleci/aws-cli@1.3.2
 
 executors:
-  machine:
-    image: ubuntu-2004:202104-01
-    docker_layer_caching: true
   golang:
     docker:
       - image: cimg/go:1.18.8
@@ -266,7 +263,9 @@ jobs:
 
   e2etest: &e2e_test
     description: Run e2e tests.
-    executor: machine
+    machine:
+      image: ubuntu-2004:202104-01
+      docker_layer_caching: true
     working_directory: ~/go/src/github.com/filecoin-project/lotus/e2e
     steps:
       - install-deps
