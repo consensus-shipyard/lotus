@@ -1102,7 +1102,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	validators []*TestValidator,
 	faultyValidators ...*TestValidator,
 ) {
-	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: membership.StringType}, faultyValidators...)
+	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: membership.StringSource}, faultyValidators...)
 }
 
 func (n *Ensemble) BeginMirMiningWithConfig(

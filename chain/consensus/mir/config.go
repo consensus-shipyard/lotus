@@ -23,12 +23,12 @@ type BaseConfig struct {
 	CheckpointRepo string
 	// The name of the group of validators.
 	GroupName string
-	// The type of membership.
-	MembershipTypeValue string
+	// The source of membership: file, chain, etc.
+	MembershipSourceValue string
 }
 
 const (
-	DefaultMembershipType = "file"
+	DefaultMembershipSource = "file"
 	// ConfigOffset is the number of epochs by which to delay configuration changes.
 	// If a configuration is agreed upon in epoch e, it will take effect in epoch e + 1 + configOffset.
 	ConfigOffset    = 2
@@ -65,15 +65,15 @@ func NewConfig(
 
 ) *Config {
 	if membershipType == "" {
-		membershipType = DefaultMembershipType
+		membershipType = DefaultMembershipSource
 	}
 
 	base := BaseConfig{
-		Addr:                addr,
-		DatastorePath:       dbPath,
-		InitialCheckpoint:   initCheck,
-		CheckpointRepo:      checkpointRepo,
-		MembershipTypeValue: membershipType,
+		Addr:                  addr,
+		DatastorePath:         dbPath,
+		InitialCheckpoint:     initCheck,
+		CheckpointRepo:        checkpointRepo,
+		MembershipSourceValue: membershipType,
 	}
 
 	if maxProposeDelay <= 0 {

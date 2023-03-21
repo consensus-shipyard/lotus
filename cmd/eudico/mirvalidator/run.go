@@ -199,7 +199,7 @@ var runCmd = &cli.Command{
 		)
 
 		var mb membership.Reader
-		switch cfg.MembershipTypeValue {
+		switch cfg.MembershipSourceValue {
 		case "file":
 			mf := filepath.Join(cctx.String("repo"), cctx.String("membership-file"))
 			mb = membership.NewFileMembership(mf)

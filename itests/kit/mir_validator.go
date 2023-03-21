@@ -23,7 +23,7 @@ type MirConfig struct {
 	Delay              int
 	MembershipFileName string
 	MembershipString   string
-	MembershipType     membership.MembershipType
+	MembershipType     membership.Source
 	MembershipFilename string
 	Databases          map[string]*TestDB
 	MockedTransport    bool
@@ -31,7 +31,7 @@ type MirConfig struct {
 
 func DefaultMirConfig() *MirConfig {
 	return &MirConfig{
-		MembershipType: membership.StringType,
+		MembershipType: membership.StringSource,
 	}
 }
 
@@ -65,20 +65,20 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 	}
 
 	switch cfg.MembershipType {
-	case membership.FakeType:
+	case membership.FakeSource:
 		v.membership = fakeMembership{}
-	case membership.StringType:
+	case membership.StringSource:
 		if cfg.MembershipString == "" {
 			return nil, fmt.Errorf("empty membership string")
 		}
 		v.membershipString = cfg.MembershipString
 		v.membership = membership.StringMembership(cfg.MembershipString)
-	case membership.FileType:
+	case membership.FileSource:
 		if cfg.MembershipFileName == "" {
 			return nil, fmt.Errorf("membership file is not specified")
 		}
 		v.membership = membership.FileMembership{FileName: cfg.MembershipFileName}
-	case membership.OnChainType:
+	case membership.OnChainSource:
 		cl := NewStubJSONRPCClient()
 		cl.nextSet = cfg.MembershipString
 		v.membership = membership.NewOnChainMembershipClient(cl, ITestSubnet)

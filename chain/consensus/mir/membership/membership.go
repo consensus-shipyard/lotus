@@ -11,13 +11,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
-type MembershipType int32
+type Source int32
 
 const (
-	FakeType    MembershipType = 0
-	StringType  MembershipType = 1
-	FileType    MembershipType = 2
-	OnChainType MembershipType = 3
+	FakeSource    Source = 0
+	StringSource  Source = 1
+	FileSource    Source = 2
+	OnChainSource Source = 3
 )
 
 type Reader interface {

@@ -82,7 +82,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -100,7 +100,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -162,7 +162,7 @@ func TestMirReconfigurationOnChain_RunSubnetWithStubJSONRPC(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
-			MembershipType: mb.OnChainType,
+			MembershipType: mb.OnChainSource,
 		})
 
 	err := kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
@@ -201,7 +201,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -219,7 +219,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -294,7 +294,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 
 	ens.InterconnectFullNodes()
 	ens.BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber], &kit.MirConfig{
-		MembershipType:     mb.FileType,
+		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFileName,
 		Databases:          dbs,
 	})
@@ -342,7 +342,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	ens.InterconnectFullNodes()
 
 	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirConfig{
-		MembershipType:     mb.FileType,
+		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFileName,
 		Databases:          dbs,
 	})
@@ -416,13 +416,13 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 	ens.InterconnectFullNodes()
 	for i := 0; i < MirTotalValidatorNumber; i++ {
 		ens.BeginMirMiningWithConfig(ctx, g, []*kit.TestValidator{validators[i]}, &kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFiles[i],
 		})
 	}
 
 	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirConfig{
-		MembershipType:     mb.FileType,
+		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFiles[MirTotalValidatorNumber],
 	})
 
@@ -480,7 +480,7 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:initialValidatorNumber],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -497,7 +497,7 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[initialValidatorNumber:],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -538,7 +538,7 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -560,7 +560,7 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 		// Start new validators.
 		ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, []*kit.TestValidator{validators[MirTotalValidatorNumber+i-1]},
 			&kit.MirConfig{
-				MembershipType:     mb.FileType,
+				MembershipType:     mb.FileSource,
 				MembershipFileName: membershipFileName,
 			})
 
@@ -601,7 +601,7 @@ func TestMirReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	ens.SaveValidatorSetToFile(0, membershipFileName, validators[:MirTotalValidatorNumber]...)
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
-			MembershipType:     mb.FileType,
+			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
 
@@ -1053,7 +1053,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirConfig{
-		MembershipType:  mb.StringType,
+		MembershipType:  mb.StringSource,
 		MockedTransport: true,
 	})
 
@@ -1248,7 +1248,7 @@ func TestMirSmoke_StopWithError(t *testing.T) {
 
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirConfig{
-		MembershipType: mb.FakeType,
+		MembershipType: mb.FakeSource,
 	})
 
 	err := kit.AdvanceChain(ctx, 10, nodes...)
@@ -1347,7 +1347,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators,
 		&kit.MirConfig{
-			MembershipType:  mb.StringType,
+			MembershipType:  mb.StringSource,
 			MockedTransport: true,
 		},
 	)
