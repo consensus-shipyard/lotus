@@ -193,7 +193,7 @@ var runCmd = &cli.Command{
 			cctx.String("checkpoints-repo"),
 			cctx.Int("segment-length"),
 			cctx.Int("config-offset"),
-			cctx.Duration("max-block-delay"),
+			cctx.Int("max-block-delay"),
 			cctx.String("ipcagent-url"),
 			cctx.String("membership"),
 		)

@@ -1057,13 +1057,13 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 }
 
 func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
-	membership := fmt.Sprintf("%d;", 0)
+	mb := fmt.Sprintf("%d;", 0)
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		membership += fmt.Sprintf("%s@%s,", v.mirAddr, id)
+		mb += fmt.Sprintf("%s@%s,", v.mirAddr, id)
 	}
-	return membership
+	return mb
 }
 
 func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile string, validators ...*TestValidator) {

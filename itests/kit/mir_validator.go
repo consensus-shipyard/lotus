@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -100,16 +99,11 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 
 func (v *MirValidator) MineBlocks(ctx context.Context) error {
 	cfg := mir.Config{
-		Consensus: &mir.ConsensusConfig{
-			SegmentLength:          1,
-			ConfigOffset:           2,
-			MaxTransactionsInBatch: 1024,
-			MaxProposeDelay:        time.Duration(1),
-		},
 		BaseConfig: &mir.BaseConfig{
 			Addr:      v.addr,
 			GroupName: v.t.Name(),
 		},
+		Consensus: mir.DefaultConsensusConfig(),
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
