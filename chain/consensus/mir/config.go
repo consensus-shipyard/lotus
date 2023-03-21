@@ -30,18 +30,20 @@ type BaseConfig struct {
 
 const (
 	DefaultMembershipSource = "file"
-	// ConfigOffset is the number of epochs by which to delay configuration changes.
+	// DefaultConfigOffset is the default number of epochs by which to delay configuration changes.
 	// If a configuration is agreed upon in epoch e, it will take effect in epoch e + 1 + configOffset.
-	ConfigOffset  = 2
-	MaxBlockDelay = time.Duration(1)
-	SegmentLength = 1
+	DefaultConfigOffset           = 2
+	DefaultMaxBlockDelay          = time.Duration(1)
+	DefaultSegmentLength          = 1
+	DefaultMaxTransactionsInBatch = 1024
 )
 
 type ConsensusConfig struct {
 	// The length of an ISS segment in Mir, in sequence numbers. Must not be negative.
-	SegmentLength   int
-	MaxProposeDelay time.Duration
-	ConfigOffset    int
+	SegmentLength          int
+	MaxProposeDelay        time.Duration
+	ConfigOffset           int
+	MaxTransactionsInBatch int
 }
 
 // ---
@@ -78,18 +80,19 @@ func NewConfig(
 	}
 
 	if maxBlockDelay <= 0 {
-		maxBlockDelay = MaxBlockDelay
+		maxBlockDelay = DefaultMaxBlockDelay
 	}
 	if configOffset <= 0 {
-		configOffset = ConfigOffset
+		configOffset = DefaultConfigOffset
 	}
 	if segmentLength <= 0 {
-		segmentLength = SegmentLength
+		segmentLength = DefaultSegmentLength
 	}
 	cns := ConsensusConfig{
-		SegmentLength:   segmentLength,
-		ConfigOffset:    configOffset,
-		MaxProposeDelay: maxBlockDelay,
+		SegmentLength:          segmentLength,
+		ConfigOffset:           configOffset,
+		MaxProposeDelay:        maxBlockDelay,
+		MaxTransactionsInBatch: DefaultMaxTransactionsInBatch,
 	}
 
 	cfg := Config{

@@ -164,7 +164,7 @@ func NewManager(ctx context.Context,
 	params.Iss.AdjustSpeed(1 * time.Second)
 	params.Iss.PBFTViewChangeSNTimeout = 6 * time.Second
 	params.Iss.PBFTViewChangeSegmentTimeout = 6 * time.Second
-	params.Mempool.MaxTransactionsInBatch = 1024
+	params.Mempool.MaxTransactionsInBatch = cfg.Consensus.MaxTransactionsInBatch
 	params.Mempool.TxFetcher = pool.NewFetcher(m.readyForTxsChan).Fetch
 
 	initCh := cfg.InitialCheckpoint

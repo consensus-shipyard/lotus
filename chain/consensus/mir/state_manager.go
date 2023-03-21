@@ -93,6 +93,8 @@ type StateManager struct {
 
 	// Mir chain height.
 	height abi.ChainEpoch
+
+	configOffset int
 }
 
 func NewStateManager(
@@ -115,14 +117,15 @@ func NewStateManager(
 		id:                      cfg.Addr.String(),
 		nextConfigurationNumber: 1,
 		checkpointRepo:          cfg.CheckpointRepo,
+		configOffset:            cfg.Consensus.ConfigOffset,
 	}
 
 	sm.reconfigurationVotes = sm.confManager.GetConfigurationVotes()
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
-	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, ConfigOffset+1)
-	for e := 0; e < ConfigOffset+1; e++ {
+	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, sm.configOffset+1)
+	for e := 0; e < sm.configOffset+1; e++ {
 		sm.memberships[t.EpochNr(e)] = initialMembership
 	}
 	sm.nextNewMembership = initialMembership
@@ -219,9 +222,9 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	sm.currentEpoch = t.EpochNr(config.EpochNr)
 
 	// Sanity check.
-	if len(config.Memberships) != ConfigOffset+1 {
+	if len(config.Memberships) != sm.configOffset+1 {
 		return fmt.Errorf("validator %v checkpoint contains %d memberships, expected %d (ConfigOffset=%d)",
-			sm.id, len(config.Memberships), ConfigOffset+1, ConfigOffset)
+			sm.id, len(config.Memberships), sm.configOffset+1, sm.configOffset)
 	}
 
 	// Set memberships for the current epoch and ConfigOffset following ones.
@@ -232,7 +235,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	}
 
 	// The next membership is the last known membership. It may be replaced by another one during this epoch.
-	sm.nextNewMembership = sm.memberships[t.EpochNr(config.EpochNr+ConfigOffset)]
+	sm.nextNewMembership = sm.memberships[t.EpochNr(config.EpochNr+uint64(sm.configOffset))]
 	log.With("validator", sm.id).Infof("RestoreState: next membership size is %d at epoch %d", len(sm.nextNewMembership), sm.currentEpoch)
 
 	// if mir provides a snapshot
@@ -465,7 +468,7 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 
 	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
 	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
-	sm.memberships[nr+ConfigOffset+1] = sm.nextNewMembership
+	sm.memberships[nr+t.EpochNr(sm.configOffset)+1] = sm.nextNewMembership
 
 	// Update current epoch number.
 	sm.currentEpoch = nr
