@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
@@ -31,9 +32,9 @@ const (
 	DefaultMembershipSource = "file"
 	// ConfigOffset is the number of epochs by which to delay configuration changes.
 	// If a configuration is agreed upon in epoch e, it will take effect in epoch e + 1 + configOffset.
-	ConfigOffset    = 2
-	MaxProposeDelay = time.Duration(1)
-	SegmentLength   = 1
+	ConfigOffset  = 2
+	MaxBlockDelay = time.Duration(1)
+	SegmentLength = 1
 )
 
 type ConsensusConfig struct {
@@ -59,13 +60,13 @@ func NewConfig(
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 	segmentLength, configOffset int,
-	maxProposeDelay time.Duration,
+	maxBlockDelay time.Duration,
 	rpcServerURL string,
-	membershipType string,
+	membershipSource string,
 
 ) *Config {
-	if membershipType == "" {
-		membershipType = DefaultMembershipSource
+	if !membership.IsSourceValid(membershipSource) {
+		membershipSource = DefaultMembershipSource
 	}
 
 	base := BaseConfig{
@@ -73,11 +74,11 @@ func NewConfig(
 		DatastorePath:         dbPath,
 		InitialCheckpoint:     initCheck,
 		CheckpointRepo:        checkpointRepo,
-		MembershipSourceValue: membershipType,
+		MembershipSourceValue: membershipSource,
 	}
 
-	if maxProposeDelay <= 0 {
-		maxProposeDelay = MaxProposeDelay
+	if maxBlockDelay <= 0 {
+		maxBlockDelay = MaxBlockDelay
 	}
 	if configOffset <= 0 {
 		configOffset = ConfigOffset
@@ -88,7 +89,7 @@ func NewConfig(
 	cns := ConsensusConfig{
 		SegmentLength:   segmentLength,
 		ConfigOffset:    configOffset,
-		MaxProposeDelay: maxProposeDelay,
+		MaxProposeDelay: maxBlockDelay,
 	}
 
 	cfg := Config{

@@ -83,7 +83,7 @@ var runCmd = &cli.Command{
 			Usage: "The length of an ISS segment. Must not be negative",
 		},
 		&cli.DurationFlag{
-			Name:  "blocks-delay",
+			Name:  "max-block-delay",
 			Usage: "The maximum delay in seconds between two blocks",
 		},
 		&cli.IntFlag{
@@ -193,7 +193,7 @@ var runCmd = &cli.Command{
 			cctx.String("checkpoints-repo"),
 			cctx.Int("segment-length"),
 			cctx.Int("config-offset"),
-			cctx.Duration("blocks-interval"),
+			cctx.Duration("max-block-delay"),
 			cctx.String("ipcagent-url"),
 			cctx.String("membership"),
 		)

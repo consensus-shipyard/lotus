@@ -1,6 +1,8 @@
 package membership
 
 import (
+	"strings"
+
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
@@ -19,6 +21,32 @@ const (
 	FileSource    Source = 2
 	OnChainSource Source = 3
 )
+
+func (e Source) String() string {
+	switch e {
+	case FakeSource:
+		return "fake"
+	case StringSource:
+		return "string"
+	case FileSource:
+		return "file"
+	case OnChainSource:
+		return "onchain"
+	default:
+		panic("unknown source")
+	}
+}
+
+func IsSourceValid(source string) bool {
+	switch strings.ToLower(source) {
+	case "file":
+		return true
+	case "onchain":
+		return true
+	default:
+		return false
+	}
+}
 
 type Reader interface {
 	GetValidatorSet() (*validator.Set, error)
