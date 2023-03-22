@@ -16,6 +16,9 @@ tests:
 	ls -la
 	whoami
 	sleep 5
+	ls -la ./testdata/
+	ls -la ./testdata/_runtime
+	ls -la ./testdata/_runtime/0
 	go test -v -count=1 -timeout=20m ./...
 
 up:
