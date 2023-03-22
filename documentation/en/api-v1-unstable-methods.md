@@ -108,9 +108,12 @@
 * [I](#I)
   * [ID](#ID)
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
+  * [IPCGetBottomUpMsgs](#IPCGetBottomUpMsgs)
+  * [IPCGetBottomUpMsgsFromRegistry](#IPCGetBottomUpMsgsFromRegistry)
   * [IPCGetCheckpoint](#IPCGetCheckpoint)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
+  * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
   * [IPCGetVotesForCheckpoint](#IPCGetVotesForCheckpoint)
   * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
@@ -3142,6 +3145,80 @@ Inputs:
 
 Response: `"f01234"`
 
+### IPCGetBottomUpMsgs
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234"
+]
+```
+
+Response:
+```json
+[
+  {
+    "MsgsCID": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Nonce": 42,
+    "Value": "0",
+    "Fee": "0"
+  }
+]
+```
+
+### IPCGetBottomUpMsgsFromRegistry
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  }
+]
+```
+
+Response:
+```json
+{
+  "Msgs": [
+    {
+      "Msg": {
+        "From": {
+          "SubnetID": {
+            "Parent": "string value",
+            "Actor": "f01234"
+          },
+          "RawAddress": "f01234"
+        },
+        "To": {
+          "SubnetID": {
+            "Parent": "string value",
+            "Actor": "f01234"
+          },
+          "RawAddress": "f01234"
+        },
+        "Method": 1,
+        "Params": {
+          "Bytes": "Ynl0ZSBhcnJheQ=="
+        },
+        "Value": "0",
+        "Nonce": 42
+      },
+      "Wrapped": true
+    }
+  ]
+}
+```
+
 ### IPCGetCheckpoint
 
 
@@ -3182,23 +3259,14 @@ Response:
         }
       }
     ],
-    "CrossMsgs": [
-      {
-        "From": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "To": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "MsgsCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "Nonce": 42,
-        "Value": "0"
-      }
-    ]
+    "CrossMsgs": {
+      "MsgsCID": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "Nonce": 42,
+      "Value": "0",
+      "Fee": "0"
+    }
   },
   "Sig": "Ynl0ZSBhcnJheQ=="
 }
@@ -3241,23 +3309,14 @@ Response:
         }
       }
     ],
-    "CrossMsgs": [
-      {
-        "From": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "To": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "MsgsCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "Nonce": 42,
-        "Value": "0"
-      }
-    ]
+    "CrossMsgs": {
+      "MsgsCID": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "Nonce": 42,
+      "Value": "0",
+      "Fee": "0"
+    }
   },
   "Sig": "Ynl0ZSBhcnJheQ=="
 }
@@ -3284,6 +3343,54 @@ Response:
 {
   "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
 }
+```
+
+### IPCGetTopDownMsgs
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  42
+]
+```
+
+Response:
+```json
+[
+  {
+    "Msg": {
+      "From": {
+        "SubnetID": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "RawAddress": "f01234"
+      },
+      "To": {
+        "SubnetID": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "RawAddress": "f01234"
+      },
+      "Method": 1,
+      "Params": {
+        "Bytes": "Ynl0ZSBhcnJheQ=="
+      },
+      "Value": "0",
+      "Nonce": 42
+    },
+    "Wrapped": true
+  }
+]
 ```
 
 ### IPCGetVotesForCheckpoint
@@ -3362,23 +3469,14 @@ Response:
             }
           }
         ],
-        "CrossMsgs": [
-          {
-            "From": {
-              "Parent": "string value",
-              "Actor": "f01234"
-            },
-            "To": {
-              "Parent": "string value",
-              "Actor": "f01234"
-            },
-            "MsgsCID": {
-              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-            },
-            "Nonce": 42,
-            "Value": "0"
-          }
-        ]
+        "CrossMsgs": {
+          "MsgsCID": {
+            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+          },
+          "Nonce": 42,
+          "Value": "0",
+          "Fee": "0"
+        }
       },
       "Sig": "Ynl0ZSBhcnJheQ=="
     }

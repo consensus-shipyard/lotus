@@ -234,6 +234,50 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 	return st.ListSubnets(a.Chain.ActorStore(ctx))
 }
 
+// IPCGetBottomUpMsgs returns the list of bottom-up messages that haven't been
+// executed yet.
+func (a *IPCAPI) IPCGetBottomUpMsgs(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	return st.BottomUpMsgsFromNonce(a.Chain.ActorStore(ctx), st.AppliedBottomupNonce)
+}
+
+// IPCGetTopDownMsgs returns the list of top down-messages from a specific nonce
+// to the latest one that has been committed in the subnet.
+func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting subnet: %w", err)
+	}
+	if !found {
+		return nil, xerrors.Errorf("subnet not found in gateway")
+	}
+	return subnet.TopDownMsgsFromNonce(a.Chain.ActorStore(ctx), nonce)
+}
+
+// IPCGetBottomUpMsgsFromRegistry gets a batch of bottom-up messages stored in the registry of a subnet
+// by Cid.
+func (a *IPCAPI) IPCGetBottomUpMsgsFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	msgs, found, err := st.GetBottomUpMsgsFromRegistry(a.Chain.ActorStore(ctx), c)
+	if err != nil {
+		return nil, xerrors.Errorf("error fetching cross-messages from registry: %w", err)
+	}
+	if !found {
+		return nil, xerrors.Errorf("cross-messages batch for cid %s not found: %w", c, err)
+	}
+	return msgs, nil
+}
+
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
 //
 // The function accepts the address actor and the tipSetKet from which to read the state as an input, along

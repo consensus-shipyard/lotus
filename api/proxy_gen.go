@@ -321,11 +321,17 @@ type FullNodeMethods struct {
 
 	IPCAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
 
+	IPCGetBottomUpMsgs func(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) `perm:"read"`
+
+	IPCGetBottomUpMsgsFromRegistry func(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) `perm:"read"`
+
 	IPCGetCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
+
+	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
 
 	IPCGetVotesForCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
 
@@ -2437,6 +2443,28 @@ func (s *FullNodeStub) IPCAddSubnetActor(p0 context.Context, p1 address.Address,
 	return *new(address.Address), ErrNotSupported
 }
 
+func (s *FullNodeStruct) IPCGetBottomUpMsgs(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
+	if s.Internal.IPCGetBottomUpMsgs == nil {
+		return *new([]*gateway.CrossMsgMeta), ErrNotSupported
+	}
+	return s.Internal.IPCGetBottomUpMsgs(p0, p1)
+}
+
+func (s *FullNodeStub) IPCGetBottomUpMsgs(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
+	return *new([]*gateway.CrossMsgMeta), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCGetBottomUpMsgsFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
+	if s.Internal.IPCGetBottomUpMsgsFromRegistry == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCGetBottomUpMsgsFromRegistry(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetBottomUpMsgsFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
+	return nil, ErrNotSupported
+}
+
 func (s *FullNodeStruct) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	if s.Internal.IPCGetCheckpoint == nil {
 		return nil, ErrNotSupported
@@ -2468,6 +2496,17 @@ func (s *FullNodeStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 add
 
 func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
 	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) {
+	if s.Internal.IPCGetTopDownMsgs == nil {
+		return *new([]*gateway.CrossMsg), ErrNotSupported
+	}
+	return s.Internal.IPCGetTopDownMsgs(p0, p1, p2, p3)
+}
+
+func (s *FullNodeStub) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) {
+	return *new([]*gateway.CrossMsg), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) {
