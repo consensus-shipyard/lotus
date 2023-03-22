@@ -3,6 +3,8 @@ package mir
 import (
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
@@ -78,13 +80,12 @@ func NewConfig(
 	initCheck *checkpoint.StableCheckpoint,
 	checkpointRepo string,
 	segmentLength, configOffset int,
-	maxBlockDelay time.Duration,
+	maxBlockDelayStr string,
 	rpcServerURL string,
 	membershipSource string,
-
-) *Config {
+) (*Config, error) {
 	if !membership.IsSourceValid(membershipSource) {
-		membershipSource = DefaultMembershipSource
+		return nil, xerrors.Errorf("invalid membership source %s", membershipSource)
 	}
 
 	base := BaseConfig{
@@ -95,6 +96,10 @@ func NewConfig(
 		MembershipSourceValue: membershipSource,
 	}
 
+	maxBlockDelay, err := time.ParseDuration(maxBlockDelayStr)
+	if err != nil {
+		return nil, xerrors.Errorf("invalid max block delay string %s: %x", maxBlockDelayStr, err)
+	}
 	if maxBlockDelay <= 0 {
 		maxBlockDelay = DefaultMaxBlockDelay
 	}
@@ -119,7 +124,7 @@ func NewConfig(
 		Consensus:  &cns,
 	}
 
-	return &cfg
+	return &cfg, nil
 }
 
 func (cfg *Config) IPCConfig() *rpc.Config {

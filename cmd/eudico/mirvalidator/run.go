@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "net/http/pprof"
 	"path/filepath"
-	"time"
 
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/stats"
@@ -86,6 +85,7 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "max-block-delay",
 			Usage: "The maximum delay between two blocks",
+			Value: "1s",
 		},
 		&cli.IntFlag{
 			Name:  "config-offset",
@@ -187,22 +187,20 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		maxBlockDelay, err := time.ParseDuration(cctx.String("max-block-delay"))
-		if err != nil {
-			return xerrors.Errorf("invalid max block delay string %s: %x", cctx.String("max-block-delay"), err)
-		}
-
-		cfg := mir.NewConfig(
+		cfg, err := mir.NewConfig(
 			validatorID,
 			dbPath,
 			initCh,
 			cctx.String("checkpoints-repo"),
 			cctx.Int("segment-length"),
 			cctx.Int("config-offset"),
-			maxBlockDelay,
+			cctx.String("max-block-delay"),
 			cctx.String("ipcagent-url"),
 			cctx.String("membership"),
 		)
+		if err != nil {
+			return xerrors.Errorf("failed to get a config: %v", err)
+		}
 
 		var mb membership.Reader
 		switch cfg.MembershipSourceValue {

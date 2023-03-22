@@ -13,16 +13,17 @@ func TestConfigBasic(t *testing.T) {
 	addr, err := address.NewFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy")
 	require.NoError(t, err)
 
-	cfg := NewConfig(addr,
+	cfg, err := NewConfig(addr,
 		"dbpath",
 		nil,
 		"repo",
 		1,
 		2,
-		time.Second,
+		"1s",
 		"http://127.0.0.1",
 		"file",
 	)
+	require.NoError(t, err)
 
 	require.Equal(t, 2, cfg.Consensus.ConfigOffset)
 	require.Equal(t, 1, cfg.Consensus.SegmentLength)
