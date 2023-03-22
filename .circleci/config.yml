@@ -272,7 +272,8 @@ jobs:
       - install-deps
       - prepare
       - restore_cache:
-          keys: go-deps-{{ checksum "go.sum" }}
+          keys:
+            - go-deps-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
