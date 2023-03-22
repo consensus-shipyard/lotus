@@ -273,12 +273,12 @@ jobs:
       - prepare
       - restore_cache:
           keys:
-            - go-deps-{{ checksum "go.sum" }}
+            - golang-deps-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
       - save_cache:
-          key: go-deps-{{ checksum "go.sum" }}
+          key: golang-deps-{{ checksum "go.sum" }}
           paths:
             - ~/.go_workspace/pkg/mod
             - ~/.cache/go-build
