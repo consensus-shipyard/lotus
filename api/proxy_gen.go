@@ -321,9 +321,9 @@ type FullNodeMethods struct {
 
 	IPCAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) `perm:"write"`
 
-	IPCGetBottomUpMsg func(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) `perm:"read"`
+	IPCGetBottomUpMsgs func(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) `perm:"read"`
 
-	IPCGetBottomUpMsgFromRegistry func(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) `perm:"read"`
+	IPCGetBottomUpMsgsFromRegistry func(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) `perm:"read"`
 
 	IPCGetCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.Checkpoint, error) `perm:"read"`
 
@@ -331,7 +331,7 @@ type FullNodeMethods struct {
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
-	IPCGetTopDownMsg func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
+	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
 
 	IPCGetVotesForCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
 
@@ -2443,25 +2443,25 @@ func (s *FullNodeStub) IPCAddSubnetActor(p0 context.Context, p1 address.Address,
 	return *new(address.Address), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCGetBottomUpMsg(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
-	if s.Internal.IPCGetBottomUpMsg == nil {
+func (s *FullNodeStruct) IPCGetBottomUpMsgs(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
+	if s.Internal.IPCGetBottomUpMsgs == nil {
 		return *new([]*gateway.CrossMsgMeta), ErrNotSupported
 	}
-	return s.Internal.IPCGetBottomUpMsg(p0, p1)
+	return s.Internal.IPCGetBottomUpMsgs(p0, p1)
 }
 
-func (s *FullNodeStub) IPCGetBottomUpMsg(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
+func (s *FullNodeStub) IPCGetBottomUpMsgs(p0 context.Context, p1 address.Address) ([]*gateway.CrossMsgMeta, error) {
 	return *new([]*gateway.CrossMsgMeta), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCGetBottomUpMsgFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
-	if s.Internal.IPCGetBottomUpMsgFromRegistry == nil {
+func (s *FullNodeStruct) IPCGetBottomUpMsgsFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
+	if s.Internal.IPCGetBottomUpMsgsFromRegistry == nil {
 		return nil, ErrNotSupported
 	}
-	return s.Internal.IPCGetBottomUpMsgFromRegistry(p0, p1, p2)
+	return s.Internal.IPCGetBottomUpMsgsFromRegistry(p0, p1, p2)
 }
 
-func (s *FullNodeStub) IPCGetBottomUpMsgFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
+func (s *FullNodeStub) IPCGetBottomUpMsgsFromRegistry(p0 context.Context, p1 address.Address, p2 cid.Cid) (*gateway.CrossMsgs, error) {
 	return nil, ErrNotSupported
 }
 
@@ -2498,14 +2498,14 @@ func (s *FullNodeStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 addre
 	return *new(cid.Cid), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCGetTopDownMsg(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) {
-	if s.Internal.IPCGetTopDownMsg == nil {
+func (s *FullNodeStruct) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) {
+	if s.Internal.IPCGetTopDownMsgs == nil {
 		return *new([]*gateway.CrossMsg), ErrNotSupported
 	}
-	return s.Internal.IPCGetTopDownMsg(p0, p1, p2, p3)
+	return s.Internal.IPCGetTopDownMsgs(p0, p1, p2, p3)
 }
 
-func (s *FullNodeStub) IPCGetTopDownMsg(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) {
+func (s *FullNodeStub) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) {
 	return *new([]*gateway.CrossMsg), ErrNotSupported
 }
 

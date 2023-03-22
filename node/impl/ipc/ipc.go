@@ -234,9 +234,9 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 	return st.ListSubnets(a.Chain.ActorStore(ctx))
 }
 
-// IPCGetBottomUpMsg returns the list of bottom-up messages from a specific nonce
-// to the latest one that has been committed in the subnet and not executed yet.
-func (a *IPCAPI) IPCGetBottomUpMsg(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error) {
+// IPCGetBottomUpMsgs returns the list of bottom-up messages that haven't been
+// executed yet.
+func (a *IPCAPI) IPCGetBottomUpMsgs(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error) {
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -244,9 +244,9 @@ func (a *IPCAPI) IPCGetBottomUpMsg(ctx context.Context, gatewayAddr address.Addr
 	return st.BottomUpMsgsFromNonce(a.Chain.ActorStore(ctx), st.AppliedBottomupNonce)
 }
 
-// IPCGetTopDownMsg returns the list of top down-messages from a specific nonce
+// IPCGetTopDownMsgs returns the list of top down-messages from a specific nonce
 // to the latest one that has been committed in the subnet.
-func (a *IPCAPI) IPCGetTopDownMsg(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) {
+func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) {
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -261,9 +261,9 @@ func (a *IPCAPI) IPCGetTopDownMsg(ctx context.Context, gatewayAddr address.Addre
 	return subnet.TopDownMsgsFromNonce(a.Chain.ActorStore(ctx), nonce)
 }
 
-// IPCGetBottomUpMsgFromRegistry gets a batch of bottom-up messages stored in the registry of a subnet
+// IPCGetBottomUpMsgsFromRegistry gets a batch of bottom-up messages stored in the registry of a subnet
 // by Cid.
-func (a *IPCAPI) IPCGetBottomUpMsgFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error) {
+func (a *IPCAPI) IPCGetBottomUpMsgsFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error) {
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err

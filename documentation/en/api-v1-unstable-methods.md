@@ -108,12 +108,12 @@
 * [I](#I)
   * [ID](#ID)
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
-  * [IPCGetBottomUpMsg](#IPCGetBottomUpMsg)
-  * [IPCGetBottomUpMsgFromRegistry](#IPCGetBottomUpMsgFromRegistry)
+  * [IPCGetBottomUpMsgs](#IPCGetBottomUpMsgs)
+  * [IPCGetBottomUpMsgsFromRegistry](#IPCGetBottomUpMsgsFromRegistry)
   * [IPCGetCheckpoint](#IPCGetCheckpoint)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
-  * [IPCGetTopDownMsg](#IPCGetTopDownMsg)
+  * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
   * [IPCGetVotesForCheckpoint](#IPCGetVotesForCheckpoint)
   * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
@@ -3145,7 +3145,7 @@ Inputs:
 
 Response: `"f01234"`
 
-### IPCGetBottomUpMsg
+### IPCGetBottomUpMsgs
 
 
 Perms: read
@@ -3171,7 +3171,7 @@ Response:
 ]
 ```
 
-### IPCGetBottomUpMsgFromRegistry
+### IPCGetBottomUpMsgsFromRegistry
 
 
 Perms: read
@@ -3345,7 +3345,7 @@ Response:
 }
 ```
 
-### IPCGetTopDownMsg
+### IPCGetTopDownMsgs
 
 
 Perms: read
