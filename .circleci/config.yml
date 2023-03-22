@@ -49,7 +49,9 @@ commands:
           condition: << parameters.linux >>
           steps:
             - run: sudo apt-get update
-            - run: sudo apt-get install ocl-icd-opencl-dev libhwloc-dev
+            - run:
+                command: sudo apt-get install ocl-icd-opencl-dev libhwloc-dev
+                no_output_timeout: 30m
       - run: git submodule sync
       - run: git submodule update --init
   download-params:
