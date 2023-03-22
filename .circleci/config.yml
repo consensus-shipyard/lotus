@@ -273,14 +273,14 @@ jobs:
       - install-deps
       - prepare
       - restore_cache:
-          keys: deps-cache
+          keys: go-deps-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
       - save_cache:
           key: go-deps-{{ checksum "go.sum" }}
           paths:
-            - ~/go/pkg/mod
+            - ~/.go_workspace/pkg/mod
             - ~/.cache/go-build
       - run:
           name: Install Docker Compose
