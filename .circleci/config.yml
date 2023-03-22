@@ -268,7 +268,6 @@ jobs:
     machine:
       image: ubuntu-2204:2022.10.2
       docker_layer_caching: true
-    working_directory: ~/go/src/github.com/filecoin-project/lotus/e2e
     steps:
       - install-deps
       - prepare
