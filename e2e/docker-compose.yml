@@ -2,6 +2,7 @@ services:
   node0:
     container_name: node0
     image: "eudico/e2e"
+    user: "${UID}:${GID}"
     build:
       context: ../
       dockerfile: e2e/Dockerfile
@@ -34,6 +35,7 @@ services:
   node1:
     container_name: node1
     image: "eudico/e2e"
+    user: "${UID}:${GID}"
     build:
       context: ../
       dockerfile: e2e/Dockerfile
@@ -63,6 +65,7 @@ services:
   node2:
     container_name: node2
     image: "eudico/e2e"
+    user: "${UID}:${GID}"
     build:
       context: ../
       dockerfile: e2e/Dockerfile
@@ -92,6 +95,7 @@ services:
   node3:
     container_name: node3
     image: "eudico/e2e"
+    user: "${UID}:${GID}"
     build:
       context: ../
       dockerfile: e2e/Dockerfile
