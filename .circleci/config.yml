@@ -278,16 +278,15 @@ jobs:
           command: make deps lotus
           no_output_timeout: 30m
       - save_cache:
-          key: deps-cache
+          key: go-deps-{{ checksum "go.sum" }}
           paths:
             - ~/go/pkg/mod
             - ~/.cache/go-build
       - run:
           name: Install Docker Compose
           command: |
-            set -x
-            curl -L https://github.com/docker/compose/releases/download/1.11.2/docker-compose-`uname -s`-`uname -m` | sudo tee /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
+            sudo DEBIAN_FRONTEND=noninteractive apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose-plugin
       - download-params
       - run:
           command: cd e2e && make test
