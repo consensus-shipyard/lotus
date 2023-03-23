@@ -42,6 +42,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/messagepool"
@@ -1056,13 +1057,13 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 }
 
 func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
-	membership := fmt.Sprintf("%d;", 0)
+	mb := fmt.Sprintf("%d;", 0)
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		membership += fmt.Sprintf("%s@%s,", v.mirAddr, id)
+		mb += fmt.Sprintf("%s@%s,", v.mirAddr, id)
 	}
-	return membership
+	return mb
 }
 
 func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile string, validators ...*TestValidator) {
@@ -1101,7 +1102,7 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	validators []*TestValidator,
 	faultyValidators ...*TestValidator,
 ) {
-	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: StringMembership}, faultyValidators...)
+	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: membership.StringSource}, faultyValidators...)
 }
 
 func (n *Ensemble) BeginMirMiningWithConfig(

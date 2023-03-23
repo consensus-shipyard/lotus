@@ -1,6 +1,9 @@
 package membership
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
@@ -10,6 +13,24 @@ import (
 
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
+
+const (
+	FakeSource    string = "fake"
+	StringSource  string = "string"
+	FileSource    string = "file"
+	OnChainSource string = "onchain"
+)
+
+func IsSourceValid(source string) error {
+	switch strings.ToLower(source) {
+	case FileSource:
+		return nil
+	case OnChainSource:
+		return nil
+	default:
+		return fmt.Errorf("membership source %s noot supported", source)
+	}
+}
 
 type Reader interface {
 	GetValidatorSet() (*validator.Set, error)

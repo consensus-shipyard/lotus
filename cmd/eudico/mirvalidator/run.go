@@ -67,7 +67,7 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "membership",
 			Usage: "membership type: onchain, file",
-			Value: "file",
+			Value: mir.DefaultMembershipSource,
 		},
 		&cli.StringFlag{
 			Name:  "membership-file",
@@ -81,7 +81,15 @@ var runCmd = &cli.Command{
 		&cli.IntFlag{
 			Name:  "segment-length",
 			Usage: "The length of an ISS segment. Must not be negative",
-			Value: 1,
+		},
+		&cli.StringFlag{
+			Name:  "max-block-delay",
+			Usage: "The maximum delay between two blocks",
+			Value: mir.DefaultMaxBlockDelay.String(),
+		},
+		&cli.IntFlag{
+			Name:  "config-offset",
+			Usage: "Number of epochs by which to delay configuration changes",
 		},
 		&cli.StringFlag{
 			Name:  "ipcagent-url",
@@ -146,9 +154,6 @@ var runCmd = &cli.Command{
 			return err
 		}
 
-		// Segment length period.
-		segmentLength := cctx.Int("segment-length")
-
 		h, err := getLibP2PHost(cctx.String("repo"))
 		if err != nil {
 			return err
@@ -182,17 +187,23 @@ var runCmd = &cli.Command{
 			log.Info("Initializing mir validator from checkpoint in height: %d", cctx.Int("init-height"))
 		}
 
-		cfg := mir.NewConfig(
+		cfg, err := mir.NewConfig(
 			validatorID,
 			dbPath,
 			initCh,
 			cctx.String("checkpoints-repo"),
-			segmentLength,
+			cctx.Int("segment-length"),
+			cctx.Int("config-offset"),
+			cctx.String("max-block-delay"),
 			cctx.String("ipcagent-url"),
+			cctx.String("membership"),
 		)
+		if err != nil {
+			return xerrors.Errorf("failed to get a config: %v", err)
+		}
 
 		var mb membership.Reader
-		switch cctx.String("membership") {
+		switch cfg.MembershipSourceValue {
 		case "file":
 			mf := filepath.Join(cctx.String("repo"), cctx.String("membership-file"))
 			mb = membership.NewFileMembership(mf)
