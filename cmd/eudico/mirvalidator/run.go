@@ -67,7 +67,7 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "membership",
 			Usage: "membership type: onchain, file",
-			Value: "file",
+			Value: mir.DefaultMembershipSource,
 		},
 		&cli.StringFlag{
 			Name:  "membership-file",
@@ -85,7 +85,7 @@ var runCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "max-block-delay",
 			Usage: "The maximum delay between two blocks",
-			Value: "1s",
+			Value: mir.DefaultMaxBlockDelay.String(),
 		},
 		&cli.IntFlag{
 			Name:  "config-offset",

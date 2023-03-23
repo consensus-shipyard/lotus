@@ -23,7 +23,7 @@ type MirConfig struct {
 	Delay              int
 	MembershipFileName string
 	MembershipString   string
-	MembershipType     membership.Source
+	MembershipType     string
 	MembershipFilename string
 	Databases          map[string]*TestDB
 	MockedTransport    bool

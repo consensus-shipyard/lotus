@@ -31,7 +31,7 @@ type BaseConfig struct {
 }
 
 const (
-	DefaultMembershipSource = "file"
+	DefaultMembershipSource = membership.FileSource
 	// DefaultConfigOffset is the default number of epochs by which to delay configuration changes.
 	// If a configuration is agreed upon in epoch e, it will take effect in epoch e + 1 + configOffset.
 	DefaultConfigOffset                 = 2
@@ -71,7 +71,6 @@ func DefaultConsensusConfig() *ConsensusConfig {
 		PBFTViewChangeSNTimeout:      DefaultPBFTViewChangeSNTimeout,
 		PBFTViewChangeSegmentTimeout: DefaultPBFTViewChangeSegmentTimeout,
 	}
-
 }
 
 func NewConfig(
@@ -84,8 +83,8 @@ func NewConfig(
 	rpcServerURL string,
 	membershipSource string,
 ) (*Config, error) {
-	if !membership.IsSourceValid(membershipSource) {
-		return nil, xerrors.Errorf("invalid membership source %s", membershipSource)
+	if err := membership.IsSourceValid(membershipSource); err != nil {
+		return nil, err
 	}
 
 	base := BaseConfig{

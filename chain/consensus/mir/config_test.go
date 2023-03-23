@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
 func TestConfigBasic(t *testing.T) {
@@ -21,7 +22,7 @@ func TestConfigBasic(t *testing.T) {
 		2,
 		"1s",
 		"http://127.0.0.1",
-		"file",
+		membership.FileSource,
 	)
 	require.NoError(t, err)
 
@@ -31,4 +32,5 @@ func TestConfigBasic(t *testing.T) {
 	require.Equal(t, 6*time.Second, cfg.Consensus.PBFTViewChangeSegmentTimeout)
 	require.Equal(t, 6*time.Second, cfg.Consensus.PBFTViewChangeSNTimeout)
 	require.Equal(t, 1024, cfg.Consensus.MaxTransactionsInBatch)
+	require.Equal(t, "file", cfg.MembershipSourceValue)
 }

@@ -1,6 +1,7 @@
 package membership
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/multiformats/go-multiaddr"
@@ -13,38 +14,21 @@ import (
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
-type Source int32
-
 const (
-	FakeSource    Source = 0
-	StringSource  Source = 1
-	FileSource    Source = 2
-	OnChainSource Source = 3
+	FakeSource    string = "fake"
+	StringSource  string = "string"
+	FileSource    string = "file"
+	OnChainSource string = "onchain"
 )
 
-func (e Source) String() string {
-	switch e {
-	case FakeSource:
-		return "fake"
-	case StringSource:
-		return "string"
-	case FileSource:
-		return "file"
-	case OnChainSource:
-		return "onchain"
-	default:
-		panic("unknown source")
-	}
-}
-
-func IsSourceValid(source string) bool {
+func IsSourceValid(source string) error {
 	switch strings.ToLower(source) {
-	case "file":
-		return true
-	case "onchain":
-		return true
+	case FileSource:
+		return nil
+	case OnChainSource:
+		return nil
 	default:
-		return false
+		return fmt.Errorf("membership source %s noot supported", source)
 	}
 }
 
