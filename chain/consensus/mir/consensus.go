@@ -96,10 +96,6 @@ func (bft *Mir) ValidateBlockHeader(_ context.Context, b *types.BlockHeader) (re
 			return "checkpoint_verification_failed", err
 		}
 	}
-	// check that the block is in the right range.
-	if b.Height < prev.Height {
-		return "block_out_of_range", xerrors.Errorf("the height of the received block is over the latest checkpoint received")
-	}
 	b.SetValidated()
 
 	return "", nil
