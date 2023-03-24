@@ -31,4 +31,4 @@ export MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run-${n}"
 echo $((n + 1)) > mir-event-logs/counter
 
 # Run validator
-./eudico mir validator run --nosync
+./eudico mir validator run --nosync --max-block-delay="1s"

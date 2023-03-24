@@ -91,6 +91,7 @@ func ValidateBlockPubsub(ctx context.Context, cns Consensus, self bool, msg *pub
 			log.Warn("ignoring block msg: ", err)
 			return pubsub.ValidationIgnore, reject
 		}
+		log.Warn("rejecting block msg: ", err)
 		recordFailureFlagPeer(reject)
 		return pubsub.ValidationReject, reject
 	}
