@@ -22,7 +22,7 @@ tests:
 	go test -v -count=1 -timeout=20m ./...
 
 up:
-	UID=${UID} GID=${GID} docker compose up -d
+	env UID=$(shell id -u) GID=$(shell id -g) docker compose up -d
 
 down:
 	docker compose down
