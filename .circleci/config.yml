@@ -291,8 +291,7 @@ jobs:
       - run:
           command: |
             cd e2e
-            go test -c -o tests.bin ./tests
-            sudo ./tests.bin
+            make test-ci
           no_output_timeout: 30m
       - run:
           command: |

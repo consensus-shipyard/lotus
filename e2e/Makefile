@@ -1,6 +1,8 @@
 all: docker gen up tests clean
 
-test: gen up tests clean
+test: gen up run-tests-locally clean
+
+test-ci: gen up run-tests-on-ci down
 
 docker:
 	docker build --tag eudico/e2e -f ./Dockerfile ..
@@ -11,8 +13,12 @@ docker_on_mac:
 gen:
 	go run ./generator/cmd -ip=192.168.10.2 -n=4 -output="./testdata/mir/"
 
-tests:
+run-tests-locally:
 	go test -v -count=1 -timeout=20m ./...
+
+run-tests-on-ci:
+	go test -c -o tests.bin ./tests
+	sudo ./tests.bin
 
 up:
 	docker compose up -d
