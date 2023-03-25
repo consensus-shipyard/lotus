@@ -289,7 +289,10 @@ jobs:
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose-plugin
       - download-params
       - run:
-          command: cd e2e && make test
+          command: |
+            cd e2e
+            go test -c -o tests.bin ./tests
+            sudo ./tests.bin
           no_output_timeout: 30m
       - run:
           command: |

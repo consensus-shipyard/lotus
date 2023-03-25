@@ -12,17 +12,10 @@ gen:
 	go run ./generator/cmd -ip=192.168.10.2 -n=4 -output="./testdata/mir/"
 
 tests:
-	echo "DEBUG:"
-	ls -la
-	whoami
-	sleep 5
-	ls -la ./testdata/
-	ls -la ./testdata/_runtime
-	ls -la ./testdata/_runtime/0
 	go test -v -count=1 -timeout=20m ./...
 
 up:
-	env UID=$(shell id -u) GID=$(shell id -g) docker compose up -d
+	docker compose up -d
 
 down:
 	docker compose down
