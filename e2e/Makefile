@@ -17,9 +17,8 @@ run-tests-locally:
 	go test -v -count=1 -timeout=20m ./...
 
 run-tests-on-ci:
-	go test -c -o tests.bin ./tests
-	sudo ./tests.bin
-
+	go test -c -o tests.app ./tests
+	sudo ./tests.app -test.v
 up:
 	docker compose up -d
 

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -23,13 +24,21 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 )
 
-const (
-	DeploymentPath = "../testdata/_runtime"
+var (
+	WaitTimeout    = 5 * time.Minute
+	DeploymentPath string
 )
 
-var (
-	WaitTimeout = 5 * time.Minute
-)
+func init() {
+	r, err := FindRoot()
+	if err != nil {
+		panic(err)
+	}
+	DeploymentPath, err = filepath.Abs(filepath.Join(r, "e2e", "testdata", "_runtime"))
+	if err != nil {
+		panic(err)
+	}
+}
 
 func getAuthToken(id string) (string, error) {
 	b, err := ioutil.ReadFile(path.Join(DeploymentPath, id, "token"))
