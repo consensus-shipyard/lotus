@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
@@ -211,7 +210,6 @@ func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, 
 	i := gateway.CheckpointEpoch(from, st.CheckPeriod)
 	out := make([]*gateway.Checkpoint, 0)
 	for i <= to {
-		fmt.Println(">>>>>> i", to)
 		ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), i)
 		if err != nil {
 			return nil, xerrors.Errorf("error getting checkpoint from actor store in epoch %d: %w", i, err)
