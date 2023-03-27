@@ -12,7 +12,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	blocks "github.com/ipfs/go-libipfs/blocks"
+	"github.com/ipfs/go-libipfs/blocks"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -334,6 +334,8 @@ type FullNodeMethods struct {
 	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
 
 	IPCGetVotesForCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
+
+	IPCListCheckpoints func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.Checkpoint, error) `perm:"read"`
 
 	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) `perm:"read"`
 
@@ -2518,6 +2520,17 @@ func (s *FullNodeStruct) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.Sub
 
 func (s *FullNodeStub) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.Checkpoint, error) {
+	if s.Internal.IPCListCheckpoints == nil {
+		return *new([]*gateway.Checkpoint), ErrNotSupported
+	}
+	return s.Internal.IPCListCheckpoints(p0, p1, p2, p3)
+}
+
+func (s *FullNodeStub) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.Checkpoint, error) {
+	return *new([]*gateway.Checkpoint), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {

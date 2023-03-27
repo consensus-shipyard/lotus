@@ -872,10 +872,12 @@ type FullNode interface {
 	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error)   //perm:read
 	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)                                 //perm:read
 	IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error)                           //perm:read
+	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.Checkpoint, error)                //perm:read
 	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error)                       //perm:read
 	IPCGetBottomUpMsgs(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error)                           //perm:read
 	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) //perm:read
 	IPCGetBottomUpMsgsFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error)         //perm:read
+
 }
 
 // reverse interface to the client, called after EthSubscribe
