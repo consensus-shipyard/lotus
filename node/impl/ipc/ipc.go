@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
@@ -128,6 +129,8 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		ts = a.Chain.GetHeaviestTipSet()
 	}
 
 	// Resolve on-chain IDs of validators to f1/f3 addresses
@@ -157,7 +160,10 @@ func (a *IPCAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 	if !found {
 		return cid.Undef, xerrors.Errorf("no subnet registered with id %s", subnet)
 	}
-	return sn.PrevCheckpoint.Cid()
+	if sn.PrevCheckpoint != nil {
+		return sn.PrevCheckpoint.Cid()
+	}
+	return cid.Undef, nil
 }
 
 // IPCGetCheckpointTemplate to be populated and signed for the epoch given as input.
@@ -192,6 +198,32 @@ func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, 
 	return v, nil
 }
 
+// IPCListCheckpoints returns a list of checkpoints committed for a submit between two epochs
+func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.Checkpoint, error) {
+	if err := a.checkParent(ctx, sn); err != nil {
+		return nil, err
+	}
+	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
+	if err != nil {
+		return nil, err
+	}
+	// get the first epoch with checkpoints after the from.
+	i := gateway.CheckpointEpoch(from, st.CheckPeriod)
+	out := make([]*gateway.Checkpoint, 0)
+	for i <= to {
+		fmt.Println(">>>>>> i", to)
+		ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), i)
+		if err != nil {
+			return nil, xerrors.Errorf("error getting checkpoint from actor store in epoch %d: %w", i, err)
+		}
+		if found {
+			out = append(out, ch)
+		}
+		i += st.CheckPeriod
+	}
+	return out, nil
+}
+
 // IPCGetCheckpoint returns the checkpoint committed in the subnet actor for an epoch.
 func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
 	if err := a.checkParent(ctx, sn); err != nil {
@@ -201,6 +233,7 @@ func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch ab
 	if err != nil {
 		return nil, err
 	}
+
 	ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), epoch)
 	if err != nil {
 		return nil, xerrors.Errorf("error getting checkpoint from actor store: %w", err)

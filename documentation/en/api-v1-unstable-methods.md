@@ -115,6 +115,7 @@
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
   * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
   * [IPCGetVotesForCheckpoint](#IPCGetVotesForCheckpoint)
+  * [IPCListCheckpoints](#IPCListCheckpoints)
   * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
   * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
@@ -3418,6 +3419,62 @@ Response:
     "f01234"
   ]
 }
+```
+
+### IPCListCheckpoints
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  10101,
+  10101
+]
+```
+
+Response:
+```json
+[
+  {
+    "Data": {
+      "Source": {
+        "Parent": "string value",
+        "Actor": "f01234"
+      },
+      "Proof": "Ynl0ZSBhcnJheQ==",
+      "Epoch": 10101,
+      "PrevCheck": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "Children": [
+        {
+          "Source": {
+            "Parent": "string value",
+            "Actor": "f01234"
+          },
+          "Checks": {
+            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+          }
+        }
+      ],
+      "CrossMsgs": {
+        "MsgsCID": {
+          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+        },
+        "Nonce": 42,
+        "Value": "0",
+        "Fee": "0"
+      }
+    },
+    "Sig": "Ynl0ZSBhcnJheQ=="
+  }
+]
 ```
 
 ### IPCListChildSubnets
