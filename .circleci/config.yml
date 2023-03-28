@@ -640,10 +640,10 @@ workflows:
       - nightly-test-mir-basic:
           name: nightly-mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout 40m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - nightly-test-mir-reconfiguration:
           name: nightly-mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout 40m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"

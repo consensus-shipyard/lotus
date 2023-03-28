@@ -188,8 +188,8 @@ github.com/cncf/xds/go v0.0.0-20211011173535-cb28da3451f1/go.mod h1:eXthEFrGJvWH
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/codegangsta/cli v1.20.0/go.mod h1:/qJNoX69yVSKu5o4jLyXAENLRyk1uhi7zkbQ3slBdOA=
-github.com/consensus-shipyard/go-ipc-types v0.1.4-0.20230321072630-abf55c838a96 h1:9/+f2e9rWKjIOZXfW+Dsao2GqmDod17aWyBBgqo3fuQ=
-github.com/consensus-shipyard/go-ipc-types v0.1.4-0.20230321072630-abf55c838a96/go.mod h1:oZQ3wFTjxmAQLFZrHkj7pagpNF7Oq+GOy/bpjjgD83A=
+github.com/consensus-shipyard/go-ipc-types v0.1.4-0.20230327104334-df679bc40990 h1:ukHid1HnzOD+DR3tCzRSY2yVUPG1f6MXveuSkpJaeYE=
+github.com/consensus-shipyard/go-ipc-types v0.1.4-0.20230327104334-df679bc40990/go.mod h1:oZQ3wFTjxmAQLFZrHkj7pagpNF7Oq+GOy/bpjjgD83A=
 github.com/containerd/cgroups v0.0.0-20201119153540-4cbc285b3327/go.mod h1:ZJeTFisyysqgcCdecO57Dj79RfL0LNeGiFUqLYQRYLE=
 github.com/containerd/cgroups v1.0.3/go.mod h1:/ofk34relqNjSGyqPrmEULrO4Sc8LJhvJmWbUCUKqj8=
 github.com/containerd/cgroups v1.0.4 h1:jN/mbWBEaz+T1pi5OFtnkQ+8qnmEbAr1Oo1FRm5B0dA=
@@ -377,8 +377,8 @@ github.com/filecoin-project/go-statestore v0.2.0 h1:cRRO0aPLrxKQCZ2UOQbzFGn4WDNd
 github.com/filecoin-project/go-statestore v0.2.0/go.mod h1:8sjBYbS35HwPzct7iT4lIXjLlYyPor80aU7t7a/Kspo=
 github.com/filecoin-project/go-storedcounter v0.1.0 h1:Mui6wSUBC+cQGHbDUBcO7rfh5zQkWJM/CpAZa/uOuus=
 github.com/filecoin-project/go-storedcounter v0.1.0/go.mod h1:4ceukaXi4vFURIoxYMfKzaRF5Xv/Pinh2oTnoxpv+z8=
-github.com/filecoin-project/mir v0.3.1 h1:wM/x1qXKw/AGWvplvCIY6lZydyWhmV08rAIariLPdio=
-github.com/filecoin-project/mir v0.3.1/go.mod h1:2YHupCVJypLmxkVC2BH23owbWaXtBuk15iJrQIQnygw=
+github.com/filecoin-project/mir v0.3.2 h1:rPxfrUXM5NFc2WNlDYXle3kpH+2QNTSGYREYw1Qdw1w=
+github.com/filecoin-project/mir v0.3.2/go.mod h1:2YHupCVJypLmxkVC2BH23owbWaXtBuk15iJrQIQnygw=
 github.com/filecoin-project/pubsub v1.0.0 h1:ZTmT27U07e54qV1mMiQo4HDr0buo8I1LDHBYLXlsNXM=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.9.13/go.mod h1:TS1AW/7LbG+615j4NsjMK1qlpAwaFsG9w0V2tg2gSao=
