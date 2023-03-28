@@ -16,8 +16,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
@@ -142,7 +140,7 @@ var _ membership.Reader = &fakeMembership{}
 type fakeMembership struct {
 }
 
-func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
+func (f fakeMembership) GetMembershipInfo() (*membership.Info, error) {
 	return nil, fmt.Errorf("no validators")
 }
 
