@@ -239,7 +239,7 @@ func NewManager(ctx context.Context,
 }
 
 func (m *Manager) Serve(ctx context.Context) error {
-	log.With("validator", m.id).Info("Mir manager serve starting")
+	log.With("validator", m.id).Info("Mir manager serve started")
 	defer log.With("validator", m.id).Info("Mir manager serve stopped")
 
 	log.With("validator", m.id).
@@ -250,10 +250,6 @@ func (m *Manager) Serve(ctx context.Context) error {
 	go func() {
 		// Run Mir node until it stops.
 		mirErrChan <- m.mirNode.Run(ctx)
-	}()
-	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
-	defer func() {
-		m.Stop()
 	}()
 
 	reconfigure := time.NewTicker(ReconfigurationInterval)
@@ -270,17 +266,23 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			log.With("validator", m.id).Debug("Mir manager: context closed")
+			log.With("validator", m.id).Info("Mir manager: context closed")
+
+			// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
+			m.Stop()
+
+			err := <-mirErrChan
+			if err != nil && !errors.Is(err, mir.ErrStopped) {
+				log.With("validator", m.id).Errorf("Mir manager: stopping Mir node error: %v", err)
+			} else {
+				log.With("validator", m.id).Infof("Mir manager: Mir node stopped")
+			}
+
 			return nil
 
 		// First catch potential errors when mining.
 		case err := <-mirErrChan:
-			log.With("validator", m.id).Info("manager received error:", err)
-			if err != nil && !errors.Is(err, mir.ErrStopped) {
-				panic(fmt.Sprintf("validator %s consensus error: %v", m.id, err))
-			}
-			log.With("validator", m.id).Infof("Mir node stopped signal")
-			return nil
+			panic(fmt.Sprintf("Mir node %v error: %v", m.id, err))
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
@@ -329,8 +331,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 // Stop stops the manager and all its components.
 func (m *Manager) Stop() {
-	log.With("validator", m.id).Infof("Mir manager stopping")
-	defer log.With("validator", m.id).Info("Mir manager stopped")
+	log.With("validator", m.id).Infof("Mir manager Stop() started")
+	defer log.With("validator", m.id).Info("Mir manager Stop() finished")
 
 	if m.stopped {
 		log.With("validator", m.id).Warnf("Mir manager has already been stopped")
