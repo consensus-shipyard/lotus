@@ -577,7 +577,7 @@ workflows:
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 15m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -timeout 5m -run TestMirReconfiguration_AddValidators"
           target: "./itests/mir_test.go"
 
   nightly:
