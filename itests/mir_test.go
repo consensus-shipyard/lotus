@@ -86,8 +86,10 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> initial advancing chain")
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -104,11 +106,11 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
-	t.Log(">>> AdvanceChain")
+	t.Log(">>> advancing chain before removing the node")
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	t.Log(">>> CheckNodesInSync")
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	t.Log(">>> check before removing the node")
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
 	t.Log(">>> remove the last added validator from membership")
@@ -118,8 +120,10 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(2), membership.GetConfigurationNumber())
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> final advancing chain")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -205,8 +209,10 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> initial advancing chain")
 	err = kit.AdvanceChain(ctx, 10*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -223,9 +229,11 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	t.Log(">>> final check")
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }
 
@@ -299,9 +307,10 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		Databases:          dbs,
 	})
 
-	t.Log(">>> check that nodes are advanced")
+	t.Log(">>> initial advancing chain")
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -347,10 +356,11 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		Databases:          dbs,
 	})
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
-
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	t.Log(">>> final check")
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
 	// Core validators must send 1 message with recovered "nonce".
@@ -426,8 +436,10 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 		MembershipFileName: membershipFiles[MirTotalValidatorNumber],
 	})
 
+	t.Log(">>> initial advancing chain")
 	err := kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -442,8 +454,10 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 		require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	}
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 2*TestedBlockNumber, nodes...)
 	require.NoError(t, err)
+	t.Log(">>> final check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 }
@@ -484,8 +498,10 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> initial advancing chain")
 	err = kit.AdvanceChain(ctx, 20, nodes[:initialValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:initialValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -501,9 +517,11 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 40, nodes...)
 	require.NoError(t, err)
-	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes...)
+	t.Log(">>> final check")
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }
 
@@ -542,8 +560,10 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> initial advancing chain")
 	err = kit.AdvanceChain(ctx, 20, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
@@ -569,9 +589,10 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 30, nodes...)
 	require.NoError(t, err)
-
+	t.Log(">>> final check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 }
@@ -605,16 +626,20 @@ func TestMirReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 			MembershipFileName: membershipFileName,
 		})
 
+	t.Log(">>> initial advancing chain")
 	err := kit.AdvanceChain(ctx, 3*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> initial check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
 	t.Log(">>> new validators have been added to the membership")
 	ens.SaveValidatorSetToFile(1, membershipFileName, validators...)
 
+	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
+	t.Log(">>> final check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 }
