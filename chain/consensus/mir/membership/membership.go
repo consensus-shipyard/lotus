@@ -32,13 +32,13 @@ func IsSourceValid(source string) error {
 	}
 }
 
-type MembershipInfo struct {
+type Info struct {
 	MinValidators uint64
 	ValidatorSet  *validator.Set
 }
 
 type Reader interface {
-	GetMembershipInfo() (*MembershipInfo, error)
+	GetMembershipInfo() (*Info, error)
 }
 
 var _ Reader = &FileMembership{}
@@ -54,13 +54,13 @@ func NewFileMembership(fileName string) FileMembership {
 }
 
 // GetMembershipInfo gets the membership config from a file.
-func (f FileMembership) GetMembershipInfo() (*MembershipInfo, error) {
+func (f FileMembership) GetMembershipInfo() (*Info, error) {
 	vs, err := validator.NewValidatorSetFromFile(f.FileName)
 	if err != nil {
 		return nil, err
 	}
 
-	return &MembershipInfo{
+	return &Info{
 		ValidatorSet: vs,
 	}, nil
 }
@@ -72,13 +72,13 @@ var _ Reader = new(StringMembership)
 type StringMembership string
 
 // GetMembershipInfo gets the membership config from the input string.
-func (s StringMembership) GetMembershipInfo() (*MembershipInfo, error) {
+func (s StringMembership) GetMembershipInfo() (*Info, error) {
 	vs, err := validator.NewValidatorSetFromString(string(s))
 	if err != nil {
 		return nil, err
 	}
 
-	return &MembershipInfo{
+	return &Info{
 		ValidatorSet: vs,
 	}, nil
 }
@@ -89,13 +89,13 @@ var _ Reader = new(EnvMembership)
 type EnvMembership string
 
 // GetMembershipInfo gets the membership config from the input environment variable.
-func (e EnvMembership) GetMembershipInfo() (*MembershipInfo, error) {
+func (e EnvMembership) GetMembershipInfo() (*Info, error) {
 	vs, err := validator.NewValidatorSetFromEnv(string(e))
 	if err != nil {
 		return nil, err
 	}
 
-	return &MembershipInfo{
+	return &Info{
 		ValidatorSet: vs,
 	}, nil
 }
@@ -115,25 +115,25 @@ func NewOnChainMembershipClient(client rpc.JSONRPCRequestSender, subnet sdk.Subn
 	}
 }
 
-type AgentReponse struct {
+type AgentResponse struct {
 	ValidatorSet  validator.Set `json:"validator_set"`
 	MinValidators uint64        `json:"min_validators"`
 }
 
 // GetMembershipInfo gets the membership config from the actor state.
-func (c *OnChainMembership) GetMembershipInfo() (*MembershipInfo, error) {
+func (c *OnChainMembership) GetMembershipInfo() (*Info, error) {
 	req := struct {
 		Subnet string `json:"subnet"`
 	}{
 		Subnet: c.Subnet.String(),
 	}
-	resp := AgentReponse{}
 
+	var resp AgentResponse
 	err := c.client.SendRequest("ipc_queryValidatorSet", &req, &resp)
 	if err != nil {
 		return nil, err
 	}
-	return &MembershipInfo{
+	return &Info{
 		ValidatorSet:  &resp.ValidatorSet,
 		MinValidators: resp.MinValidators,
 	}, nil

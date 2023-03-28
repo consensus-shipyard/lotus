@@ -24,7 +24,7 @@ func (c *StubJSONRPCClient) SendRequest(method string, params interface{}, reply
 	if err != nil {
 		return err
 	}
-	resp := membership.AgentReponse{ValidatorSet: *set}
+	resp := membership.AgentResponse{ValidatorSet: *set}
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return err
