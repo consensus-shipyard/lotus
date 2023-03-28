@@ -340,9 +340,10 @@ func (m *Manager) Stop() {
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
-			log.With("validator", m.id).Errorf("Could not close interceptor: %s", err)
+			log.With("validator", m.id).Errorf("Could not stop interceptor: %s", err)
+		} else {
+			log.With("validator", m.id).Info("Interceptor stopped")
 		}
-		log.With("validator", m.id).Info("Interceptor closed")
 	}
 
 	m.net.Stop()
