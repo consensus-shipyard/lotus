@@ -1,4 +1,3 @@
-// Package mir implements ISS consensus protocol using the Mir protocol framework.
 package mir
 
 import (
@@ -97,12 +96,18 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
 	}
 
-	initialValidatorSet, err := membership.GetValidatorSet()
+	mInfo, err := membership.GetMembershipInfo()
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to get validator set: %w", id, err)
 	}
-	// TODO: Check here the minimum number of validators for the subnet
-	if initialValidatorSet.Size() == 0 {
+	initialValidatorSet := mInfo.ValidatorSet
+	valSize := initialValidatorSet.Size()
+	// Check the minimum number of validators.
+	if mInfo.MinValidators > uint64(valSize) {
+		return nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
+	}
+	// There needs to be at least one validator in the membership
+	if valSize == 0 {
 		return nil, fmt.Errorf("validator %v: empty validator set", id)
 	}
 
@@ -278,12 +283,12 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newSet, err := m.membership.GetValidatorSet()
+			mInfo, err := m.membership.GetMembershipInfo()
 			if err != nil {
 				log.With("validator", m.id).Warnf("failed to get subnet validators: %v", err)
 				continue
 			}
-
+			newSet := mInfo.ValidatorSet
 			if lastValidatorSet.Equal(newSet) {
 				continue
 			}

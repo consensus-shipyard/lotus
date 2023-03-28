@@ -11,8 +11,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
+type MembershipInfo struct {
+	MinValidators uint64
+	ValidatorSet  *validator.Set
+}
+
 type Reader interface {
-	GetValidatorSet() (*validator.Set, error)
+	GetMembershipInfo() (*MembershipInfo, error)
 }
 
 var _ Reader = &FileMembership{}
@@ -27,9 +32,16 @@ func NewFileMembership(fileName string) FileMembership {
 	}
 }
 
-// GetValidatorSet gets the membership config from a file.
-func (f FileMembership) GetValidatorSet() (*validator.Set, error) {
-	return validator.NewValidatorSetFromFile(f.FileName)
+// GetMembershipInfo gets the membership config from a file.
+func (f FileMembership) GetMembershipInfo() (*MembershipInfo, error) {
+	vs, err := validator.NewValidatorSetFromFile(f.FileName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MembershipInfo{
+		ValidatorSet: vs,
+	}, nil
 }
 
 // ------
@@ -38,9 +50,16 @@ var _ Reader = new(StringMembership)
 
 type StringMembership string
 
-// GetValidatorSet gets the membership config from the input string.
-func (s StringMembership) GetValidatorSet() (*validator.Set, error) {
-	return validator.NewValidatorSetFromString(string(s))
+// GetMembershipInfo gets the membership config from the input string.
+func (s StringMembership) GetMembershipInfo() (*MembershipInfo, error) {
+	vs, err := validator.NewValidatorSetFromString(string(s))
+	if err != nil {
+		return nil, err
+	}
+
+	return &MembershipInfo{
+		ValidatorSet: vs,
+	}, nil
 }
 
 // -----
@@ -48,9 +67,16 @@ var _ Reader = new(EnvMembership)
 
 type EnvMembership string
 
-// GetValidatorSet gets the membership config from the input environment variable.
-func (e EnvMembership) GetValidatorSet() (*validator.Set, error) {
-	return validator.NewValidatorSetFromEnv(string(e))
+// GetMembershipInfo gets the membership config from the input environment variable.
+func (e EnvMembership) GetMembershipInfo() (*MembershipInfo, error) {
+	vs, err := validator.NewValidatorSetFromEnv(string(e))
+	if err != nil {
+		return nil, err
+	}
+
+	return &MembershipInfo{
+		ValidatorSet: vs,
+	}, nil
 }
 
 // -----
@@ -69,11 +95,12 @@ func NewOnChainMembershipClient(client rpc.JSONRPCRequestSender, subnet sdk.Subn
 }
 
 type AgentReponse struct {
-	ValidatorSet validator.Set `json:"validator_set"`
+	ValidatorSet  validator.Set `json:"validator_set"`
+	MinValidators uint64        `json:"min_validators"`
 }
 
-// GetValidatorSet gets the membership config from the actor state.
-func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
+// GetMembershipInfo gets the membership config from the actor state.
+func (c *OnChainMembership) GetMembershipInfo() (*MembershipInfo, error) {
 	req := struct {
 		Subnet string `json:"subnet"`
 	}{
@@ -85,7 +112,10 @@ func (c *OnChainMembership) GetValidatorSet() (*validator.Set, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &resp.ValidatorSet, err
+	return &MembershipInfo{
+		ValidatorSet:  &resp.ValidatorSet,
+		MinValidators: resp.MinValidators,
+	}, nil
 }
 
 // ----
