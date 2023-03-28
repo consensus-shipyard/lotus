@@ -111,7 +111,7 @@ func NewManager(ctx context.Context,
 	if mInfo.MinValidators > uint64(valSize) {
 		return nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
 	}
-	
+
 	_, initialMembership, err := mirmembership.Membership(initialValidatorSet.Validators)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to build node membership: %w", id, err)
