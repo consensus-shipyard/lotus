@@ -165,6 +165,11 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 		}
 		if len(connPeers) == 0 {
 			log.With("validator", sm.id).Warnf("syncFromPeers for TSK %s: no connected peers", tsk)
+			// if we are the only validator, we can return was we don't need to sync from anyone.
+			// This way we can restart a solo validator without the need of other nodes.
+			if len(sm.memberships[sm.currentEpoch]) == 1 {
+				return nil
+			}
 		}
 
 		for _, p := range connPeers {
