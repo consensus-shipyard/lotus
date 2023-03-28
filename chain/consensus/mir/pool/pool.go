@@ -2,16 +2,20 @@
 package pool
 
 import (
+	"context"
+
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	requestpbtypes "github.com/filecoin-project/mir/pkg/pb/requestpb/types"
 )
 
 type Fetcher struct {
 	ReadyForTxsChan chan chan []*requestpb.Request
+	ctx             context.Context
 }
 
-func NewFetcher(ch chan chan []*requestpb.Request) *Fetcher {
+func NewFetcher(ctx context.Context, ch chan chan []*requestpb.Request) *Fetcher {
 	return &Fetcher{
+		ctx:             ctx,
 		ReadyForTxsChan: ch,
 	}
 }
@@ -19,12 +23,17 @@ func NewFetcher(ch chan chan []*requestpb.Request) *Fetcher {
 func (f *Fetcher) Fetch() []*requestpbtypes.Request {
 	inputChan := make(chan []*requestpb.Request)
 	f.ReadyForTxsChan <- inputChan
+
 	var txs []*requestpbtypes.Request
 
-	for _, r := range <-inputChan {
-		tx := requestpbtypes.RequestFromPb(r)
-		txs = append(txs, tx)
+	select {
+	case <-f.ctx.Done():
+		return nil
+	case input := <-inputChan:
+		for _, r := range input {
+			tx := requestpbtypes.RequestFromPb(r)
+			txs = append(txs, tx)
+		}
+		return txs
 	}
-
-	return txs
 }
