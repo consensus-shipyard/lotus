@@ -9,8 +9,8 @@ import (
 )
 
 type Fetcher struct {
-	ReadyForTxsChan chan chan []*requestpb.Request
 	ctx             context.Context
+	ReadyForTxsChan chan chan []*requestpb.Request
 }
 
 func NewFetcher(ctx context.Context, ch chan chan []*requestpb.Request) *Fetcher {

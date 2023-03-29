@@ -15,7 +15,6 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -32,6 +31,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	mirmembership "github.com/filecoin-project/lotus/chain/consensus/mir/membership"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -67,7 +67,6 @@ type Manager struct {
 	net             net.Transport
 	interceptor     *eventlog.Recorder
 	readyForTxsChan chan chan []*mirproto.Request
-	stopChan        chan struct{}
 	stopped         bool
 	cryptoManager   *CryptoManager
 	confManager     *ConfigurationManager
@@ -148,7 +147,6 @@ func NewManager(ctx context.Context,
 		ds:                  ds,
 		netName:             netName,
 		lotusNode:           node,
-		stopChan:            make(chan struct{}),
 		readyForTxsChan:     make(chan chan []*mirproto.Request),
 		requestPool:         fifo.New(),
 		cryptoManager:       cryptoManager,
@@ -303,10 +301,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 			}
 
 		case mirChan := <-m.readyForTxsChan:
-			log.With("validator", m.id).Infof("ready for getting txs")
-
 			if ctx.Err() != nil {
-				log.With("validator", m.id).Info("Mir manager: context closed before ChainHead")
+				log.With("validator", m.id).Info("Mir manager: context closed before calling ChainHead")
 				return nil
 			}
 			base, err := m.lotusNode.ChainHead(ctx)
@@ -326,13 +322,11 @@ func (m *Manager) Serve(ctx context.Context) error {
 				requests = append(requests, configRequests...)
 			}
 
-			log.With("validator", m.id).Infof("sending requests to Mir")
 			select {
 			case <-ctx.Done():
 				log.With("validator", m.id).Info("Mir manager: context closed while sending txs")
 				return nil
 			case mirChan <- requests:
-				log.With("validator", m.id).Infof("sent requests to Mir")
 			}
 		}
 	}
@@ -365,15 +359,12 @@ func (m *Manager) stop() {
 	m.net.Stop()
 	log.With("validator", m.id).Info("Network transport stopped")
 
-	close(m.stopChan)
 	m.mirNode.Stop()
-	log.With("validator", m.id).Info("Mir node Stop() call finished")
-
 	err := <-m.mirErrChan
 	if !errors.Is(err, mir.ErrStopped) {
-		log.With("validator", m.id).Errorf("Mir manager: Mir node stopped with error: %v", err)
+		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", err)
 	} else {
-		log.With("validator", m.id).Infof("Mir manager: Mir node stopped")
+		log.With("validator", m.id).Infof("Mir node stopped")
 	}
 }
 
