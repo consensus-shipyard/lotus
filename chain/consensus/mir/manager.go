@@ -304,6 +304,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 			}
 
 		case mirChan := <-m.readyForTxsChan:
+			log.With("validator", m.id).Infof("ready for getting txs")
+			
 			if ctx.Err() != nil {
 				log.With("validator", m.id).Info("Mir manager [ChainHead]: context closed")
 				return nil
@@ -325,7 +327,9 @@ func (m *Manager) Serve(ctx context.Context) error {
 				requests = append(requests, configRequests...)
 			}
 
+			log.With("validator", m.id).Infof("sending requests to Mir")
 			mirChan <- requests
+			log.With("validator", m.id).Infof("sent requests to Mir")
 		}
 	}
 }
