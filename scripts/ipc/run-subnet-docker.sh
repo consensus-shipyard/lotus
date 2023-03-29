@@ -13,9 +13,10 @@ PORT=$1
 VAL_PORT=$2
 SUBNETID=$3
 VAL_KEY_ABSOLUTE_PATH=$4
+CONTAINER_NAME=ipc${SUBNETID//\//_}
 
 echo "[*] Running docker container for root in port $PORT"
-img=`docker run -dit --add-host host.docker.internal:host-gateway -p $PORT:1234 -p $VAL_PORT:1347 -v $VAL_KEY_ABSOLUTE_PATH:/wallet.key:ro --entrypoint "/scripts/ipc/entrypoints/eudico-subnet.sh" eudico $SUBNETID`
+img=`docker run -dit --add-host host.docker.internal:host-gateway -p $PORT:1234 -p $VAL_PORT:1347 -v $VAL_KEY_ABSOLUTE_PATH:/wallet.key:ro --name $CONTAINER_NAME --entrypoint "/scripts/ipc/entrypoints/eudico-subnet.sh" eudico $SUBNETID`
 echo "[*] Waiting for the daemon to start"
 docker exec -it $img  eudico wait-api --timeout 120s
 sleep 10
