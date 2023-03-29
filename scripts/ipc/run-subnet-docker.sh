@@ -4,7 +4,7 @@ set -e
 
 if [ $# -ne 4 ]
 then
-    echo "Provide the port where lotus and validator will be listening as first/second argument, the subnet id as third, and the validator address as fourth"
+    echo "Provide the port where lotus and validator will be listening as first and second arguments, the subnet id as third, and the path to the validator key as fourth"
     echo "Args: [port] [validator_libp2p_port] [subnet_id] [import_validator_key_absolute_path]"
     exit 1
 fi
@@ -13,7 +13,7 @@ PORT=$1
 VAL_PORT=$2
 SUBNETID=$3
 VAL_KEY_ABSOLUTE_PATH=$4
-CONTAINER_NAME=ipc${SUBNETID//\//_}
+CONTAINER_NAME=ipc${SUBNETID//\//_}_$PORT
 
 echo "[*] Running docker container for root in port $PORT"
 img=`docker run -dit --add-host host.docker.internal:host-gateway -p $PORT:1234 -p $VAL_PORT:1347 -v $VAL_KEY_ABSOLUTE_PATH:/wallet.key:ro --name $CONTAINER_NAME --entrypoint "/scripts/ipc/entrypoints/eudico-subnet.sh" eudico $SUBNETID`

@@ -12,7 +12,7 @@ PORT=$1
 VAL_PORT=$2
 
 echo "[*] Running docker container for root in port $PORT"
-img=`docker run -dit -p $PORT:1234 -p $VAL_PORT:1347 --name ipc_root --entrypoint "/scripts/ipc/entrypoints/eudico-root-single.sh" eudico`
+img=`docker run -dit -p $PORT:1234 -p $VAL_PORT:1347 --name ipc_root_$PORT --entrypoint "/scripts/ipc/entrypoints/eudico-root-single.sh" eudico`
 echo "[*] Waiting for the daemon to start"
 docker exec -it $img  eudico wait-api --timeout 120s
 sleep 10
