@@ -253,13 +253,12 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 	go func() {
 		// Run Mir node until it stops.
-		// We pass a new context to Run() to be sure that if the context is closed then the Mir
+		// We pass a new cancellable context to Run() to be sure that if the Lotus context is closed then the Mir
 		// node will not be stopped implicitly and there will be no race between Lotus and Mir during shutdown process.
-		// In this case we also know that if we receive an error from mirErrChan before cancelling mirCtx
+		// In this case we also know that if we receive an error on mirErrChan before cancelling mirCtx
 		// then that error is not ErrStopped.
 		m.mirErrChan <- m.mirNode.Run(m.mirCtx)
 	}()
-	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
 	defer m.stop()
 
 	reconfigure := time.NewTicker(ReconfigurationInterval)
@@ -279,7 +278,6 @@ func (m *Manager) Serve(ctx context.Context) error {
 			log.With("validator", m.id).Info("Mir manager: context closed")
 			return nil
 
-		// First catch potential errors when mining.
 		case err := <-m.mirErrChan:
 			panic(fmt.Sprintf("Mir node %v running error: %v", m.id, err))
 
@@ -343,7 +341,10 @@ func (m *Manager) stop() {
 	}
 	m.stopped = true
 
+	// Cancel Mir Context.
 	m.mirCancel()
+
+	// Stop components used by the Mir node.
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {

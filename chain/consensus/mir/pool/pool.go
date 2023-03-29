@@ -3,7 +3,6 @@ package pool
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	requestpbtypes "github.com/filecoin-project/mir/pkg/pb/requestpb/types"
@@ -29,7 +28,6 @@ func (f *Fetcher) Fetch() []*requestpbtypes.Request {
 
 	select {
 	case <-f.ctx.Done():
-		fmt.Println(">>> fetch context closed")
 		return nil
 	case input := <-inputChan:
 		for _, r := range input {
