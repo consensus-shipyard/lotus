@@ -306,7 +306,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 			log.With("validator", m.id).Infof("ready for getting txs")
 
 			if ctx.Err() != nil {
-				log.With("validator", m.id).Info("Mir manager [ChainHead]: context closed")
+				log.With("validator", m.id).Info("Mir manager: context closed before ChainHead")
 				return nil
 			}
 			base, err := m.lotusNode.ChainHead(ctx)
@@ -367,6 +367,7 @@ func (m *Manager) stop() {
 
 	close(m.stopChan)
 	m.mirNode.Stop()
+	log.With("validator", m.id).Info("Mir node Stop() call finished")
 
 	err := <-m.mirErrChan
 	if !errors.Is(err, mir.ErrStopped) {

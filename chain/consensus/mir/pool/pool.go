@@ -22,7 +22,11 @@ func NewFetcher(ctx context.Context, ch chan chan []*requestpb.Request) *Fetcher
 
 func (f *Fetcher) Fetch() []*requestpbtypes.Request {
 	inputChan := make(chan []*requestpb.Request)
-	f.ReadyForTxsChan <- inputChan
+	select {
+	case <-f.ctx.Done():
+		return nil
+	case f.ReadyForTxsChan <- inputChan:
+	}
 
 	var txs []*requestpbtypes.Request
 
