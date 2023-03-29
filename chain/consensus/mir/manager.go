@@ -15,7 +15,6 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -59,13 +58,15 @@ type Manager struct {
 	lotusNode v1api.FullNode
 
 	// Mir types.
+	mirCtx          context.Context
+	mirErrChan      chan error
+	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
 	requestPool     *fifo.Pool
 	wal             *simplewal.WAL
 	net             net.Transport
 	interceptor     *eventlog.Recorder
 	readyForTxsChan chan chan []*mirproto.Request
-	stopChan        chan struct{}
 	stopped         bool
 	cryptoManager   *CryptoManager
 	confManager     *ConfigurationManager
@@ -146,7 +147,6 @@ func NewManager(ctx context.Context,
 		ds:                  ds,
 		netName:             netName,
 		lotusNode:           node,
-		stopChan:            make(chan struct{}),
 		readyForTxsChan:     make(chan chan []*mirproto.Request),
 		requestPool:         fifo.New(),
 		cryptoManager:       cryptoManager,
@@ -155,6 +155,8 @@ func NewManager(ctx context.Context,
 		initialValidatorSet: initialValidatorSet,
 		membership:          membership,
 	}
+	m.mirErrChan = make(chan error, 1)
+	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
 	m.stateManager, err = NewStateManager(ctx, initialMembership, m.confManager, node, ds, m.requestPool, cfg)
 	if err != nil {
@@ -168,7 +170,7 @@ func NewManager(ctx context.Context,
 	params.Iss.PBFTViewChangeSNTimeout = cfg.Consensus.PBFTViewChangeSNTimeout
 	params.Iss.PBFTViewChangeSegmentTimeout = cfg.Consensus.PBFTViewChangeSegmentTimeout
 	params.Mempool.MaxTransactionsInBatch = cfg.Consensus.MaxTransactionsInBatch
-	params.Mempool.TxFetcher = pool.NewFetcher(m.readyForTxsChan).Fetch
+	params.Mempool.TxFetcher = pool.NewFetcher(ctx, m.readyForTxsChan).Fetch
 
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config
@@ -239,22 +241,22 @@ func NewManager(ctx context.Context,
 }
 
 func (m *Manager) Serve(ctx context.Context) error {
-	log.With("validator", m.id).Info("Mir manager serve starting")
+	log.With("validator", m.id).Info("Mir manager serve started")
 	defer log.With("validator", m.id).Info("Mir manager serve stopped")
 
 	log.With("validator", m.id).
 		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
 			m.netName, m.id, m.id, m.initialValidatorSet.GetValidators())
 
-	mirErrChan := make(chan error, 1)
 	go func() {
 		// Run Mir node until it stops.
-		mirErrChan <- m.mirNode.Run(ctx)
+		// We pass a new cancellable context to Run() to be sure that if the Lotus context is closed then the Mir
+		// node will not be stopped implicitly and there will be no race between Lotus and Mir during shutdown process.
+		// In this case we also know that if we receive an error on mirErrChan before cancelling mirCtx
+		// then that error is not ErrStopped.
+		m.mirErrChan <- m.mirNode.Run(m.mirCtx)
 	}()
-	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
-	defer func() {
-		m.Stop()
-	}()
+	defer m.stop()
 
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
@@ -270,17 +272,11 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			log.With("validator", m.id).Debug("Mir manager: context closed")
+			log.With("validator", m.id).Info("Mir manager: context closed")
 			return nil
 
-		// First catch potential errors when mining.
-		case err := <-mirErrChan:
-			log.With("validator", m.id).Info("manager received error:", err)
-			if err != nil && !errors.Is(err, mir.ErrStopped) {
-				panic(fmt.Sprintf("validator %s consensus error: %v", m.id, err))
-			}
-			log.With("validator", m.id).Infof("Mir node stopped signal")
-			return nil
+		case err := <-m.mirErrChan:
+			panic(fmt.Sprintf("Mir node %v running error: %v", m.id, err))
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
@@ -305,7 +301,11 @@ func (m *Manager) Serve(ctx context.Context) error {
 			}
 
 		case mirChan := <-m.readyForTxsChan:
-			base, err := m.stateManager.api.ChainHead(ctx)
+			if ctx.Err() != nil {
+				log.With("validator", m.id).Info("Mir manager: context closed before calling ChainHead")
+				return nil
+			}
+			base, err := m.lotusNode.ChainHead(ctx)
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)
 			}
@@ -322,21 +322,31 @@ func (m *Manager) Serve(ctx context.Context) error {
 				requests = append(requests, configRequests...)
 			}
 
-			mirChan <- requests
+			select {
+			case <-ctx.Done():
+				log.With("validator", m.id).Info("Mir manager: context closed while sending txs")
+				return nil
+			case mirChan <- requests:
+			}
 		}
 	}
 }
 
-// Stop stops the manager and all its components.
-func (m *Manager) Stop() {
-	log.With("validator", m.id).Infof("Mir manager stopping")
-	defer log.With("validator", m.id).Info("Mir manager stopped")
+// stop stops the manager and all its components.
+func (m *Manager) stop() {
+	log.With("validator", m.id).Infof("Mir manager stop() started")
+	defer log.With("validator", m.id).Info("Mir manager stop() finished")
 
 	if m.stopped {
 		log.With("validator", m.id).Warnf("Mir manager has already been stopped")
 		return
 	}
 	m.stopped = true
+
+	// Cancel Mir Context.
+	m.mirCancel()
+
+	// Stop components used by the Mir node.
 
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
@@ -349,8 +359,13 @@ func (m *Manager) Stop() {
 	m.net.Stop()
 	log.With("validator", m.id).Info("Network transport stopped")
 
-	close(m.stopChan)
 	m.mirNode.Stop()
+	err := <-m.mirErrChan
+	if !errors.Is(err, mir.ErrStopped) {
+		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", err)
+	} else {
+		log.With("validator", m.id).Infof("Mir node stopped")
+	}
 }
 
 func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
