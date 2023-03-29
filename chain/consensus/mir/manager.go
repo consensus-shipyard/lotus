@@ -15,7 +15,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
-
+	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -32,7 +32,6 @@ import (
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	mirmembership "github.com/filecoin-project/lotus/chain/consensus/mir/membership"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/pool"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
@@ -305,12 +304,12 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 		case mirChan := <-m.readyForTxsChan:
 			log.With("validator", m.id).Infof("ready for getting txs")
-			
+
 			if ctx.Err() != nil {
 				log.With("validator", m.id).Info("Mir manager [ChainHead]: context closed")
 				return nil
 			}
-			base, err := m.stateManager.api.ChainHead(ctx)
+			base, err := m.lotusNode.ChainHead(ctx)
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)
 			}
@@ -328,8 +327,13 @@ func (m *Manager) Serve(ctx context.Context) error {
 			}
 
 			log.With("validator", m.id).Infof("sending requests to Mir")
-			mirChan <- requests
-			log.With("validator", m.id).Infof("sent requests to Mir")
+			select {
+			case <-ctx.Done():
+				log.With("validator", m.id).Info("Mir manager: context closed while sending tra")
+				continue
+			case mirChan <- requests:
+				log.With("validator", m.id).Infof("sent requests to Mir")
+			}
 		}
 	}
 }

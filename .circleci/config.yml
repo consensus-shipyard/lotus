@@ -598,12 +598,12 @@ workflows:
       - test-mir-basic:
           name: mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -timeout 15m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -timeout 15m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
       - build-spacenet
       - build-all:
