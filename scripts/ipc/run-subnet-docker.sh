@@ -20,7 +20,8 @@ img=`docker run -dit --add-host host.docker.internal:host-gateway -p $PORT:1234 
 echo "[*] Waiting for the daemon to start"
 docker exec -it $img  eudico wait-api --timeout 120s
 sleep 10
-echo ">>> Subnet $SUBNETID daemon running in container: $img"
+name=`docker ps --format "{{.Names}}" --filter "id=$img"`
+echo ">>> Subnet $SUBNETID daemon running in container: $img (friendly name: $name)"
 token=`docker exec -it $img  eudico auth create-token --perm admin`
 echo ">>> Token to $SUBNETID daemon: $token"
 wallet=`docker exec -it $img  eudico wallet default`
