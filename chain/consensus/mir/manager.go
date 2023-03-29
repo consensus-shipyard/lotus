@@ -329,7 +329,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 			log.With("validator", m.id).Infof("sending requests to Mir")
 			select {
 			case <-ctx.Done():
-				log.With("validator", m.id).Info("Mir manager: context closed while sending tra")
+				log.With("validator", m.id).Info("Mir manager: context closed while sending txs")
 				return nil
 			case mirChan <- requests:
 				log.With("validator", m.id).Infof("sent requests to Mir")
