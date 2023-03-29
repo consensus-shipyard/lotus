@@ -29,18 +29,18 @@ Not online yet... (could not get API info for FullNode: could not get api endpoi
 Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
 === (this process may take several minutes until all the infrastructure is deployed)
 
->>> Root daemon running in container: 4f8f0577143c1a5de4111b4053f8d485c8aaabbba462e7e5465f628f039ecba9
+>>> Root daemon running in container: 4f8f0577143c1a5de4111b4053f8d485c8aaabbba462e7e5465f628f039ecba9 (friendly name: ipc_root_1235)
 >>> Token to /root daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0._-2xzek2c3QzYqt5MWdQYrpRtK_Kqi8uEu3bvcm0i40
 >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
 ```
-The information about the token to the daemon and the default wallet will be used to configure the [IPC agent](https://github.com/consensus-shipyard/ipc-agent) to interact with the rootnet. Refer to the agent's documentation for further information about how to run a subnet and interact with IPC.
+The information about the token to the daemon and the default wallet will be used to configure the [IPC agent](https://github.com/consensus-shipyard/ipc-agent) to interact with the rootnet. The docker container will be named `ipc_root_<API_PORT>`. Refer to the agent's documentation for further information about how to run a subnet and interact with IPC.
 
 ### Run a subnet node
 To run a subnet node in docker bundled with a daemon and a validator you can use: 
 ```
-./scripts/ipc/run-subnet-docker.sh <PORT> <VALIDATOR_LIBP2P_PORT> <SUBNET> <ABSOLUTE_PATH_VAL_KEY>
+./scripts/ipc/run-subnet-docker.sh <API_PORT> <VALIDATOR_LIBP2P_PORT> <SUBNET_ID> <ABSOLUTE_PATH_VAL_KEY>
 ```
-This command runs a new node for a subnet `<SUBNETID>` listening at `<PORT>` and the validator listening at port `<VALIDATOR_LIBP2P_PORT>`. The last argument is the private key of the address that the validator of the subnet will use as its default wallet. Usually this will be the wallet address from the root that you used to join the subnet. To get the private key for an address into a file you can run the following command against your root (or parent) node:
+This command runs a new node for a subnet `<SUBNET_ID>` listening at `<API_PORT>` and the validator listening at port `<VALIDATOR_LIBP2P_PORT>`. The last argument is the private key of the address that the validator of the subnet will use as its default wallet. Usually this will be the wallet address from the root that you used to join the subnet. To get the private key for an address into a file you can run the following command against your root (or parent) node:
 ```
 ./eudico wallet export --lotus-json <ADDRESS>
 ```
@@ -53,7 +53,7 @@ Not online yet... (could not get API info for FullNode: could not get api endpoi
 Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
 === (this process may take several minutes until all the infrastructure is deployed)
 
->>> Subnet /root/t01002 daemon running in container: 196f07aa68fedb48f6c14a0eb2aad3e139438cb515e0b238689b88c8bd440e8a
+>>> Subnet /root/t01002 daemon running in container: 196f07aa68fedb48f6c14a0eb2aad3e139438cb515e0b238689b88c8bd440e8a (friendly name: ipc_root_t01002_1239)
 >>> Token to /root/t01002 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.dR5L79UIi1ZoPlvaW1Taxyc4nujxRw2elCU85yvi7vc
 >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
 >>> Subnet subnet validator info:
@@ -63,7 +63,7 @@ Not online yet... (could not get API info for FullNode: could not get api endpoi
 ```
 > Bear in mind that this scripts expects the absolute path of the key as an argument, if you use the relative path the script will fail.
 
-This script deploys a daemon and a validator for your subnet, however, it is not started mining automatically (as it was the case for the root node), because one need to first join a subnet to start mining in a subnet. Again, all of the output of the execution of your node will then become useful to configure you IPC agent with the subnet. Refer to the [IPC agent](https://github.com/consensus-shipyard/ipc-agent) for documentation on how to run a subnet over this infrastructure.
+This script deploys a daemon and a validator for your subnet, however, it is not started mining automatically (as it was the case for the root node), because one need to first join a subnet to start mining in a subnet. Again, all of the output of the execution of your node will then become useful to configure you IPC agent with the subnet. The resulting container docker will be named `ipc_<SUBNET_ID>_<API_PORT>` (with `/` replaced by `_` so as to yield a valid name). Refer to the [IPC agent](https://github.com/consensus-shipyard/ipc-agent) for documentation on how to run a subnet over this infrastructure.
 
 ### Mining in a subnet
 To initialize the mining process in a subnet node directly after all of the relevant operations to join a subnet were successfully, you just need to run the following script passing as argument the docker container where your subnet node is running: 
@@ -72,8 +72,9 @@ To initialize the mining process in a subnet node directly after all of the rele
 ```
 
 ### Troubleshooting the deployment
-If at ant point these scripts do not behave as expected, or you are running out of patience while they deploy and you want to check how they are doing, we suggest you:
-- Listen to the logs of the underlying container through `dcoker logs -f <CONTAINER_ID>`
+If at any point these scripts do not behave as expected, or you are running out of patience while they deploy and you want to check how they are doing, we suggest you:
+- Check for running containers using `docker ps`. You may use the listed container name instead of CONTAINER_ID in the steps below.
+- Listen to the logs of the underlying container through `docker logs -f <CONTAINER_ID>`
 - You attach to the container to interact with it. We multiplex the daemon and validator processes inside the container with `tmux` so you will have to trigger a bash in the container and attach to its tmux session to interact with it: 
 ```
 # attach to container
