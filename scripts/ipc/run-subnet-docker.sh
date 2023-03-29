@@ -26,7 +26,7 @@ token=`docker exec -it $img  eudico auth create-token --perm admin`
 echo ">>> Token to $SUBNETID daemon: $token"
 wallet=`docker exec -it $img  eudico wallet default`
 echo ">>> Default wallet: $wallet"
-val=`docker exec -it $img  eudico mir validator config validator-addr`
+val=`docker exec -it $img  eudico mir validator config validator-addr | sed q1`
 echo ">>> Subnet subnet validator info:"
 echo $val
 echo ">>> API listening in host port $PORT"
