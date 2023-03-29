@@ -22,7 +22,7 @@ In order to run IPC and test the deployment of subnets, we first need to run a r
 ```
 As an argument we need to pass the port where we want the lotus daemon for rootnet to be listening and the default libp2p port used by the unique validator. The result of the scripts is the deployment of this single validator subnet and the api token and default wallet that we can use to interact with this network through the IPC agent: 
 ```
-$ ./scripts/ipc/run-root-docker-1val.sh 1235
+$ ./scripts/ipc/run-root-docker-1val.sh 1235 1239
 [*] Running docker container for root in port 1235
 [*] Waiting for the daemon to start
 Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
