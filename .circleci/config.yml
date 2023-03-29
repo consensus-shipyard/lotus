@@ -572,8 +572,6 @@ workflows:
   version: 2.1
   ci:
     jobs:
-      - lint-all:
-          concurrency: "16"   # expend all docker 2xlarge CPUs.
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus

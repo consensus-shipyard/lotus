@@ -59,6 +59,9 @@ type Manager struct {
 	lotusNode v1api.FullNode
 
 	// Mir types.
+	mirCtx          context.Context
+	mirErrChan      chan error
+	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
 	requestPool     *fifo.Pool
 	wal             *simplewal.WAL
@@ -155,6 +158,8 @@ func NewManager(ctx context.Context,
 		initialValidatorSet: initialValidatorSet,
 		membership:          membership,
 	}
+	m.mirErrChan = make(chan error, 1)
+	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
 	m.stateManager, err = NewStateManager(ctx, initialMembership, m.confManager, node, ds, m.requestPool, cfg)
 	if err != nil {
@@ -246,11 +251,16 @@ func (m *Manager) Serve(ctx context.Context) error {
 		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
 			m.netName, m.id, m.id, m.initialValidatorSet.GetValidators())
 
-	mirErrChan := make(chan error, 1)
 	go func() {
 		// Run Mir node until it stops.
-		mirErrChan <- m.mirNode.Run(ctx)
+		// We pass a new context to Run() to be sure that if the context is closed then the Mir
+		// node will not be stopped implicitly and there will be no race between Lotus and Mir during shutdown process.
+		// In this case we also know that if we receive an error from mirErrChan before cancelling mirCtx
+		// then that error is not ErrStopped.
+		m.mirErrChan <- m.mirNode.Run(m.mirCtx)
 	}()
+	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
+	defer m.stop()
 
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
@@ -267,22 +277,11 @@ func (m *Manager) Serve(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			log.With("validator", m.id).Info("Mir manager: context closed")
-
-			// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
-			m.stop()
-
-			err := <-mirErrChan
-			if err != nil && !errors.Is(err, mir.ErrStopped) {
-				log.With("validator", m.id).Errorf("Mir manager: stopping Mir node error: %v", err)
-			} else {
-				log.With("validator", m.id).Infof("Mir manager: Mir node stopped")
-			}
-
 			return nil
 
 		// First catch potential errors when mining.
-		case err := <-mirErrChan:
-			panic(fmt.Sprintf("Mir node %v error: %v", m.id, err))
+		case err := <-m.mirErrChan:
+			panic(fmt.Sprintf("Mir node %v running error: %v", m.id, err))
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
@@ -307,6 +306,10 @@ func (m *Manager) Serve(ctx context.Context) error {
 			}
 
 		case mirChan := <-m.readyForTxsChan:
+			if ctx.Err() != nil {
+				log.With("validator", m.id).Info("Mir manager [ChainHead]: context closed")
+				return nil
+			}
 			base, err := m.stateManager.api.ChainHead(ctx)
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)
@@ -340,6 +343,8 @@ func (m *Manager) stop() {
 	}
 	m.stopped = true
 
+	m.mirCancel()
+
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
 			log.With("validator", m.id).Errorf("Could not stop interceptor: %s", err)
@@ -353,6 +358,13 @@ func (m *Manager) stop() {
 
 	close(m.stopChan)
 	m.mirNode.Stop()
+
+	err := <-m.mirErrChan
+	if !errors.Is(err, mir.ErrStopped) {
+		log.With("validator", m.id).Errorf("Mir manager: Mir node stopped with error: %v", err)
+	} else {
+		log.With("validator", m.id).Infof("Mir manager: Mir node stopped")
+	}
 }
 
 func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {
