@@ -269,7 +269,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 			log.With("validator", m.id).Info("Mir manager: context closed")
 
 			// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
-			m.Stop()
+			m.stop()
 
 			err := <-mirErrChan
 			if err != nil && !errors.Is(err, mir.ErrStopped) {
@@ -329,10 +329,10 @@ func (m *Manager) Serve(ctx context.Context) error {
 	}
 }
 
-// Stop stops the manager and all its components.
-func (m *Manager) Stop() {
-	log.With("validator", m.id).Infof("Mir manager Stop() started")
-	defer log.With("validator", m.id).Info("Mir manager Stop() finished")
+// stop stops the manager and all its components.
+func (m *Manager) stop() {
+	log.With("validator", m.id).Infof("Mir manager stop() started")
+	defer log.With("validator", m.id).Info("Mir manager stop() finished")
 
 	if m.stopped {
 		log.With("validator", m.id).Warnf("Mir manager has already been stopped")
