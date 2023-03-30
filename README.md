@@ -2,6 +2,8 @@
 
 Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-project/lotus), itself an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io). This is a work-in-progress, intended to enable easier experimentation with future protocol features, and is not meant to be used in the production network.
 
+[![consensus-shipyard](https://circleci.com/gh/consensus-shipyard/lotus.svg?style=svg)](https://app.circleci.com/pipelines/github/consensus-shipyard/lotus)
+
 ## Building & Documentation
 
 > Note: The default `master` branch is the dev branch, please use with caution. For the latest stable version, checkout the most recent [`Latest release`](https://github.com/filecoin-project/lotus/releases).
