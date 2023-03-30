@@ -13,7 +13,7 @@ PORT=$1
 VAL_PORT=$2
 SUBNETID=${3%/}
 VAL_KEY_ABSOLUTE_PATH=$4
-CONTAINER_NAME=ipc${SUBNETID//\//_}_$PORT
+CONTAINER_NAME=`echo ipc${SUBNETID}_${PORT} | sed 's/\//_/g'`
 
 echo "[*] Running docker container for root in port $PORT"
 img=`docker run -dit --add-host host.docker.internal:host-gateway -p $PORT:1234 -p $VAL_PORT:1347 -v $VAL_KEY_ABSOLUTE_PATH:/wallet.key:ro --name $CONTAINER_NAME --entrypoint "/scripts/ipc/entrypoints/eudico-subnet.sh" eudico $SUBNETID`
@@ -26,8 +26,7 @@ token=`docker exec -it $img  eudico auth create-token --perm admin`
 echo ">>> Token to $SUBNETID daemon: $token"
 wallet=`docker exec -it $img  eudico wallet default`
 echo ">>> Default wallet: $wallet"
-val=`docker exec -it $img  eudico mir validator config validator-addr | sed q1`
 echo ">>> Subnet subnet validator info:"
-echo $val
+docker exec -it $img  eudico mir validator config validator-addr
 echo ">>> API listening in host port $PORT"
 echo ">>> Validator listening in host port $VAL_PORT"
