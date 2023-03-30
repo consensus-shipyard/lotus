@@ -434,7 +434,7 @@ jobs:
           no_output_timeout: 30m
       - run:
           name: check tag and version output match
-          command: ./scripts/version-check.sh ./lotus
+          command: ./scripts/version-check.sh ./eudico
       - store_artifacts:
           path: lotus
       - store_artifacts:
