@@ -395,63 +395,62 @@ jobs:
           name: "trigger payment channel stress testplan on taas"
           command: ~/testground-cli run composition -f $HOME/testground/plans/lotus-soup/_compositions/paych-stress-k8s.toml --metadata-commit=$CIRCLE_SHA1 --metadata-repo=filecoin-project/lotus --metadata-branch=$CIRCLE_BRANCH
 
-  build-macos:
+  build-darwin-amd64:
     description: build darwin lotus binary
-    macos:
-      xcode: "12.5.1"
     working_directory: ~/go/src/github.com/filecoin-project/lotus
+    macos:
+      xcode: "13.4.1"
     steps:
-      - prepare:
+      - build-platform-specific:
           linux: false
           darwin: true
-      - run:
-          name: Install go
-          command: |
-            curl -O https://dl.google.com/go/go1.18.8.darwin-amd64.pkg && \
-            sudo installer -pkg go1.18.8.darwin-amd64.pkg -target /
-      - run:
-          name: Install pkg-config
-          command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
-      - run: go version
-      - run:
-          name: Install Rust
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y
-      - run:
-          name: Install hwloc
-          command: |
-            mkdir ~/hwloc
-            curl --location https://download.open-mpi.org/release/hwloc/v2.4/hwloc-2.4.1.tar.gz --output ~/hwloc/hwloc-2.4.1.tar.gz
-            cd ~/hwloc
-            tar -xvzpf hwloc-2.4.1.tar.gz
-            cd hwloc-2.4.1
-            ./configure && make && sudo make install
-      - restore_cache:
-          name: restore cargo cache
-          key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
-      - run:
-          command: make build
-          no_output_timeout: 30m
+          darwin-architecture: amd64
+      - run: make lotus lotus-miner lotus-worker
+      - run: otool -hv lotus
       - run:
           name: check tag and version output match
-          command: ./scripts/version-check.sh ./eudico
-      - store_artifacts:
-          path: lotus
-      - store_artifacts:
-          path: lotus-miner
-      - store_artifacts:
-          path: lotus-worker
-      - run: mkdir darwin && mv lotus lotus-miner lotus-worker darwin/
+          command: ./scripts/version-check.sh ./lotus
+      - run: |
+          mkdir -p /tmp/workspace/darwin_amd64_v1 && \
+          mv lotus lotus-miner lotus-worker /tmp/workspace/darwin_amd64_v1/
       - persist_to_workspace:
-          root: "."
+          root: /tmp/workspace
           paths:
-            - darwin
-      - save_cache:
-          name: save cargo cache
-          key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
+            - darwin_amd64_v1
+
+  build-darwin-arm64:
+    description: self-hosted m1 runner
+    working_directory: ~/go/src/github.com/filecoin-project/lotus
+    machine: true
+    resource_class: filecoin-project/self-hosted-m1
+    steps:
+      - run: echo 'export PATH=/opt/homebrew/bin:"$PATH"' >> "$BASH_ENV"
+      - build-platform-specific:
+          linux: false
+          darwin: true
+          darwin-architecture: arm64
+      - run: |
+          export CPATH=$(brew --prefix)/include
+          export LIBRARY_PATH=$(brew --prefix)/lib
+          make lotus lotus-miner lotus-worker
+      - run: otool -hv lotus
+      - run:
+          name: check tag and version output match
+          command: ./scripts/version-check.sh ./lotus
+      - run: |
+          mkdir -p /tmp/workspace/darwin_arm64 && \
+          mv lotus lotus-miner lotus-worker /tmp/workspace/darwin_arm64/
+      - persist_to_workspace:
+          root: /tmp/workspace
           paths:
-            - "~/.rustup"
-            - "~/.cargo"
+            - darwin_arm64
+      - run:
+          command: make clean
+          when: always
+      - run:
+          name: cleanup homebrew
+          command: HOMEBREW_NO_AUTO_UPDATE=1 brew uninstall pkg-config coreutils jq hwloc
+          when: always
 
   gofmt:
     executor: golang
