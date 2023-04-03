@@ -71,6 +71,7 @@ func TestIPCAccessors(t *testing.T) {
 	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
 	require.NoError(t, err)
 	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
+	require.NoError(t, err)
 
 	JoinSubnet(t, ctx, api, src, actorAddr)
 	c, err := abi.CidBuilder.Sum([]byte("genesis"))

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -52,7 +51,7 @@ func MakeGenesisTemplate(templatePath string, subnetID string) (genesis.Template
 		templatePath = filepath.Join(filepath.Dir(e), defaultTemplateFilePath)
 	}
 
-	tmplBytes, err := ioutil.ReadFile(templatePath)
+	tmplBytes, err := os.ReadFile(templatePath)
 	if err != nil {
 		return genesis.Template{}, xerrors.Errorf("failed to read template %s: %w", templatePath, err)
 	}
