@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -68,7 +67,7 @@ var keyinfoVerifyCmd = &cli.Command{
 		defer inputFile.Close() //nolint:errcheck
 		input := bufio.NewReader(inputFile)
 
-		keyContent, err := ioutil.ReadAll(input)
+		keyContent, err := io.ReadAll(input)
 		if err != nil {
 			return err
 		}
@@ -167,7 +166,7 @@ var keyinfoImportCmd = &cli.Command{
 			input = bufio.NewReader(inputFile)
 		}
 
-		encoded, err := ioutil.ReadAll(input)
+		encoded, err := io.ReadAll(input)
 		if err != nil {
 			return err
 		}
@@ -279,7 +278,7 @@ var keyinfoInfoCmd = &cli.Command{
 			input = bufio.NewReader(inputFile)
 		}
 
-		encoded, err := ioutil.ReadAll(input)
+		encoded, err := io.ReadAll(input)
 		if err != nil {
 			return err
 		}

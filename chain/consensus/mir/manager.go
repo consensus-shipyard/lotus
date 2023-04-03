@@ -10,9 +10,8 @@ import (
 	"path"
 	"time"
 
-	"golang.org/x/xerrors"
-
 	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"

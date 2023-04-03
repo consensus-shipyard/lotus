@@ -11,12 +11,13 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/chain/consensus/mir"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	mirlibp2pnet "github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	mirtypes "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
 type MirConfig struct {

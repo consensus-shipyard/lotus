@@ -31,6 +31,10 @@ var ErrExpensiveFork = errors.New("refusing explicit call due to state fork at e
 // tipset's parent. In the presence of null blocks, the height at which the message is invoked may
 // be less than the specified tipset.
 func (sm *StateManager) Call(ctx context.Context, msg *types.Message, ts *types.TipSet) (*api.InvocResult, error) {
+	// Copy the message as we modify it below.
+	msgCopy := *msg
+	msg = &msgCopy
+
 	if msg.GasLimit == 0 {
 		msg.GasLimit = build.BlockGasLimit
 	}
@@ -48,8 +52,8 @@ func (sm *StateManager) Call(ctx context.Context, msg *types.Message, ts *types.
 }
 
 // CallWithGas calculates the state for a given tipset, and then applies the given message on top of that state.
-func (sm *StateManager) CallWithGas(ctx context.Context, msg *types.Message, priorMsgs []types.ChainMsg, ts *types.TipSet) (*api.InvocResult, error) {
-	return sm.callInternal(ctx, msg, priorMsgs, ts, cid.Undef, sm.GetNetworkVersion, true, true)
+func (sm *StateManager) CallWithGas(ctx context.Context, msg *types.Message, priorMsgs []types.ChainMsg, ts *types.TipSet, applyTsMessages bool) (*api.InvocResult, error) {
+	return sm.callInternal(ctx, msg, priorMsgs, ts, cid.Undef, sm.GetNetworkVersion, true, applyTsMessages)
 }
 
 // CallAtStateAndVersion allows you to specify a message to execute on the given stateCid and network version.
@@ -113,12 +117,22 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 	if stateCid == cid.Undef {
 		stateCid = ts.ParentState()
 	}
+	tsMsgs, err := sm.cs.MessagesForTipset(ctx, ts)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to lookup messages for parent tipset: %w", err)
+	}
+
 	if applyTsMessages {
-		tsMsgs, err := sm.cs.MessagesForTipset(ctx, ts)
-		if err != nil {
-			return nil, xerrors.Errorf("failed to lookup messages for parent tipset: %w", err)
-		}
 		priorMsgs = append(tsMsgs, priorMsgs...)
+	} else {
+		var filteredTsMsgs []types.ChainMsg
+		for _, tsMsg := range tsMsgs {
+			//TODO we should technically be normalizing the filecoin address of from when we compare here
+			if tsMsg.VMMessage().From == msg.VMMessage().From {
+				filteredTsMsgs = append(filteredTsMsgs, tsMsg)
+			}
+		}
+		priorMsgs = append(filteredTsMsgs, priorMsgs...)
 	}
 
 	// Technically, the tipset we're passing in here should be ts+1, but that may not exist.

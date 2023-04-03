@@ -3,9 +3,10 @@ package evm
 import (
 	"github.com/ipfs/go-cid"
 
-	"github.com/filecoin-project/lotus/chain/actors/adt"
-
+	"github.com/filecoin-project/go-state-types/abi"
 	evm10 "github.com/filecoin-project/go-state-types/builtin/v10/evm"
+
+	"github.com/filecoin-project/lotus/chain/actors/adt"
 )
 
 var _ State = (*state10)(nil)
@@ -38,6 +39,10 @@ type state10 struct {
 
 func (s *state10) Nonce() (uint64, error) {
 	return s.State.Nonce, nil
+}
+
+func (s *state10) IsAlive() (bool, error) {
+	return s.State.Tombstone == nil, nil
 }
 
 func (s *state10) GetState() interface{} {

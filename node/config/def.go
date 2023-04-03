@@ -89,13 +89,15 @@ func DefaultFullNode() *FullNode {
 			SimultaneousTransfersForRetrieval: DefaultSimultaneousTransfers,
 		},
 		Chainstore: Chainstore{
-			EnableSplitstore: false,
+			EnableSplitstore: true,
 			Splitstore: Splitstore{
-				ColdStoreType: "messages",
+				ColdStoreType: "discard",
 				HotStoreType:  "badger",
 				MarkSetType:   "badger",
 
-				HotStoreFullGCFrequency: 20,
+				HotStoreFullGCFrequency:      20,
+				HotStoreMaxSpaceThreshold:    150_000_000_000,
+				HotstoreMaxSpaceSafetyBuffer: 50_000_000_000,
 			},
 		},
 		Cluster: *DefaultUserRaftConfig(),
@@ -154,7 +156,7 @@ func DefaultStorageMiner() *StorageMiner {
 		},
 
 		Proving: ProvingConfig{
-			ParallelCheckLimit:    128,
+			ParallelCheckLimit:    32,
 			PartitionCheckTimeout: Duration(20 * time.Minute),
 			SingleCheckTimeout:    Duration(10 * time.Minute),
 		},

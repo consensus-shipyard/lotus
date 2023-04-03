@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/multiformats/go-multiaddr"
-
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"github.com/multiformats/go-multiaddr"
 
 	t "github.com/filecoin-project/mir/pkg/types"
 

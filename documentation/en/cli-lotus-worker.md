@@ -7,18 +7,16 @@ USAGE:
    lotus-worker [global options] command [command options] [arguments...]
 
 VERSION:
-   1.19.1-dev
+   1.21.0-rc2
 
 COMMANDS:
-   run         Start lotus worker
-   stop        Stop a running lotus worker
-   info        Print worker info
-   storage     manage sector storage
-   set         Manage worker settings
-   wait-quiet  Block until all running tasks exit
-   resources   Manage resource table overrides
-   tasks       Manage task processing
-   help, h     Shows a list of commands or help for one command
+   run        Start lotus worker
+   stop       Stop a running lotus worker
+   info       Print worker info
+   storage    manage sector storage
+   resources  Manage resource table overrides
+   tasks      Manage task processing
+   help, h    Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
    --enable-gpu-proving                     enable use of GPU for mining operations (default: true) [$LOTUS_WORKER_ENABLE_GPU_PROVING]
@@ -47,7 +45,7 @@ OPTIONS:
    --no-local-storage            don't use storageminer repo for sector storage (default: false) [$LOTUS_WORKER_NO_LOCAL_STORAGE]
    --no-swap                     don't use swap (default: false) [$LOTUS_WORKER_NO_SWAP]
    --parallel-fetch-limit value  maximum fetch operations to run in parallel (default: 5) [$LOTUS_WORKER_PARALLEL_FETCH_LIMIT]
-   --post-parallel-reads value   maximum number of parallel challenge reads (0 = no limit) (default: 128) [$LOTUS_WORKER_POST_PARALLEL_READS]
+   --post-parallel-reads value   maximum number of parallel challenge reads (0 = no limit) (default: 32) [$LOTUS_WORKER_POST_PARALLEL_READS]
    --post-read-timeout value     time limit for reading PoSt challenges (0 = no limit) (default: 0s) [$LOTUS_WORKER_POST_READ_TIMEOUT]
    --precommit1                  enable precommit1 (default: true) [$LOTUS_WORKER_PRECOMMIT1]
    --precommit2                  enable precommit2 (default: true) [$LOTUS_WORKER_PRECOMMIT2]
@@ -151,32 +149,6 @@ OPTIONS:
    --all           redeclare all storage paths (default: false)
    --drop-missing  Drop index entries with missing files (default: false)
    --id value      storage path ID
-   
-```
-
-## lotus-worker set
-```
-NAME:
-   lotus-worker set - Manage worker settings
-
-USAGE:
-   lotus-worker set [command options] [arguments...]
-
-OPTIONS:
-   --enabled  enable/disable new task processing (default: true)
-   
-```
-
-## lotus-worker wait-quiet
-```
-NAME:
-   lotus-worker wait-quiet - Block until all running tasks exit
-
-USAGE:
-   lotus-worker wait-quiet [command options] [arguments...]
-
-OPTIONS:
-   --help, -h  show help (default: false)
    
 ```
 

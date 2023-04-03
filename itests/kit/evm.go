@@ -64,7 +64,7 @@ func (e *EVM) DeployContractWithValue(ctx context.Context, sender address.Addres
 	require.NoError(err)
 
 	e.t.Log("waiting for message to execute")
-	wait, err := e.StateWaitMsg(ctx, smsg.Cid(), 0, 0, false)
+	wait, err := e.StateWaitMsg(ctx, smsg.Cid(), 3, 0, false)
 	require.NoError(err)
 
 	require.True(wait.Receipt.ExitCode.IsSuccess(), "contract installation failed")
@@ -104,6 +104,10 @@ func (e *EVM) DeployContractFromFilename(ctx context.Context, binFilename string
 }
 
 func (e *EVM) InvokeSolidity(ctx context.Context, sender address.Address, target address.Address, selector []byte, inputData []byte) (*api.MsgLookup, error) {
+	return e.InvokeSolidityWithValue(ctx, sender, target, selector, inputData, big.Zero())
+}
+
+func (e *EVM) InvokeSolidityWithValue(ctx context.Context, sender address.Address, target address.Address, selector []byte, inputData []byte, value big.Int) (*api.MsgLookup, error) {
 	params := append(selector, inputData...)
 	var buffer bytes.Buffer
 	err := cbg.WriteByteArray(&buffer, params)
@@ -115,7 +119,7 @@ func (e *EVM) InvokeSolidity(ctx context.Context, sender address.Address, target
 	msg := &types.Message{
 		To:       target,
 		From:     sender,
-		Value:    big.Zero(),
+		Value:    value,
 		Method:   builtintypes.MethodsEVM.InvokeContract,
 		GasLimit: build.BlockGasLimit, // note: we hardcode block gas limit due to slightly broken gas estimation - https://github.com/filecoin-project/lotus/issues/10041
 		Params:   params,
@@ -128,7 +132,7 @@ func (e *EVM) InvokeSolidity(ctx context.Context, sender address.Address, target
 	}
 
 	e.t.Log("waiting for message to execute")
-	wait, err := e.StateWaitMsg(ctx, smsg.Cid(), 0, 0, false)
+	wait, err := e.StateWaitMsg(ctx, smsg.Cid(), 3, 0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +249,22 @@ func (e *EVM) ComputeContractAddress(deployer ethtypes.EthAddress, nonce uint64)
 	hasher := sha3.NewLegacyKeccak256()
 	hasher.Write(encoded)
 	return *(*ethtypes.EthAddress)(hasher.Sum(nil)[12:])
+}
+
+// return eth block from a wait return
+// this necessarily goes back one parent in the chain because wait is one block ahead of execution
+func (e *EVM) GetEthBlockFromWait(ctx context.Context, wait *api.MsgLookup) ethtypes.EthBlock {
+	c, err := wait.TipSet.Cid()
+	require.NoError(e.t, err)
+	hash, err := ethtypes.EthHashFromCid(c)
+	require.NoError(e.t, err)
+
+	ethBlockParent, err := e.EthGetBlockByHash(ctx, hash, true)
+	require.NoError(e.t, err)
+	ethBlock, err := e.EthGetBlockByHash(ctx, ethBlockParent.ParentHash, true)
+	require.NoError(e.t, err)
+
+	return ethBlock
 }
 
 func (e *EVM) InvokeContractByFuncName(ctx context.Context, fromAddr address.Address, idAddr address.Address, funcSignature string, inputData []byte) ([]byte, *api.MsgLookup, error) {
