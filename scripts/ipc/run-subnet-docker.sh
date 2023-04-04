@@ -27,6 +27,6 @@ echo ">>> Token to $SUBNETID daemon: $token"
 wallet=`docker exec -it $img  eudico wallet default`
 echo ">>> Default wallet: $wallet"
 echo ">>> Subnet subnet validator info:"
-docker exec -it $img  eudico mir validator config validator-addr
+docker exec -it $img eudico mir validator config validator-addr | grep '127.0.0.1/tcp' | sed 's/^.*\/127.0.0.1/\/dns\/host.docker.internal/' | sed -E "s/\/[0-9]+\//\/$VAL_PORT\//"
 echo ">>> API listening in host port $PORT"
 echo ">>> Validator listening in host port $VAL_PORT"
