@@ -7,11 +7,10 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
-
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	lcli "github.com/filecoin-project/lotus/cli"
 )

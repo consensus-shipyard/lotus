@@ -7,9 +7,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/urfave/cli/v2"
-
 	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"github.com/urfave/cli/v2"
 )
 
 var initCmd = &cli.Command{

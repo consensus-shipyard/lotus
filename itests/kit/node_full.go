@@ -181,6 +181,38 @@ func (f *TestFullNode) ExpectSend(ctx context.Context, from, to address.Address,
 	return nil
 }
 
+// ChainPredicate encapsulates a chain condition.
+type ChainPredicate func(set *types.TipSet) bool
+
+// HeightAtLeast returns a ChainPredicate that is satisfied when the chain
+// height is equal or higher to the target.
+func HeightAtLeast(target abi.ChainEpoch) ChainPredicate {
+	return func(ts *types.TipSet) bool {
+		return ts.Height() >= target
+	}
+}
+
+// BlocksMinedByAll returns a ChainPredicate that is satisfied when we observe a
+// tipset including blocks from all the specified miners, in no particular order.
+func BlocksMinedByAll(miner ...address.Address) ChainPredicate {
+	return func(ts *types.TipSet) bool {
+		seen := make([]bool, len(miner))
+		var done int
+		for _, b := range ts.Blocks() {
+			for i, m := range miner {
+				if b.Miner != m || seen[i] {
+					continue
+				}
+				seen[i] = true
+				if done++; done == len(miner) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
 func (f *TestFullNode) IsSyncedWith(ctx context.Context, from abi.ChainEpoch, nodes ...*TestFullNode) (abi.ChainEpoch, error) {
 	if len(nodes) < 1 {
 		return 0, fmt.Errorf("no checked nodes")
@@ -279,37 +311,5 @@ func (f *TestFullNode) waitForTipSet(ctx context.Context, height abi.ChainEpoch,
 			}
 			return nil
 		}
-	}
-}
-
-// ChainPredicate encapsulates a chain condition.
-type ChainPredicate func(set *types.TipSet) bool
-
-// HeightAtLeast returns a ChainPredicate that is satisfied when the chain
-// height is equal or higher to the target.
-func HeightAtLeast(target abi.ChainEpoch) ChainPredicate {
-	return func(ts *types.TipSet) bool {
-		return ts.Height() >= target
-	}
-}
-
-// BlocksMinedByAll returns a ChainPredicate that is satisfied when we observe a
-// tipset including blocks from all the specified miners, in no particular order.
-func BlocksMinedByAll(miner ...address.Address) ChainPredicate {
-	return func(ts *types.TipSet) bool {
-		seen := make([]bool, len(miner))
-		var done int
-		for _, b := range ts.Blocks() {
-			for i, m := range miner {
-				if b.Miner != m || seen[i] {
-					continue
-				}
-				seen[i] = true
-				if done++; done == len(miner) {
-					return true
-				}
-			}
-		}
-		return false
 	}
 }

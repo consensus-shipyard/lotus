@@ -13,6 +13,7 @@
   * [ChainCheckBlockstore](#ChainCheckBlockstore)
   * [ChainDeleteObj](#ChainDeleteObj)
   * [ChainExport](#ChainExport)
+  * [ChainExportRangeInternal](#ChainExportRangeInternal)
   * [ChainGetBlock](#ChainGetBlock)
   * [ChainGetBlockMessages](#ChainGetBlockMessages)
   * [ChainGetEvents](#ChainGetEvents)
@@ -28,6 +29,7 @@
   * [ChainGetTipSetByHeight](#ChainGetTipSetByHeight)
   * [ChainHasObj](#ChainHasObj)
   * [ChainHead](#ChainHead)
+  * [ChainHotGC](#ChainHotGC)
   * [ChainNotify](#ChainNotify)
   * [ChainPrune](#ChainPrune)
   * [ChainPutObj](#ChainPutObj)
@@ -68,6 +70,7 @@
   * [CreateBackup](#CreateBackup)
 * [Eth](#Eth)
   * [EthAccounts](#EthAccounts)
+  * [EthAddressToFilecoinAddress](#EthAddressToFilecoinAddress)
   * [EthBlockNumber](#EthBlockNumber)
   * [EthCall](#EthCall)
   * [EthChainId](#EthChainId)
@@ -88,9 +91,11 @@
   * [EthGetTransactionByBlockHashAndIndex](#EthGetTransactionByBlockHashAndIndex)
   * [EthGetTransactionByBlockNumberAndIndex](#EthGetTransactionByBlockNumberAndIndex)
   * [EthGetTransactionByHash](#EthGetTransactionByHash)
+  * [EthGetTransactionByHashLimited](#EthGetTransactionByHashLimited)
   * [EthGetTransactionCount](#EthGetTransactionCount)
   * [EthGetTransactionHashByCid](#EthGetTransactionHashByCid)
   * [EthGetTransactionReceipt](#EthGetTransactionReceipt)
+  * [EthGetTransactionReceiptLimited](#EthGetTransactionReceiptLimited)
   * [EthMaxPriorityFeePerGas](#EthMaxPriorityFeePerGas)
   * [EthNewBlockFilter](#EthNewBlockFilter)
   * [EthNewFilter](#EthNewFilter)
@@ -100,6 +105,8 @@
   * [EthSubscribe](#EthSubscribe)
   * [EthUninstallFilter](#EthUninstallFilter)
   * [EthUnsubscribe](#EthUnsubscribe)
+* [Filecoin](#Filecoin)
+  * [FilecoinAddressToEthAddress](#FilecoinAddressToEthAddress)
 * [Gas](#Gas)
   * [GasEstimateFeeCap](#GasEstimateFeeCap)
   * [GasEstimateGasLimit](#GasEstimateGasLimit)
@@ -485,6 +492,50 @@ Inputs:
 ```
 
 Response: `"Ynl0ZSBhcnJheQ=="`
+
+### ChainExportRangeInternal
+ChainExportRangeInternal triggers the export of a chain
+CAR-snapshot directly to disk. It is similar to ChainExport,
+except, depending on options, the snapshot can include receipts,
+messages and stateroots for the length between the specified head
+and tail, thus producing "archival-grade" snapshots that include
+all the on-chain data.  The header chain is included back to
+genesis and these snapshots can be used to initialize Filecoin
+nodes.
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  {
+    "WriteBufferSize": 123,
+    "NumWorkers": 123,
+    "IncludeMessages": true,
+    "IncludeReceipts": true,
+    "IncludeStateRoots": true
+  }
+]
+```
+
+Response: `{}`
 
 ### ChainGetBlock
 ChainGetBlock returns the block specified by the given CID.
@@ -1040,6 +1091,26 @@ Response:
 }
 ```
 
+### ChainHotGC
+ChainHotGC does online (badger) GC on the hot store; only supported if you are using
+the splitstore
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "Threshold": 12.3,
+    "Periodic": true,
+    "Moving": true
+  }
+]
+```
+
+Response: `{}`
+
 ### ChainNotify
 ChainNotify returns channel with chain head updates.
 First message is guaranteed to be of len == 1, and type == 'current'.
@@ -1064,7 +1135,7 @@ Response:
 ```
 
 ### ChainPrune
-ChainPrune prunes the stored chain state and garbage collects; only supported if you
+ChainPrune forces compaction on cold store and garbage collects; only supported if you
 are using the splitstore
 
 
@@ -2276,6 +2347,21 @@ Response:
 ]
 ```
 
+### EthAddressToFilecoinAddress
+EthAddressToFilecoinAddress converts an EthAddress into an f410 Filecoin Address
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031"
+]
+```
+
+Response: `"f01234"`
+
 ### EthBlockNumber
 EthBlockNumber returns the height of the latest (heaviest) TipSet
 
@@ -2657,7 +2743,7 @@ Response:
   "accessList": [
     "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
   ],
-  "yParity": "0x0",
+  "v": "0x0",
   "r": "0x0",
   "s": "0x0"
 }
@@ -2696,7 +2782,7 @@ Response:
   "accessList": [
     "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
   ],
-  "yParity": "0x0",
+  "v": "0x0",
   "r": "0x0",
   "s": "0x0"
 }
@@ -2734,7 +2820,46 @@ Response:
   "accessList": [
     "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
   ],
-  "yParity": "0x0",
+  "v": "0x0",
+  "r": "0x0",
+  "s": "0x0"
+}
+```
+
+### EthGetTransactionByHashLimited
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  10101
+]
+```
+
+Response:
+```json
+{
+  "chainId": "0x5",
+  "nonce": "0x5",
+  "hash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "blockHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "blockNumber": "0x5",
+  "transactionIndex": "0x5",
+  "from": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "to": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "value": "0x0",
+  "type": "0x5",
+  "input": "0x07",
+  "gas": "0x5",
+  "maxFeePerGas": "0x0",
+  "maxPriorityFeePerGas": "0x0",
+  "accessList": [
+    "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
+  ],
+  "v": "0x0",
   "r": "0x0",
   "s": "0x0"
 }
@@ -2780,6 +2905,54 @@ Inputs:
 ```json
 [
   "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
+]
+```
+
+Response:
+```json
+{
+  "transactionHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "transactionIndex": "0x5",
+  "blockHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "blockNumber": "0x5",
+  "from": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "to": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "root": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "status": "0x5",
+  "contractAddress": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "cumulativeGasUsed": "0x5",
+  "gasUsed": "0x5",
+  "effectiveGasPrice": "0x0",
+  "logsBloom": "0x07",
+  "logs": [
+    {
+      "address": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+      "data": "0x07",
+      "topics": [
+        "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
+      ],
+      "removed": true,
+      "logIndex": "0x5",
+      "transactionIndex": "0x5",
+      "transactionHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+      "blockHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+      "blockNumber": "0x5"
+    }
+  ],
+  "type": "0x5"
+}
+```
+
+### EthGetTransactionReceiptLimited
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  10101
 ]
 ```
 
@@ -2941,6 +3114,24 @@ Inputs:
 ```
 
 Response: `true`
+
+## Filecoin
+
+
+### FilecoinAddressToEthAddress
+FilecoinAddressToEthAddress converts an f410 or f0 Filecoin Address to an EthAddress
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234"
+]
+```
+
+Response: `"0x5cbeecf99d3fdb3f25e309cc264f240bb0664031"`
 
 ## Gas
 
@@ -4332,7 +4523,7 @@ Response:
   ],
   "SizeLimitHigh": 123,
   "SizeLimitLow": 123,
-  "ReplaceByFeeRatio": 12.3,
+  "ReplaceByFeeRatio": 1.23,
   "PruneCooldown": 60000000000,
   "GasLimitOverestimation": 12.3
 }
@@ -4620,7 +4811,7 @@ Inputs:
     ],
     "SizeLimitHigh": 123,
     "SizeLimitLow": 123,
-    "ReplaceByFeeRatio": 12.3,
+    "ReplaceByFeeRatio": 1.23,
     "PruneCooldown": 60000000000,
     "GasLimitOverestimation": 12.3
   }
@@ -6652,95 +6843,49 @@ Response:
   },
   "ExecutionTrace": {
     "Msg": {
-      "Version": 42,
-      "To": "f01234",
       "From": "f01234",
-      "Nonce": 42,
+      "To": "f01234",
       "Value": "0",
-      "GasLimit": 9,
-      "GasFeeCap": "0",
-      "GasPremium": "0",
       "Method": 1,
       "Params": "Ynl0ZSBhcnJheQ==",
-      "CID": {
-        "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-      }
+      "ParamsCodec": 42
     },
     "MsgRct": {
       "ExitCode": 0,
       "Return": "Ynl0ZSBhcnJheQ==",
-      "GasUsed": 9,
-      "EventsRoot": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
+      "ReturnCodec": 42
     },
-    "Error": "string value",
-    "Duration": 60000000000,
     "GasCharges": [
       {
         "Name": "string value",
-        "loc": [
-          {
-            "File": "string value",
-            "Line": 123,
-            "Function": "string value"
-          }
-        ],
         "tg": 9,
         "cg": 9,
         "sg": 9,
-        "vtg": 9,
-        "vcg": 9,
-        "vsg": 9,
-        "tt": 60000000000,
-        "ex": {}
+        "tt": 60000000000
       }
     ],
     "Subcalls": [
       {
         "Msg": {
-          "Version": 42,
-          "To": "f01234",
           "From": "f01234",
-          "Nonce": 42,
+          "To": "f01234",
           "Value": "0",
-          "GasLimit": 9,
-          "GasFeeCap": "0",
-          "GasPremium": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "CID": {
-            "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-          }
+          "ParamsCodec": 42
         },
         "MsgRct": {
           "ExitCode": 0,
           "Return": "Ynl0ZSBhcnJheQ==",
-          "GasUsed": 9,
-          "EventsRoot": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "ReturnCodec": 42
         },
-        "Error": "string value",
-        "Duration": 60000000000,
         "GasCharges": [
           {
             "Name": "string value",
-            "loc": [
-              {
-                "File": "string value",
-                "Line": 123,
-                "Function": "string value"
-              }
-            ],
             "tg": 9,
             "cg": 9,
             "sg": 9,
-            "vtg": 9,
-            "vcg": 9,
-            "vsg": 9,
-            "tt": 60000000000,
-            "ex": {}
+            "tt": 60000000000
           }
         ],
         "Subcalls": null
@@ -6928,95 +7073,49 @@ Response:
       },
       "ExecutionTrace": {
         "Msg": {
-          "Version": 42,
-          "To": "f01234",
           "From": "f01234",
-          "Nonce": 42,
+          "To": "f01234",
           "Value": "0",
-          "GasLimit": 9,
-          "GasFeeCap": "0",
-          "GasPremium": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "CID": {
-            "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-          }
+          "ParamsCodec": 42
         },
         "MsgRct": {
           "ExitCode": 0,
           "Return": "Ynl0ZSBhcnJheQ==",
-          "GasUsed": 9,
-          "EventsRoot": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "ReturnCodec": 42
         },
-        "Error": "string value",
-        "Duration": 60000000000,
         "GasCharges": [
           {
             "Name": "string value",
-            "loc": [
-              {
-                "File": "string value",
-                "Line": 123,
-                "Function": "string value"
-              }
-            ],
             "tg": 9,
             "cg": 9,
             "sg": 9,
-            "vtg": 9,
-            "vcg": 9,
-            "vsg": 9,
-            "tt": 60000000000,
-            "ex": {}
+            "tt": 60000000000
           }
         ],
         "Subcalls": [
           {
             "Msg": {
-              "Version": 42,
-              "To": "f01234",
               "From": "f01234",
-              "Nonce": 42,
+              "To": "f01234",
               "Value": "0",
-              "GasLimit": 9,
-              "GasFeeCap": "0",
-              "GasPremium": "0",
               "Method": 1,
               "Params": "Ynl0ZSBhcnJheQ==",
-              "CID": {
-                "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-              }
+              "ParamsCodec": 42
             },
             "MsgRct": {
               "ExitCode": 0,
               "Return": "Ynl0ZSBhcnJheQ==",
-              "GasUsed": 9,
-              "EventsRoot": {
-                "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-              }
+              "ReturnCodec": 42
             },
-            "Error": "string value",
-            "Duration": 60000000000,
             "GasCharges": [
               {
                 "Name": "string value",
-                "loc": [
-                  {
-                    "File": "string value",
-                    "Line": 123,
-                    "Function": "string value"
-                  }
-                ],
                 "tg": 9,
                 "cg": 9,
                 "sg": 9,
-                "vtg": 9,
-                "vcg": 9,
-                "vsg": 9,
-                "tt": 60000000000,
-                "ex": {}
+                "tt": 60000000000
               }
             ],
             "Subcalls": null
@@ -8443,95 +8542,49 @@ Response:
   },
   "ExecutionTrace": {
     "Msg": {
-      "Version": 42,
-      "To": "f01234",
       "From": "f01234",
-      "Nonce": 42,
+      "To": "f01234",
       "Value": "0",
-      "GasLimit": 9,
-      "GasFeeCap": "0",
-      "GasPremium": "0",
       "Method": 1,
       "Params": "Ynl0ZSBhcnJheQ==",
-      "CID": {
-        "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-      }
+      "ParamsCodec": 42
     },
     "MsgRct": {
       "ExitCode": 0,
       "Return": "Ynl0ZSBhcnJheQ==",
-      "GasUsed": 9,
-      "EventsRoot": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
+      "ReturnCodec": 42
     },
-    "Error": "string value",
-    "Duration": 60000000000,
     "GasCharges": [
       {
         "Name": "string value",
-        "loc": [
-          {
-            "File": "string value",
-            "Line": 123,
-            "Function": "string value"
-          }
-        ],
         "tg": 9,
         "cg": 9,
         "sg": 9,
-        "vtg": 9,
-        "vcg": 9,
-        "vsg": 9,
-        "tt": 60000000000,
-        "ex": {}
+        "tt": 60000000000
       }
     ],
     "Subcalls": [
       {
         "Msg": {
-          "Version": 42,
-          "To": "f01234",
           "From": "f01234",
-          "Nonce": 42,
+          "To": "f01234",
           "Value": "0",
-          "GasLimit": 9,
-          "GasFeeCap": "0",
-          "GasPremium": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "CID": {
-            "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-          }
+          "ParamsCodec": 42
         },
         "MsgRct": {
           "ExitCode": 0,
           "Return": "Ynl0ZSBhcnJheQ==",
-          "GasUsed": 9,
-          "EventsRoot": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "ReturnCodec": 42
         },
-        "Error": "string value",
-        "Duration": 60000000000,
         "GasCharges": [
           {
             "Name": "string value",
-            "loc": [
-              {
-                "File": "string value",
-                "Line": 123,
-                "Function": "string value"
-              }
-            ],
             "tg": 9,
             "cg": 9,
             "sg": 9,
-            "vtg": 9,
-            "vcg": 9,
-            "vsg": 9,
-            "tt": 60000000000,
-            "ex": {}
+            "tt": 60000000000
           }
         ],
         "Subcalls": null

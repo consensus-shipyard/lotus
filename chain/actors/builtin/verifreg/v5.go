@@ -2,22 +2,21 @@ package verifreg
 
 import (
 	"fmt"
+
+	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
+	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/manifest"
-	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/adt"
-	"golang.org/x/xerrors"
-
 	builtin5 "github.com/filecoin-project/specs-actors/v5/actors/builtin"
-
 	verifreg5 "github.com/filecoin-project/specs-actors/v5/actors/builtin/verifreg"
 	adt5 "github.com/filecoin-project/specs-actors/v5/actors/util/adt"
 
-	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
 )
 
 var _ State = (*state5)(nil)
@@ -115,6 +114,12 @@ func (s *state5) GetClaim(providerIdAddr address.Address, claimId verifreg9.Clai
 }
 
 func (s *state5) GetClaims(providerIdAddr address.Address) (map[ClaimId]Claim, error) {
+
+	return nil, xerrors.Errorf("unsupported in actors v5")
+
+}
+
+func (s *state5) GetClaimIdsBySector(providerIdAddr address.Address) (map[abi.SectorNumber][]ClaimId, error) {
 
 	return nil, xerrors.Errorf("unsupported in actors v5")
 

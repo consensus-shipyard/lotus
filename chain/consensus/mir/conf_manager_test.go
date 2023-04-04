@@ -10,9 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/types"
+
+	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
 )
 
 func TestRestoreConfigurationVotes(t *testing.T) {

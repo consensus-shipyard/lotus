@@ -4,9 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMembership(t *testing.T) {

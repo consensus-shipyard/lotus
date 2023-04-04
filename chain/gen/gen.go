@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -167,7 +167,7 @@ func NewGeneratorWithSectorsAndUpgradeSchedule(numSectors int, us stmgr.UpgradeS
 
 	maddr1 := genesis2.MinerAddress(0)
 
-	m1temp, err := ioutil.TempDir("", "preseal")
+	m1temp, err := os.MkdirTemp("", "preseal")
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func NewGeneratorWithSectorsAndUpgradeSchedule(numSectors int, us stmgr.UpgradeS
 
 	maddr2 := genesis2.MinerAddress(1)
 
-	m2temp, err := ioutil.TempDir("", "preseal")
+	m2temp, err := os.MkdirTemp("", "preseal")
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func NewGeneratorWithSectorsAndUpgradeSchedule(numSectors int, us stmgr.UpgradeS
 	//return nil, xerrors.Errorf("creating drand beacon: %w", err)
 	//}
 
-	sm, err := stmgr.NewStateManager(cs, consensus.NewTipSetExecutor(filcns.RewardFunc), sys, us, beac)
+	sm, err := stmgr.NewStateManager(cs, consensus.NewTipSetExecutor(filcns.RewardFunc), sys, us, beac, ds)
 	if err != nil {
 		return nil, xerrors.Errorf("initing stmgr: %w", err)
 	}

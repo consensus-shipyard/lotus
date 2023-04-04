@@ -8,10 +8,11 @@ import (
 	"math"
 	"sort"
 
-	abi "github.com/filecoin-project/go-state-types/abi"
 	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	xerrors "golang.org/x/xerrors"
+
+	abi "github.com/filecoin-project/go-state-types/abi"
 )
 
 var _ = xerrors.Errorf
@@ -139,7 +140,7 @@ func (t *HelloMessage) UnmarshalCBOR(r io.Reader) (err error) {
 		case cbg.MajNegativeInt:
 			extraI = int64(extra)
 			if extraI < 0 {
-				return fmt.Errorf("int64 negative oveflow")
+				return fmt.Errorf("int64 negative overflow")
 			}
 			extraI = -1 - extraI
 		default:
@@ -249,7 +250,7 @@ func (t *LatencyMessage) UnmarshalCBOR(r io.Reader) (err error) {
 		case cbg.MajNegativeInt:
 			extraI = int64(extra)
 			if extraI < 0 {
-				return fmt.Errorf("int64 negative oveflow")
+				return fmt.Errorf("int64 negative overflow")
 			}
 			extraI = -1 - extraI
 		default:
@@ -274,7 +275,7 @@ func (t *LatencyMessage) UnmarshalCBOR(r io.Reader) (err error) {
 		case cbg.MajNegativeInt:
 			extraI = int64(extra)
 			if extraI < 0 {
-				return fmt.Errorf("int64 negative oveflow")
+				return fmt.Errorf("int64 negative overflow")
 			}
 			extraI = -1 - extraI
 		default:

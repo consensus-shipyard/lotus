@@ -11,10 +11,11 @@ import (
 	"github.com/ipfs/go-datastore"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/mir/pkg/client"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	t "github.com/filecoin-project/mir/pkg/types"
+
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 )
 
 const (

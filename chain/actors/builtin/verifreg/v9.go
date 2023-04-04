@@ -2,21 +2,21 @@ package verifreg
 
 import (
 	"fmt"
+
+	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
-	"github.com/filecoin-project/go-state-types/manifest"
-	"github.com/ipfs/go-cid"
-
-	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/adt"
-	"golang.org/x/xerrors"
-
+	"github.com/filecoin-project/go-state-types/big"
 	builtin9 "github.com/filecoin-project/go-state-types/builtin"
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
+	"github.com/filecoin-project/go-state-types/manifest"
 
-	"github.com/filecoin-project/go-state-types/big"
+	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
 )
 
 var _ State = (*state9)(nil)
@@ -127,6 +127,24 @@ func (s *state9) GetClaims(providerIdAddr address.Address) (map[ClaimId]Claim, e
 	retMap := make(map[ClaimId]Claim, len(v9Map))
 	for k, v := range v9Map {
 		retMap[ClaimId(k)] = Claim(v)
+	}
+
+	return retMap, err
+
+}
+
+func (s *state9) GetClaimIdsBySector(providerIdAddr address.Address) (map[abi.SectorNumber][]ClaimId, error) {
+
+	v9Map, err := s.LoadClaimsToMap(s.store, providerIdAddr)
+
+	retMap := make(map[abi.SectorNumber][]ClaimId)
+	for k, v := range v9Map {
+		claims, ok := retMap[v.Sector]
+		if !ok {
+			retMap[v.Sector] = []ClaimId{ClaimId(k)}
+		} else {
+			retMap[v.Sector] = append(claims, ClaimId(k))
+		}
 	}
 
 	return retMap, err

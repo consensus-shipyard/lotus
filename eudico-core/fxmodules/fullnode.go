@@ -177,7 +177,7 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 var fullNodeAPIProviders = fx.Provide(
 	messagepool.NewProvider,
 	fx.Annotate(modules.MessagePool, fx.As(new(messagepool.MpoolNonceAPI))),
-	fx.Annotate(stmgr.NewStateManager, fx.As(new(stmgr.StateManagerAPI))),
+	fx.Annotate(modules.StateManager, fx.As(new(stmgr.StateManagerAPI))),
 	func(
 		chainModule full.ChainModule,
 		gasModule full.GasModule,

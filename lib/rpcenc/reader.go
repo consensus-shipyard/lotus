@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -158,7 +157,7 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 					}
 
 					if resp.StatusCode != http.StatusOK {
-						b, _ := ioutil.ReadAll(resp.Body)
+						b, _ := io.ReadAll(resp.Body)
 						log.Errorf("sending reader param (%s): non-200 status: %s, msg: '%s'", u.String(), resp.Status, string(b))
 						return
 					}
@@ -182,7 +181,7 @@ func ReaderParamEncoder(addr string) jsonrpc.Option {
 				defer resp.Body.Close() //nolint
 
 				if resp.StatusCode != http.StatusOK {
-					b, _ := ioutil.ReadAll(resp.Body)
+					b, _ := io.ReadAll(resp.Body)
 					log.Errorf("sending reader param (%s): non-200 status: %s, msg: '%s'", u.String(), resp.Status, string(b))
 					return
 				}
@@ -221,7 +220,7 @@ type RpcReader struct {
 
 	res       chan readRes
 	beginOnce *sync.Once
-	closeOnce sync.Once
+	closeOnce *sync.Once
 }
 
 var ErrHasBody = errors.New("RPCReader has body, either already read from or from a client with no redirect support")
@@ -265,6 +264,7 @@ func (w *RpcReader) beginPost() {
 		w.postBody = nr.postBody
 		w.res = nr.res
 		w.beginOnce = nr.beginOnce
+		w.closeOnce = nr.closeOnce
 	}
 }
 
@@ -355,6 +355,7 @@ func ReaderParamDecoder() (http.HandlerFunc, jsonrpc.ServerOption) {
 			res:       make(chan readRes),
 			next:      ch,
 			beginOnce: &sync.Once{},
+			closeOnce: &sync.Once{},
 		}
 
 		switch req.Method {

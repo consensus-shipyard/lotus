@@ -5,14 +5,13 @@ import (
 	"golang.org/x/xerrors"
 
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
+	builtin10 "github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/cbor"
-
 	"github.com/filecoin-project/go-state-types/manifest"
+
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/types"
-
-	builtin10 "github.com/filecoin-project/go-state-types/builtin"
 )
 
 var Methods = builtin10.MethodsEVM
@@ -49,6 +48,7 @@ type State interface {
 	cbor.Marshaler
 
 	Nonce() (uint64, error)
+	IsAlive() (bool, error)
 	GetState() interface{}
 
 	GetBytecode() ([]byte, error)
