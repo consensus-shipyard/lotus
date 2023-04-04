@@ -14,6 +14,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -25,6 +26,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/pool/fifo"
+	"github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
 )
@@ -283,7 +285,11 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	log.With("validator", sm.id).Info("applytxs started")
 	defer log.With("validator", sm.id).Info("applytxs finished")
 
-	var mirMsgs []Message
+	var (
+		mirMsgs []Message
+		err     error
+		valSet  *validator.Set
+	)
 
 	sm.height++
 
@@ -293,7 +299,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
 		case ConfigurationRequest:
-			err := sm.applyConfigMsg(req)
+			valSet, err = sm.applyConfigMsg(req)
 			if err != nil {
 				return err
 			}
@@ -313,6 +319,19 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	msgs := sm.getSignedMessages(mirMsgs)
 	log.With("validator", sm.id).With("epoch", sm.currentEpoch).
 		With("height", sm.height).Infof("try to create a block: msgs - %d", len(msgs))
+
+	// if new reconfiguration message, include config
+	// message in block to update on-chain membership
+	if valSet != nil {
+		// FIXME: We should pick up the genesis address and not use the default one
+		// once we move into the user-defined gateway territory
+		reconfigMsg, err := NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, valSet)
+		if err != nil {
+			return err
+		}
+		// Make it a message with an empty signature, these config messages are executed implicitly
+		msgs = append(msgs, &ltypes.SignedMessage{Message: *reconfigMsg, Signature: crypto.Signature{}})
+	}
 
 	// include checkpoint in VRF proof field?
 	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
@@ -363,28 +382,29 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	return nil
 }
 
-func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
+func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, error) {
 	var valSet validator.Set
 	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
-		return err
+		return nil, err
 	}
 
 	enoughVotes, err := sm.countVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
-		return nil
+		// @denis: do we need to have this a `nil` error?
+		return nil, nil
 	}
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.id {
 		_ = sm.confManager.Done(t.ReqNo(msg.ReqNo)) // nolint
 	}
 	if !enoughVotes {
-		return nil
+		return nil, nil
 	}
 
 	err = sm.updateNextMembership(&valSet)
 	if err != nil {
-		return xerrors.Errorf("validator %v failed to update membership: %w", sm.id, err)
+		return nil, xerrors.Errorf("validator %v failed to update membership: %w", sm.id, err)
 	}
 
 	sm.nextConfigurationNumber = valSet.ConfigurationNumber
@@ -394,7 +414,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) error {
 		}
 	}
 
-	return nil
+	return &valSet, nil
 }
 
 func (sm *StateManager) updateNextMembership(set *validator.Set) error {

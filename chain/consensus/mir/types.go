@@ -9,17 +9,21 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
 	mir "github.com/filecoin-project/mir/pkg/types"
 
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
@@ -42,6 +46,20 @@ type ManglerParams struct {
 	MinDelay time.Duration `json:"min_delay"`
 	MaxDelay time.Duration `json:"max_delay"`
 	DropRate float32       `json:"drop_rate"`
+}
+
+func NewSetMembershipMsg(gw address.Address, valSet *validator.Set) (*types.Message, error) {
+	params, err := actors.SerializeParams(valSet)
+	if err != nil {
+		return nil, err
+	}
+	return &types.Message{
+		To:     gw,
+		From:   builtin.SystemActorAddr,
+		Value:  abi.NewTokenAmount(0),
+		Method: builtin.MustGenerateFRCMethodNum("SetMembership"),
+		Params: params,
+	}, nil
 }
 
 // SetEnvManglerParams sets Mir's mangler environment variable.
