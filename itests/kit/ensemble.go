@@ -9,7 +9,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -370,6 +372,13 @@ func (n *Ensemble) Start() *Ensemble {
 		n.mn = mocknet.New()
 	}
 
+	go func() {
+		sigCh := make(chan os.Signal)
+		signal.Notify(sigCh, syscall.SIGINT)
+		<-sigCh
+		os.Exit(1)
+	}()
+
 	// ---------------------
 	//  FULL NODES
 	// ---------------------
@@ -480,8 +489,6 @@ func (n *Ensemble) Start() *Ensemble {
 			return stopErr
 		}
 
-		node.MonitorShutdown(shutdownChan, node.ShutdownHandler{Component: "node", StopFunc: stopFunc})
-
 		// Are we hitting this node through its RPC?
 		if full.options.rpc {
 			withRPC, rpcCloser := fullRpc(n.t, full)
@@ -490,6 +497,7 @@ func (n *Ensemble) Start() *Ensemble {
 				rpcShutdownOnce.Do(rpcCloser)
 				return stop(ctx)
 			}
+
 			n.t.Cleanup(func() { rpcShutdownOnce.Do(rpcCloser) })
 		}
 
