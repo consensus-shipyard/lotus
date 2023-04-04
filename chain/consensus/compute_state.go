@@ -30,6 +30,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/cron"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/reward"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/rand"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -214,6 +215,29 @@ func (t *TipSetExecutor) ApplyBlocks(ctx context.Context,
 			if _, found := processedMsgs[m.Cid()]; found {
 				continue
 			}
+
+			// Check if the block includes a config message to set the
+			// new membership and execute it implicitly.
+			// FIXME: Setting default gateway address here, this should
+			// maybe change
+			if membership.IsConfigMsg(DefaultGatewayAddr, m) {
+				ret, err := vmi.ApplyImplicitMessage(ctx, m)
+				if err != nil {
+					return cid.Undef, cid.Undef, xerrors.Errorf("running cron: %w", err)
+				}
+
+				if em != nil {
+					if err := em.MessageApplied(ctx, ts, m.Cid(), m, ret, true); err != nil {
+						return cid.Undef, cid.Undef, xerrors.Errorf("callback failed on set-membership: %w", err)
+					}
+				}
+				if ret.ExitCode != 0 {
+					return cid.Undef, cid.Undef, xerrors.Errorf("membership exit was non-zero: %d", ret.ExitCode)
+				}
+				// if config message executed we can move to the next one
+				continue
+			}
+
 			r, err := vmi.ApplyMessage(ctx, cm)
 			if err != nil {
 				return cid.Undef, cid.Undef, err

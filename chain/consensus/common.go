@@ -25,6 +25,7 @@ import (
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
@@ -37,6 +38,8 @@ import (
 
 // Common operations shared by all consensus algorithm implementations.
 var log = logging.Logger("consensus-common")
+
+var DefaultGatewayAddr, _ = address.NewIDAddress(64)
 
 // RunAsyncChecks accepts a list of checks to perform in parallel.
 //
@@ -264,7 +267,6 @@ func checkBlockMessages(ctx context.Context, sm *stmgr.StateManager, cs *store.C
 		if err != nil {
 			return xerrors.Errorf("failed to store message %s: %w", m.Cid(), err)
 		}
-
 		k := cbg.CborCid(c)
 		if err := bmArr.Set(uint64(i), &k); err != nil {
 			return xerrors.Errorf("failed to put bls message at index %d: %w", i, err)
@@ -277,19 +279,23 @@ func checkBlockMessages(ctx context.Context, sm *stmgr.StateManager, cs *store.C
 			return xerrors.Errorf("block had invalid signed message at index %d: %w", i, err)
 		}
 
-		if err := checkMsg(m); err != nil {
-			return xerrors.Errorf("block had invalid secpk message at index %d: %w", i, err)
-		}
+		// if this is a config message no need to check the message
+		if !membership.IsConfigMsg(DefaultGatewayAddr, &m.Message) {
 
-		// `From` being an account actor is only validated inside the `vm.ResolveToDeterministicAddr` call
-		// in `StateManager.ResolveToDeterministicAddress` here (and not in `checkMsg`).
-		kaddr, err := sm.ResolveToDeterministicAddress(ctx, m.Message.From, baseTs)
-		if err != nil {
-			return xerrors.Errorf("failed to resolve key addr: %w", err)
-		}
+			if err := checkMsg(m); err != nil {
+				return xerrors.Errorf("block had invalid secpk message at index %d: %w", i, err)
+			}
 
-		if err := AuthenticateMessage(m, kaddr); err != nil {
-			return xerrors.Errorf("failed to validate signature: %w", err)
+			// `From` being an account actor is only validated inside the `vm.ResolveToDeterministicAddr` call
+			// in `StateManager.ResolveToDeterministicAddress` here (and not in `checkMsg`).
+			kaddr, err := sm.ResolveToDeterministicAddress(ctx, m.Message.From, baseTs)
+			if err != nil {
+				return xerrors.Errorf("failed to resolve key addr: %w", err)
+			}
+
+			if err := AuthenticateMessage(m, kaddr); err != nil {
+				return xerrors.Errorf("failed to validate signature: %w", err)
+			}
 		}
 
 		c, err := store.PutMessage(ctx, tmpbs, m)

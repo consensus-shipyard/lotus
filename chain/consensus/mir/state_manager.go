@@ -14,7 +14,6 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -325,12 +324,12 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if valSet != nil {
 		// FIXME: We should pick up the genesis address and not use the default one
 		// once we move into the user-defined gateway territory
-		reconfigMsg, err := NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, valSet)
+		reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, valSet)
 		if err != nil {
 			return err
 		}
 		// Make it a message with an empty signature, these config messages are executed implicitly
-		msgs = append(msgs, &ltypes.SignedMessage{Message: *reconfigMsg, Signature: crypto.Signature{}})
+		msgs = append(msgs, reconfigMsg)
 	}
 
 	// include checkpoint in VRF proof field?
