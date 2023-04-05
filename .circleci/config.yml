@@ -125,7 +125,8 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- -y
       - restore_cache:
           name: restore cache
-          keys: linux-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
+          keys:
+            - linux-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
@@ -170,7 +171,8 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- -y
       - restore_cache:
           name: restore cache
-          key: macos-v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
+          keys:
+            - macos-v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
       - run:
           command: make spacenet
           no_output_timeout: 10m
@@ -224,7 +226,8 @@ jobs:
       - prepare
       - restore_cache:
           name: restore cache
-          keys: test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
+          keys:
+            - test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
