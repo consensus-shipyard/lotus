@@ -226,7 +226,7 @@ jobs:
           name: restore cache
           keys: test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
       - run:
-          command: make deps
+          command: make deps lotus
           no_output_timeout: 30m
       - run:
           command: make spacenet
