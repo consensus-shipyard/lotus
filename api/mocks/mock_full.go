@@ -1614,41 +1614,11 @@ func (mr *MockFullNodeMockRecorder) IPCAddSubnetActor(arg0, arg1, arg2 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCAddSubnetActor", reflect.TypeOf((*MockFullNode)(nil).IPCAddSubnetActor), arg0, arg1, arg2)
 }
 
-// IPCGetBottomUpMsgs mocks base method.
-func (m *MockFullNode) IPCGetBottomUpMsgs(arg0 context.Context, arg1 address.Address) ([]*gateway.CrossMsgMeta, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IPCGetBottomUpMsgs", arg0, arg1)
-	ret0, _ := ret[0].([]*gateway.CrossMsgMeta)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IPCGetBottomUpMsgs indicates an expected call of IPCGetBottomUpMsgs.
-func (mr *MockFullNodeMockRecorder) IPCGetBottomUpMsgs(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetBottomUpMsgs", reflect.TypeOf((*MockFullNode)(nil).IPCGetBottomUpMsgs), arg0, arg1)
-}
-
-// IPCGetBottomUpMsgsFromRegistry mocks base method.
-func (m *MockFullNode) IPCGetBottomUpMsgsFromRegistry(arg0 context.Context, arg1 address.Address, arg2 cid.Cid) (*gateway.CrossMsgs, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IPCGetBottomUpMsgsFromRegistry", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*gateway.CrossMsgs)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IPCGetBottomUpMsgsFromRegistry indicates an expected call of IPCGetBottomUpMsgsFromRegistry.
-func (mr *MockFullNodeMockRecorder) IPCGetBottomUpMsgsFromRegistry(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetBottomUpMsgsFromRegistry", reflect.TypeOf((*MockFullNode)(nil).IPCGetBottomUpMsgsFromRegistry), arg0, arg1, arg2)
-}
-
 // IPCGetCheckpoint mocks base method.
-func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCGetCheckpoint", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret0, _ := ret[0].(*gateway.BottomUpCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1660,10 +1630,10 @@ func (mr *MockFullNodeMockRecorder) IPCGetCheckpoint(arg0, arg1, arg2 interface{
 }
 
 // IPCGetCheckpointTemplate mocks base method.
-func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCGetCheckpointTemplate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret0, _ := ret[0].(*gateway.BottomUpCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1720,10 +1690,10 @@ func (mr *MockFullNodeMockRecorder) IPCGetVotesForCheckpoint(arg0, arg1, arg2 in
 }
 
 // IPCListCheckpoints mocks base method.
-func (m *MockFullNode) IPCListCheckpoints(arg0 context.Context, arg1 sdk.SubnetID, arg2, arg3 abi.ChainEpoch) ([]*gateway.Checkpoint, error) {
+func (m *MockFullNode) IPCListCheckpoints(arg0 context.Context, arg1 sdk.SubnetID, arg2, arg3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCListCheckpoints", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].([]*gateway.Checkpoint)
+	ret0, _ := ret[0].([]*gateway.BottomUpCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -357,7 +357,7 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 replace github.com/filecoin-project/test-vectors => ./extern/test-vectors
 
 // uncomment for local development. Keeping it here for now for convenience.
-// replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types
+replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types
 
 // uncomment for local development. Keeping it here for now for convenience.
 // replace github.com/filecoin-project/mir => ../tmp/mir

@@ -59,14 +59,14 @@ func TestIPCAccessors(t *testing.T) {
 	require.NoError(t, err)
 
 	params := subnetactor.ConstructParams{
-		Parent:            parent,
-		Name:              "test",
-		IPCGatewayAddr:    genesis.DefaultIPCGatewayAddrID,
-		CheckPeriod:       genesis.DefaultCheckpointPeriod,
-		FinalityThreshold: 5,
-		MinValidators:     1,
-		MinValidatorStake: abi.TokenAmount(types.MustParseFIL("1FIL")),
-		Consensus:         subnetactor.Mir,
+		Parent:              parent,
+		Name:                "test",
+		IPCGatewayAddr:      genesis.DefaultIPCGatewayAddrID,
+		BottomUpCheckPeriod: genesis.DefaultCheckpointPeriod,
+		TopDownCheckPeriod:  genesis.DefaultCheckpointPeriod,
+		MinValidators:       1,
+		MinValidatorStake:   abi.TokenAmount(types.MustParseFIL("1FIL")),
+		Consensus:           subnetactor.Mir,
 	}
 	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
 	require.NoError(t, err)
@@ -80,9 +80,6 @@ func TestIPCAccessors(t *testing.T) {
 
 	// get subnet actor state
 	_, err = api.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
-	require.NoError(t, err)
-	// get votes for checkpoints.
-	_, err = api.IPCGetVotesForCheckpoint(ctx, sn, cid.Undef)
 	require.NoError(t, err)
 	// get list of child subnets and see there are none
 	l, err := api.IPCListChildSubnets(ctx, genesis.DefaultIPCGatewayAddr)
@@ -121,7 +118,7 @@ func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from,
 }
 
 func SubmitCheckpoint(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID, from address.Address, epoch abi.ChainEpoch, prev cid.Cid) {
-	ch := gateway.NewCheckpoint(sn, epoch)
+	ch := gateway.NewBottomUpCheckpoint(sn, epoch)
 	ch.Data.PrevCheck = prev
 	params, err := actors.SerializeParams(ch)
 	require.NoError(t, err)
