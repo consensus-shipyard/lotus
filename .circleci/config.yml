@@ -114,7 +114,6 @@ jobs:
     description: build spacenet on Linux VM
     machine:
       image: ubuntu-2204:2023.02.1
-    working_directory: ~/go/src/github.com/filecoin-project/lotus
     steps:
       - prepare:
           linux: true
@@ -126,7 +125,7 @@ jobs:
             curl https://sh.rustup.rs -sSf | sh -s -- -y
       - restore_cache:
           name: restore cache
-          keys: linux-v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
+          keys: linux-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
@@ -135,11 +134,11 @@ jobs:
           no_output_timeout: 10m
       - save_cache:
           name: save cache
-          key: linux-v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
+          key: linux-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
           paths:
             - "~/.rustup"
             - "~/.cargo"
-            - ~/go/pkg/mod
+            - ~/.go_workspace/pkg/mod
             - ~/.cache/go-build
   build-macos-spacenet:
     description: build spacenet on macos
@@ -223,9 +222,21 @@ jobs:
     executor: << parameters.executor >>
     steps:
       - prepare
+      - restore_cache:
+          name: restore cache
+          keys: test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
       - run:
-          command: make deps lotus
+          command: make deps
           no_output_timeout: 30m
+      - run:
+          command: make spacenet
+          no_output_timeout: 10m
+      - save_cache:
+          name: save cache
+          key: test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
+          paths:
+            - ~/go/pkg/mod
+            - ~/.cache/go-build
       - download-params
       - run:
           name: go test
