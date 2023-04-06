@@ -281,13 +281,13 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
 func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
-	log.With("validator", sm.id).Info("applytxs started")
-	defer log.With("validator", sm.id).Info("applytxs finished")
+	log.With("validator", sm.id).Info("ApplyTXs started")
+	defer log.With("validator", sm.id).Info("ApplyTXs finished")
 
 	var (
-		mirMsgs []Message
-		err     error
-		valSet  *validator.Set
+		mirMsgs    []Message
+		valSetMsgs []*types.SignedMessage
+		err        error
 	)
 
 	sm.height++
@@ -298,9 +298,19 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
 		case ConfigurationRequest:
-			valSet, err = sm.applyConfigMsg(req)
+			votedValSet, err := sm.applyConfigMsg(req)
 			if err != nil {
 				return err
+			}
+			if votedValSet != nil {
+				// FIXME: We should pick up the genesis address and not use the default one
+				// once we move into the user-defined gateway territory
+				reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, votedValSet)
+				if err != nil {
+					return err
+				}
+				fmt.Println(">>>> voted reconfig msgs", reconfigMsg.Cid())
+				valSetMsgs = append(valSetMsgs, reconfigMsg)
 			}
 		}
 	}
@@ -319,19 +329,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	log.With("validator", sm.id).With("epoch", sm.currentEpoch).
 		With("height", sm.height).Infof("try to create a block: msgs - %d", len(msgs))
 
-	// if new reconfiguration message, include config
-	// message in block to update on-chain membership
-	if valSet != nil {
-		// FIXME: We should pick up the genesis address and not use the default one
-		// once we move into the user-defined gateway territory
-		reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, valSet)
-		if err != nil {
-			return err
-		}
-		// Make it a message with an empty signature, these config messages are executed implicitly
-		msgs = append(msgs, reconfigMsg)
-	}
-
 	// include checkpoint in VRF proof field?
 	vrfCheckpoint := &ltypes.Ticket{VRFProof: nil}
 	eproofCheckpoint := &ltypes.ElectionProof{}
@@ -346,6 +343,9 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		}
 		log.With("validator", sm.id).Infof("Including Mir checkpoint for in block %d", sm.height)
 	}
+
+	// Include config messages into the block to update on-chain membership.
+	msgs = append(msgs, valSetMsgs...)
 
 	bh, err := sm.api.MinerCreateBlock(sm.ctx, &lapi.BlockTemplate{
 		// mir blocks are created by all miners. We use system actor as miner of the block
@@ -387,7 +387,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, err
 	}
 
-	enoughVotes, err := sm.countVote(t.NodeID(msg.ClientId), &valSet)
+	enoughVotes, finished, err := sm.countVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
 		// @denis: do we need to have this a `nil` error?
@@ -397,7 +397,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 	if msg.ClientId == sm.id {
 		_ = sm.confManager.Done(t.ReqNo(msg.ReqNo)) // nolint
 	}
-	if !enoughVotes {
+	if !enoughVotes || finished {
 		return nil, nil
 	}
 
@@ -428,20 +428,21 @@ func (sm *StateManager) updateNextMembership(set *validator.Set) error {
 	return nil
 }
 
-// countVotes count votes for the validator set and returns true if we have got enough votes for this valSet.
-func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) (bool, error) {
+// countVotes count the number of the votes for the validator set and returns if we have enough votes,
+// if we have already finished voting, and an error.
+func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) (bool, bool, error) {
 	if set.ConfigurationNumber < sm.nextConfigurationNumber {
-		return false, xerrors.Errorf("validator %s sent outdated vote: received - %d, expected - %d",
+		return false, false, xerrors.Errorf("validator %s sent outdated vote: received - %d, expected - %d",
 			votingValidator, set.ConfigurationNumber, sm.nextConfigurationNumber)
 	}
 
 	if _, found := sm.memberships[sm.currentEpoch][votingValidator]; !found {
-		return false, xerrors.Errorf("validator %s is not in the membership", votingValidator)
+		return false, false, xerrors.Errorf("validator %s is not in the membership", votingValidator)
 	}
 
 	h, err := set.Hash()
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	if _, exist := sm.reconfigurationVotes[set.ConfigurationNumber]; !exist {
@@ -454,7 +455,7 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 
 	// Prevent double voting.
 	if _, voted := sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator]; voted {
-		return false, xerrors.Errorf("validator %s has already voted for configuration %d", votingValidator, set.ConfigurationNumber)
+		return false, false, xerrors.Errorf("validator %s has already voted for configuration %d", votingValidator, set.ConfigurationNumber)
 	}
 
 	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator] = struct{}{}
@@ -470,10 +471,14 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 			set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
 
 	// We must have f+1 votes at least.
-	if votes < weakQuorum(nodes) {
-		return false, nil
+	switch {
+	case votes == weakQuorum(nodes):
+		return true, false, nil
+	case votes > weakQuorum(nodes):
+		return true, true, nil
+	default:
+		return false, false, nil
 	}
-	return true, nil
 }
 
 func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {

@@ -186,8 +186,7 @@ func NewSetMembershipMsg(gw address.Address, valSet *validator.Set) (*types.Sign
 	return &types.SignedMessage{Message: msg, Signature: crypto.Signature{Type: crypto.SigTypeDelegated}}, nil
 }
 
-// IsConfigMsg determines if the message is a config message
-// to set on-chain membership
+// IsConfigMsg determines if the message is a config message to set on-chain membership.
 func IsConfigMsg(gw address.Address, msg *types.Message) bool {
 	return msg.To == gw &&
 		msg.From == builtin.SystemActorAddr &&

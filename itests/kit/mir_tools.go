@@ -86,6 +86,7 @@ func WaitForMessageWithAvailable(ctx context.Context, n *TestFullNode, c cid.Cid
 		default:
 
 		}
+
 		_, err := n.StateWaitMsg(ctx, c, 5, 100, true)
 		if err != nil {
 			if !strict {
