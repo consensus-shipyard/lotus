@@ -237,7 +237,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirReconfiguration_MembershipMessagesSent tests that membership messages are sent vy validaors.
+// TestMirReconfiguration_MembershipMessagesSent tests that membership messages are sent by validators.
 func TestMirReconfiguration_MembershipMessagesSent(t *testing.T) {
 	membershipFileName := kit.TempFileName("membership")
 	t.Cleanup(func() {
