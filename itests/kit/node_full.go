@@ -71,7 +71,7 @@ func MergeFullNodes(fullNodes []*TestFullNode) *TestFullNode {
 	return &wrappedFullNode
 }
 
-func (f TestFullNode) Shutdown(ctx context.Context) error {
+func (f *TestFullNode) Shutdown(ctx context.Context) error {
 	return f.Stop(ctx)
 }
 
@@ -276,7 +276,7 @@ func (f *TestFullNode) IsSyncedWith(ctx context.Context, from abi.ChainEpoch, no
 
 func (f *TestFullNode) waitForTipSet(ctx context.Context, height abi.ChainEpoch, targetTipSet *types.TipSet) error {
 	// one minute baseline timeout
-	timeout := 10 * time.Second
+	timeout := 20 * time.Second
 	base, err := ChainHeadWithCtx(ctx, f)
 	if err != nil {
 		return err

@@ -213,7 +213,7 @@ jobs:
         description: gotestsum format. https://github.com/gotestyourself/gotestsum#format
       coverage:
         type: string
-        default: -coverprofile=coverage.txt -coverpkg=github.com/filecoin-project/lotus/...
+        default: -coverprofile=/tmp/conformance.out -coverpkg ./chain/consensus/,./ipcagent,./eudico-core
         description: Coverage flag. Set to the empty string to disable.
       codecov-upload:
         type: boolean
@@ -259,6 +259,7 @@ jobs:
               << parameters.coverage >> \
               << parameters.go-test-flags >> \
               << parameters.target >>
+            go tool cover -html=/tmp/conformance.out -o /tmp/test-artifacts/conformance-coverage.html
           no_output_timeout: 30m
       - run:
           command: |
@@ -272,6 +273,10 @@ jobs:
           path: /tmp/test-artifacts/<< parameters.suite >>.json
       - store_artifacts:
           path: /tmp/test-mir-interceptor
+      - store_artifacts:
+          path: /tmp/test-artifacts/test-coverage.html
+      - store_artifacts:
+          path: /tmp/test-artifacts/conformance.out
       - when:
           condition: << parameters.codecov-upload >>
           steps:
