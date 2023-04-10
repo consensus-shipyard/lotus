@@ -42,7 +42,7 @@ func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeri
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
 	}
 
-	voting, err := voting.NewWithRatio(store, 0, abi.ChainEpoch(tdPeriod), voting.Ratio{2, 3})
+	voting, err := voting.NewWithRatio(store, 0, abi.ChainEpoch(tdPeriod), voting.Ratio{Num: 2, Denom: 3})
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
 	}
