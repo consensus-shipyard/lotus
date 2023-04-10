@@ -92,8 +92,8 @@ var addCmd = &cli.Command{
 
 		// subnet-specific configurations from cli flags
 		minVals := cctx.Uint64("min-validators")
-		chp := abi.ChainEpoch(cctx.Int("checkpoint-period"))
-		finalityThreshold := abi.ChainEpoch(cctx.Int("finality-threshold"))
+		buPeriod := abi.ChainEpoch(cctx.Int("bu-checkpoint-period"))
+		tdPeriod := abi.ChainEpoch(cctx.Int("td-checkpoint-threshold"))
 
 		// get the default gateway address
 		gwAddr, err := address.IDFromAddress(genesis.DefaultIPCGatewayAddr)
@@ -102,14 +102,14 @@ var addCmd = &cli.Command{
 		}
 
 		params := subnetactor.ConstructParams{
-			Parent:            parent,
-			Name:              subnetName,
-			IPCGatewayAddr:    gwAddr,
-			CheckPeriod:       chp,
-			FinalityThreshold: finalityThreshold,
-			MinValidators:     minVals,
-			MinValidatorStake: abi.TokenAmount(types.MustParseFIL("1FIL")),
-			Consensus:         subnetactor.Mir,
+			Parent:              parent,
+			Name:                subnetName,
+			IPCGatewayAddr:      gwAddr,
+			BottomUpCheckPeriod: buPeriod,
+			TopDownCheckPeriod:  tdPeriod,
+			MinValidators:       minVals,
+			MinValidatorStake:   abi.TokenAmount(types.MustParseFIL("1FIL")),
+			Consensus:           subnetactor.Mir,
 		}
 		actorAddr, err := api.IPCAddSubnetActor(ctx, addr, params)
 		if err != nil {

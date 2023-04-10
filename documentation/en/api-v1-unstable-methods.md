@@ -115,8 +115,6 @@
 * [I](#I)
   * [ID](#ID)
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
-  * [IPCGetBottomUpMsgs](#IPCGetBottomUpMsgs)
-  * [IPCGetBottomUpMsgsFromRegistry](#IPCGetBottomUpMsgsFromRegistry)
   * [IPCGetCheckpoint](#IPCGetCheckpoint)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
@@ -3328,88 +3326,14 @@ Inputs:
     "Consensus": 0,
     "MinValidatorStake": "0",
     "MinValidators": 42,
-    "FinalityThreshold": 10101,
-    "CheckPeriod": 10101,
+    "TopDownCheckPeriod": 10101,
+    "BottomUpCheckPeriod": 10101,
     "Genesis": "Ynl0ZSBhcnJheQ=="
   }
 ]
 ```
 
 Response: `"f01234"`
-
-### IPCGetBottomUpMsgs
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  "f01234"
-]
-```
-
-Response:
-```json
-[
-  {
-    "MsgsCID": {
-      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-    },
-    "Nonce": 42,
-    "Value": "0",
-    "Fee": "0"
-  }
-]
-```
-
-### IPCGetBottomUpMsgsFromRegistry
-
-
-Perms: read
-
-Inputs:
-```json
-[
-  "f01234",
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
-]
-```
-
-Response:
-```json
-{
-  "Msgs": [
-    {
-      "Msg": {
-        "From": {
-          "SubnetID": {
-            "Parent": "string value",
-            "Actor": "f01234"
-          },
-          "RawAddress": "f01234"
-        },
-        "To": {
-          "SubnetID": {
-            "Parent": "string value",
-            "Actor": "f01234"
-          },
-          "RawAddress": "f01234"
-        },
-        "Method": 1,
-        "Params": {
-          "Bytes": "Ynl0ZSBhcnJheQ=="
-        },
-        "Value": "0",
-        "Nonce": 42
-      },
-      "Wrapped": true
-    }
-  ]
-}
-```
 
 ### IPCGetCheckpoint
 
@@ -3431,10 +3355,6 @@ Response:
 ```json
 {
   "Data": {
-    "Source": {
-      "Parent": "string value",
-      "Actor": "f01234"
-    },
     "Proof": "Ynl0ZSBhcnJheQ==",
     "Epoch": 10101,
     "PrevCheck": {
@@ -3452,11 +3372,33 @@ Response:
       }
     ],
     "CrossMsgs": {
-      "MsgsCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "Nonce": 42,
-      "Value": "0",
+      "CrossMsgs": [
+        {
+          "Msg": {
+            "From": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "To": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "Method": 1,
+            "Params": {
+              "Bytes": "Ynl0ZSBhcnJheQ=="
+            },
+            "Value": "0",
+            "Nonce": 42
+          },
+          "Wrapped": true
+        }
+      ],
       "Fee": "0"
     }
   },
@@ -3481,10 +3423,6 @@ Response:
 ```json
 {
   "Data": {
-    "Source": {
-      "Parent": "string value",
-      "Actor": "f01234"
-    },
     "Proof": "Ynl0ZSBhcnJheQ==",
     "Epoch": 10101,
     "PrevCheck": {
@@ -3502,11 +3440,33 @@ Response:
       }
     ],
     "CrossMsgs": {
-      "MsgsCID": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      },
-      "Nonce": 42,
-      "Value": "0",
+      "CrossMsgs": [
+        {
+          "Msg": {
+            "From": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "To": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "Method": 1,
+            "Params": {
+              "Bytes": "Ynl0ZSBhcnJheQ=="
+            },
+            "Value": "0",
+            "Nonce": 42
+          },
+          "Wrapped": true
+        }
+      ],
       "Fee": "0"
     }
   },
@@ -3634,10 +3594,6 @@ Response:
 [
   {
     "Data": {
-      "Source": {
-        "Parent": "string value",
-        "Actor": "f01234"
-      },
       "Proof": "Ynl0ZSBhcnJheQ==",
       "Epoch": 10101,
       "PrevCheck": {
@@ -3655,11 +3611,33 @@ Response:
         }
       ],
       "CrossMsgs": {
-        "MsgsCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "Nonce": 42,
-        "Value": "0",
+        "CrossMsgs": [
+          {
+            "Msg": {
+              "From": {
+                "SubnetID": {
+                  "Parent": "string value",
+                  "Actor": "f01234"
+                },
+                "RawAddress": "f01234"
+              },
+              "To": {
+                "SubnetID": {
+                  "Parent": "string value",
+                  "Actor": "f01234"
+                },
+                "RawAddress": "f01234"
+              },
+              "Method": 1,
+              "Params": {
+                "Bytes": "Ynl0ZSBhcnJheQ=="
+              },
+              "Value": "0",
+              "Nonce": 42
+            },
+            "Wrapped": true
+          }
+        ],
         "Fee": "0"
       }
     },
@@ -3697,10 +3675,6 @@ Response:
     "Status": 0,
     "PrevCheckpoint": {
       "Data": {
-        "Source": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
         "Proof": "Ynl0ZSBhcnJheQ==",
         "Epoch": 10101,
         "PrevCheck": {
@@ -3718,11 +3692,33 @@ Response:
           }
         ],
         "CrossMsgs": {
-          "MsgsCID": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          },
-          "Nonce": 42,
-          "Value": "0",
+          "CrossMsgs": [
+            {
+              "Msg": {
+                "From": {
+                  "SubnetID": {
+                    "Parent": "string value",
+                    "Actor": "f01234"
+                  },
+                  "RawAddress": "f01234"
+                },
+                "To": {
+                  "SubnetID": {
+                    "Parent": "string value",
+                    "Actor": "f01234"
+                  },
+                  "RawAddress": "f01234"
+                },
+                "Method": 1,
+                "Params": {
+                  "Bytes": "Ynl0ZSBhcnJheQ=="
+                },
+                "Value": "0",
+                "Nonce": 42
+              },
+              "Wrapped": true
+            }
+          ],
           "Fee": "0"
         }
       },
@@ -3764,8 +3760,9 @@ Response:
   "Subnets": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
-  "CheckPeriod": 10101,
-  "Checkpoints": {
+  "BottomUpCheckPeriod": 10101,
+  "TopDownCheckPeriod": 10101,
+  "BottomUpCheckpoints": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   "CheckMsgRegistry": {
@@ -3774,13 +3771,37 @@ Response:
   "Postbox": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
-  "Nonce": 42,
   "BottomupNonce": 42,
-  "BottomupMsgMeta": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
   "AppliedBottomupNonce": 42,
-  "AppliedTopdownNonce": 42
+  "AppliedTopdownNonce": 42,
+  "TopDownCheckVoting": {
+    "GenesisEpoch": 10101,
+    "SubmissionPeriod": 10101,
+    "LastVotingExecuted": 10101,
+    "ExecutableEpochQueue": [
+      10101
+    ],
+    "EpochVoteSubmission": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Ratio": {
+      "Num": 42,
+      "Denom": 42
+    }
+  },
+  "Validators": {
+    "Validators": {
+      "validators": [
+        {
+          "addr": "f01234",
+          "net_addr": "string value",
+          "weight": "0"
+        }
+      ],
+      "configuration_number": 42
+    },
+    "TotalWeight": "0"
+  }
 }
 ```
 
@@ -3824,12 +3845,9 @@ Response:
   },
   "Status": 0,
   "Genesis": "Ynl0ZSBhcnJheQ==",
-  "FinalityThreshold": 10101,
-  "CheckPeriod": 10101,
-  "Checkpoints": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "WindowChecks": {
+  "TopDownCheckPeriod": 10101,
+  "BottomUpCheckPeriod": 10101,
+  "CommittedCheckpoints": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   "ValidatorSet": {
@@ -3842,7 +3860,25 @@ Response:
     ],
     "configuration_number": 42
   },
-  "MinValidators": 42
+  "MinValidators": 42,
+  "PreviousExecutedCheckpoint": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "BottomUpCheckpointVoting": {
+    "GenesisEpoch": 10101,
+    "SubmissionPeriod": 10101,
+    "LastVotingExecuted": 10101,
+    "ExecutableEpochQueue": [
+      10101
+    ],
+    "EpochVoteSubmission": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Ratio": {
+      "Num": 42,
+      "Denom": 42
+    }
+  }
 }
 ```
 

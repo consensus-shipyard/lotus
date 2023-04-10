@@ -168,7 +168,7 @@ func (a *IPCAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 // IPCGetCheckpointTemplate to be populated and signed for the epoch given as input.
 // If the template for the epoch is empty (either because it has no data or an epoch from the
 // future was provided) an empty template is returned.
-func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, 
 }
 
 // IPCListCheckpoints returns a list of checkpoints committed for a submit between two epochs
-func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.Checkpoint, error) {
+func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
 	if err := a.checkParent(ctx, sn); err != nil {
 		return nil, err
 	}
@@ -207,8 +207,8 @@ func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, 
 		return nil, err
 	}
 	// get the first epoch with checkpoints after the from.
-	i := gateway.CheckpointEpoch(from, st.CheckPeriod)
-	out := make([]*gateway.Checkpoint, 0)
+	i := gateway.CheckpointEpoch(from, st.BottomUpCheckPeriod)
+	out := make([]*gateway.BottomUpCheckpoint, 0)
 	for i <= to {
 		ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), i)
 		if err != nil {
@@ -217,13 +217,13 @@ func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, 
 		if found {
 			out = append(out, ch)
 		}
-		i += st.CheckPeriod
+		i += st.BottomUpCheckPeriod
 	}
 	return out, nil
 }
 
 // IPCGetCheckpoint returns the checkpoint committed in the subnet actor for an epoch.
-func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	if err := a.checkParent(ctx, sn); err != nil {
 		return nil, err
 	}
@@ -265,16 +265,6 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 	return st.ListSubnets(a.Chain.ActorStore(ctx))
 }
 
-// IPCGetBottomUpMsgs returns the list of bottom-up messages that haven't been
-// executed yet.
-func (a *IPCAPI) IPCGetBottomUpMsgs(ctx context.Context, gatewayAddr address.Address) ([]*gateway.CrossMsgMeta, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-	return st.BottomUpMsgsFromNonce(a.Chain.ActorStore(ctx), st.AppliedBottomupNonce)
-}
-
 // IPCGetTopDownMsgs returns the list of top down-messages from a specific nonce
 // to the latest one that has been committed in the subnet.
 func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) {
@@ -290,23 +280,6 @@ func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Addr
 		return nil, xerrors.Errorf("subnet not found in gateway")
 	}
 	return subnet.TopDownMsgsFromNonce(a.Chain.ActorStore(ctx), nonce)
-}
-
-// IPCGetBottomUpMsgsFromRegistry gets a batch of bottom-up messages stored in the registry of a subnet
-// by Cid.
-func (a *IPCAPI) IPCGetBottomUpMsgsFromRegistry(ctx context.Context, gatewayAddr address.Address, c cid.Cid) (*gateway.CrossMsgs, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
-	if err != nil {
-		return nil, err
-	}
-	msgs, found, err := st.GetBottomUpMsgsFromRegistry(a.Chain.ActorStore(ctx), c)
-	if err != nil {
-		return nil, xerrors.Errorf("error fetching cross-messages from registry: %w", err)
-	}
-	if !found {
-		return nil, xerrors.Errorf("cross-messages batch for cid %s not found: %w", c, err)
-	}
-	return msgs, nil
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.

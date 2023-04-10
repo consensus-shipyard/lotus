@@ -50,7 +50,7 @@ require (
 	github.com/filecoin-project/go-statemachine v1.0.3
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/go-storedcounter v0.1.0
-	github.com/filecoin-project/mir v0.3.3
+	github.com/filecoin-project/mir v0.3.4
 	github.com/filecoin-project/pubsub v1.0.0
 	github.com/filecoin-project/specs-actors v0.9.15
 	github.com/filecoin-project/specs-actors/v2 v2.3.6
@@ -357,7 +357,7 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/filecoin-ffi
 replace github.com/filecoin-project/test-vectors => ./extern/test-vectors
 
 // uncomment for local development. Keeping it here for now for convenience.
-// replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types
+replace github.com/consensus-shipyard/go-ipc-types => ../go-ipc-types
 
 // uncomment for local development. Keeping it here for now for convenience.
 // replace github.com/filecoin-project/mir => ../tmp/mir

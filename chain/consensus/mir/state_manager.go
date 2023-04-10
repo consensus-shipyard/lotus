@@ -651,9 +651,9 @@ func (sm *StateManager) deliverCheckpoint(checkpoint *checkpoint.StableCheckpoin
 }
 
 func (sm *StateManager) getSignedMessages(mirMsgs []Message) (msgs []*types.SignedMessage) {
-	log.With("validator", sm.id).Infof("received a block with %d messages", len(msgs))
+	log.With("validator", sm.id).With("epoch", sm.currentEpoch).
+		Infof("received a block with %d messages", len(mirMsgs))
 	for _, tx := range mirMsgs {
-
 		input, err := parseTx(tx)
 		if err != nil {
 			log.With("validator", sm.id).Error("unable to decode a message in Mir block:", err)
