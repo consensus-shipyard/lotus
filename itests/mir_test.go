@@ -296,6 +296,10 @@ func TestMirReconfiguration_MembershipMessagesSent(t *testing.T) {
 	t.Log(">>> final check")
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
+
+	err = kit.MirNodesWaitMembershipMsg(ctx, membership, nodes...)
+	require.NoError(t, err)
+
 }
 
 // TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
