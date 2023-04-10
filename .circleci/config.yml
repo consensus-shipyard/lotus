@@ -372,7 +372,7 @@ workflows:
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout=10m -run TestMirReconfiguration_AddOneValidatorToMembershipWithDelay"
+          go-test-flags: "-tags=spacenet -timeout=5m -run TestMirReconfiguration_AddOneValidatorToMembershipWithDelay"
           target: "./itests/mir_test.go"
 
   nightly:
@@ -387,15 +387,15 @@ workflows:
       - nightly-test-mir-with-mangler:
           name: nightly-mir-mangler-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 120m -run TestMirWithMangler"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
       - nightly-test-mir-basic:
           name: nightly-mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - nightly-test-mir-reconfiguration:
           name: nightly-mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
