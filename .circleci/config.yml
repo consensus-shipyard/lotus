@@ -372,7 +372,7 @@ workflows:
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration_AddOneValidatorToMembershipWithDelay"
+          go-test-flags: "-tags=spacenet -timeout=10m -run TestMirReconfiguration_AddOneValidatorToMembershipWithDelay"
           target: "./itests/mir_test.go"
 
   nightly:
