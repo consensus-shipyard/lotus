@@ -309,7 +309,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				if err != nil {
 					return err
 				}
-				fmt.Println(">>>> voted reconfig msgs", reconfigMsg.Cid())
 				valSetMsgs = append(valSetMsgs, reconfigMsg)
 			}
 		}
@@ -387,7 +386,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, err
 	}
 
-	enoughVotes, finished, err := sm.countVote(t.NodeID(msg.ClientId), &valSet)
+	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
 		// @denis: do we need to have this a `nil` error?
@@ -395,7 +394,9 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 	}
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.id {
-		_ = sm.confManager.Done(t.ReqNo(msg.ReqNo)) // nolint
+		if err := sm.confManager.Done(t.ReqNo(msg.ReqNo)); err != nil {
+			log.With("validator", sm.id).Errorf("failed to mark config message as done: %v", err)
+		}
 	}
 	if !enoughVotes || finished {
 		return nil, nil
@@ -428,9 +429,11 @@ func (sm *StateManager) updateNextMembership(set *validator.Set) error {
 	return nil
 }
 
-// countVotes count the number of the votes for the validator set and returns if we have enough votes,
-// if we have already finished voting, and an error.
-func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) (bool, bool, error) {
+// processVote process a vote of the validator for the validator set and returns whether there are enough votes,
+// and whether the voting is finished, and an error.
+//
+// The voting is considered finished if we have enough votes and the next vote should not change the state.
+func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set) (bool, bool, error) {
 	if set.ConfigurationNumber < sm.nextConfigurationNumber {
 		return false, false, xerrors.Errorf("validator %s sent outdated vote: received - %d, expected - %d",
 			votingValidator, set.ConfigurationNumber, sm.nextConfigurationNumber)
@@ -460,14 +463,13 @@ func (sm *StateManager) countVote(votingValidator t.NodeID, set *validator.Set) 
 
 	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator] = struct{}{}
 	if err := sm.confManager.StoreConfigurationVotes(sm.reconfigurationVotes); err != nil {
-		log.With("validator", sm.id).
-			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
+		return false, false, xerrors.Errorf("validator %s failed to store votes in epoch %d: %w", votingValidator, sm.currentEpoch, err)
 	}
 
 	votes := len(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)])
 	nodes := len(sm.memberships[sm.currentEpoch])
 	log.With("validator", sm.id).
-		Infof("UpdateAndCheckVotes: valset number %d, epoch %d: votes %d, nodes %d",
+		Infof("countVote: valset number %d, epoch %d: votes %d, nodes %d",
 			set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
 
 	// We must have f+1 votes at least.
