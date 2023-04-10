@@ -5,6 +5,7 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/voting"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"golang.org/x/xerrors"
 
@@ -35,13 +36,13 @@ var (
 	DefaultIPCGatewayAddr, _ = address.NewIDAddress(DefaultIPCGatewayAddrID)
 )
 
-func constructState(store adt.Store, network ipctypes.SubnetID, checkPeriod int64) (*gateway.State, error) {
-	emptyArrayCid, err := adt.StoreEmptyArray(store, bitWidth)
+func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeriod int64) (*gateway.State, error) {
+	emptyMapCid, err := adt.StoreEmptyMap(store, bitWidth)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
 	}
 
-	emptyMapCid, err := adt.StoreEmptyMap(store, bitWidth)
+	voting, err := voting.NewWithRatio(store, 0, abi.ChainEpoch(tdPeriod), voting.Ratio{Num: 2, Denom: 3})
 	if err != nil {
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
 	}
@@ -51,15 +52,14 @@ func constructState(store adt.Store, network ipctypes.SubnetID, checkPeriod int6
 		TotalSubnets:         0,
 		MinStake:             big.NewInt(minStake),
 		Subnets:              emptyMapCid,
-		CheckPeriod:          abi.ChainEpoch(checkPeriod),
-		Checkpoints:          emptyMapCid,
-		CheckMsgRegistry:     emptyMapCid,
+		BottomUpCheckPeriod:  abi.ChainEpoch(buPeriod),
+		TopDownCheckPeriod:   abi.ChainEpoch(tdPeriod),
+		BottomUpCheckpoints:  emptyMapCid,
 		Postbox:              emptyMapCid,
-		Nonce:                0,
 		BottomupNonce:        0,
-		BottomupMsgMeta:      emptyArrayCid,
 		AppliedBottomupNonce: MaxUint64,
 		AppliedTopdownNonce:  0,
+		TopDownCheckVoting:   voting,
 	}, nil
 }
 
@@ -70,7 +70,9 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 		return nil, xerrors.Errorf("cannot parse network name as subnetID: %w", err)
 	}
 
-	dst, err := constructState(adt.WrapStore(ctx, cbor.NewCborStore(bs)), network, checkPeriod)
+	// NOTE: For now we use the same checkpointing period for bottom-up and top-down checkpoints.
+	// TODO: Make this configurable
+	dst, err := constructState(adt.WrapStore(ctx, cbor.NewCborStore(bs)), network, checkPeriod, checkPeriod)
 	if err != nil {
 		return nil, err
 	}
