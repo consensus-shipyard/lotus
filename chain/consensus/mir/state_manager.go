@@ -391,8 +391,8 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
 		// This error is not critical for the operation of the validator process, we should notify
 		// the user but not kill the process. Returning an error here would exit the validator
-		// process with failure. 
-		return nil, nil
+		// process with failure.
+		return nil, nilg
 	}
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.id {
