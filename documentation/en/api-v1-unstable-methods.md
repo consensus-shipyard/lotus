@@ -119,7 +119,7 @@
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
   * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
-  * [IPCGetVotesForCheckpoint](#IPCGetVotesForCheckpoint)
+  * [IPCHasVotedBottomUpCheckpoint](#IPCHasVotedBottomUpCheckpoint)
   * [IPCListCheckpoints](#IPCListCheckpoints)
   * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
@@ -3355,6 +3355,10 @@ Response:
 ```json
 {
   "Data": {
+    "Source": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
     "Proof": "Ynl0ZSBhcnJheQ==",
     "Epoch": 10101,
     "PrevCheck": {
@@ -3366,9 +3370,11 @@ Response:
           "Parent": "string value",
           "Actor": "f01234"
         },
-        "Checks": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        }
+        "Checks": [
+          {
+            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+          }
+        ]
       }
     ],
     "CrossMsgs": {
@@ -3423,6 +3429,10 @@ Response:
 ```json
 {
   "Data": {
+    "Source": {
+      "Parent": "string value",
+      "Actor": "f01234"
+    },
     "Proof": "Ynl0ZSBhcnJheQ==",
     "Epoch": 10101,
     "PrevCheck": {
@@ -3434,9 +3444,11 @@ Response:
           "Parent": "string value",
           "Actor": "f01234"
         },
-        "Checks": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        }
+        "Checks": [
+          {
+            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+          }
+        ]
       }
     ],
     "CrossMsgs": {
@@ -3545,7 +3557,7 @@ Response:
 ]
 ```
 
-### IPCGetVotesForCheckpoint
+### IPCHasVotedBottomUpCheckpoint
 
 
 Perms: read
@@ -3557,20 +3569,12 @@ Inputs:
     "Parent": "string value",
     "Actor": "f01234"
   },
-  {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+  10101,
+  "f01234"
 ]
 ```
 
-Response:
-```json
-{
-  "Validators": [
-    "f01234"
-  ]
-}
-```
+Response: `true`
 
 ### IPCListCheckpoints
 
@@ -3594,6 +3598,10 @@ Response:
 [
   {
     "Data": {
+      "Source": {
+        "Parent": "string value",
+        "Actor": "f01234"
+      },
       "Proof": "Ynl0ZSBhcnJheQ==",
       "Epoch": 10101,
       "PrevCheck": {
@@ -3605,9 +3613,11 @@ Response:
             "Parent": "string value",
             "Actor": "f01234"
           },
-          "Checks": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "Checks": [
+            {
+              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+            }
+          ]
         }
       ],
       "CrossMsgs": {
@@ -3675,6 +3685,10 @@ Response:
     "Status": 0,
     "PrevCheckpoint": {
       "Data": {
+        "Source": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
         "Proof": "Ynl0ZSBhcnJheQ==",
         "Epoch": 10101,
         "PrevCheck": {
@@ -3686,9 +3700,11 @@ Response:
               "Parent": "string value",
               "Actor": "f01234"
             },
-            "Checks": {
-              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-            }
+            "Checks": [
+              {
+                "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+              }
+            ]
           }
         ],
         "CrossMsgs": {
@@ -3763,9 +3779,6 @@ Response:
   "BottomUpCheckPeriod": 10101,
   "TopDownCheckPeriod": 10101,
   "BottomUpCheckpoints": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "CheckMsgRegistry": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   "Postbox": {
@@ -3845,8 +3858,9 @@ Response:
   },
   "Status": 0,
   "Genesis": "Ynl0ZSBhcnJheQ==",
-  "TopDownCheckPeriod": 10101,
   "BottomUpCheckPeriod": 10101,
+  "TopDownCheckPeriod": 10101,
+  "GenesisEpoch": 10101,
   "CommittedCheckpoints": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },

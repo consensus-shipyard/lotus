@@ -176,25 +176,23 @@ func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr addre
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
 }
 
-// IPCGetVotesForCheckpoint returns if there is an active voting for a checkpoint with a specific cid.
-// If no active votings are found for a checkpoints is because the checkpoint has already been committed
-// or because no one has votes that checkpoint yet.
-func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error) {
+// IPCHasVotedBottomUpCheckpoint checks if a validator has already voted a specific checkpoint
+// for certain epoch
+func (a *IPCAPI) IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error) {
 	if err := a.checkParent(ctx, sn); err != nil {
-		return nil, err
+		return false, err
 	}
 	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	v, found, err := st.GetCheckpointVotes(a.Chain.ActorStore(ctx), c)
+	// ValidatorHasVote=d expects on-chain IDs. This is how votes are indexed in the StateAPI
+	// of the actor.
+	v, err = a.StateManager.LookupID(ctx, v, a.Chain.GetHeaviestTipSet())
 	if err != nil {
-		return nil, xerrors.Errorf("error getting votes from actor store: %w", err)
+		return false, xerrors.Errorf("error getting on-chain ID for validator: %w", err)
 	}
-	if !found {
-		return &subnetactor.Votes{make([]address.Address, 0)}, nil
-	}
-	return v, nil
+	return st.BottomUpCheckpointVoting.ValidatorHasVoted(a.Chain.ActorStore(ctx), e, v)
 }
 
 // IPCListCheckpoints returns a list of checkpoints committed for a submit between two epochs
