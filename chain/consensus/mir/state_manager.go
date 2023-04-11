@@ -284,8 +284,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	log.With("validator", sm.id).Info("ApplyTXs started")
 	defer log.With("validator", sm.id).Info("ApplyTXs finished")
 
-	fmt.Println(">>>", sm.id, sm.height, txs)
-
 	var (
 		mirMsgs    []Message
 		valSetMsgs []*types.SignedMessage
@@ -293,6 +291,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	)
 
 	sm.height++
+	fmt.Println(">>> input transactions", sm.id, sm.height, txs)
 
 	// For each request in the batch
 	for _, req := range txs {
@@ -305,7 +304,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				return err
 			}
 			if votedValSet != nil {
-				fmt.Println(">>>", sm.id, sm.height, req)
+				fmt.Println(">>> votedValset ! nil", sm.id, sm.height, req)
 				// FIXME: We should pick up the genesis address and not use the default one
 				// once we move into the user-defined gateway territory
 				reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, votedValSet)
