@@ -398,6 +398,8 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, err
 	}
 
+	fmt.Println("!!! reconfigVotes before", sm.id, sm.height, sm.reconfigurationVotes)
+
 	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
@@ -406,13 +408,18 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		// process with failure.
 		return nil, nil
 	}
+
+	fmt.Println("!!! reconfigVotes after", sm.id, sm.height, sm.reconfigurationVotes)
+
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.id {
 		if err := sm.confManager.Done(t.ReqNo(msg.ReqNo)); err != nil {
 			log.With("validator", sm.id).Errorf("failed to mark config message as done: %v", err)
 		}
 	}
+	fmt.Println("!!!", sm.id, sm.height, "enoughVotes:", enoughVotes, "finished:", finished)
 	if !enoughVotes || finished {
+		fmt.Println("!!!", sm.id, sm.height, "!enoughVotes || finished")
 		return nil, nil
 	}
 
@@ -427,6 +434,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 			delete(sm.reconfigurationVotes, n)
 		}
 	}
+	fmt.Println("!!!", sm.id, sm.height, "return &valSet")
 
 	return &valSet, nil
 }
