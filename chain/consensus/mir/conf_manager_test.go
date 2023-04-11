@@ -26,6 +26,8 @@ func TestRestoreConfigurationVotes(t *testing.T) {
 
 	m := GetConfigurationVotes(votes)
 	fmt.Println(m)
+	require.Equal(t, 2, len(valSet1))
+	require.Equal(t, 1, len(valSet2))
 	require.Equal(t, 2, len(m))
 	require.Equal(t, 2, len(m[0]["hash1"]))
 	require.Equal(t, struct{}{}, m[0]["hash1"]["id1"])

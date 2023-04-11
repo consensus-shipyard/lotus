@@ -262,6 +262,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
 		sm.nextConfigurationNumber = ch.NextConfigNumber
+		fmt.Println(">>> before GetConfigurationVotes", sm.id, ch.Votes.Records)
 		sm.reconfigurationVotes = GetConfigurationVotes(ch.Votes.Records)
 
 		// purge any state previous to the checkpoint
@@ -390,6 +391,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 
 	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
+		panic(err)
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
 		// This error is not critical for the operation of the validator process, we should notify
 		// the user but not kill the process. Returning an error here would exit the validator
@@ -534,6 +536,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 	nextHeight := sm.height + 1
 	log.With("validator", sm.id).Infof("Snapshot started: epoch - %d, height - %d", sm.currentEpoch, sm.height)
 
+	fmt.Println(">>> before Snapshot", sm.id, sm.currentEpoch, sm.reconfigurationVotes)
+
 	// populating checkpoint template
 	ch := Checkpoint{
 		Height:           nextHeight,
@@ -542,6 +546,8 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		NextConfigNumber: sm.nextConfigurationNumber,
 		Votes:            VoteRecords{Records: StoreConfigurationVotes(sm.reconfigurationVotes)},
 	}
+
+	fmt.Println(">>> after snapshotting", sm.id, sm.currentEpoch, ch.Votes)
 
 	// put blocks in descending order.
 	i := nextHeight - 1

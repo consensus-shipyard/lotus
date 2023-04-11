@@ -14,6 +14,7 @@ import (
 	"github.com/filecoin-project/mir/pkg/client"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	t "github.com/filecoin-project/mir/pkg/types"
+	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
 )
@@ -271,13 +272,16 @@ func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string]map[t.NodeID]s
 
 func StoreConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) []VoteRecord {
 	var vs []VoteRecord
-	for n, hashToValidatorsVotes := range votes {
-		for h, nodeIDs := range hashToValidatorsVotes {
+
+	for _, n := range maputil.GetSortedKeys(votes) {
+		hashToValidatorsVotes := votes[n]
+		for _, h := range maputil.GetSortedKeys(hashToValidatorsVotes) {
+			nodeIDs := hashToValidatorsVotes[h]
 			e := VoteRecord{
 				ConfigurationNumber: n,
 				ValSetHash:          h,
 			}
-			for n := range nodeIDs {
+			for _, n := range maputil.GetSortedKeys(nodeIDs) {
 				e.VotedValidators = append(e.VotedValidators, VotedValidator{n.Pb()})
 			}
 			vs = append(vs, e)
