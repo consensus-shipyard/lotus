@@ -140,6 +140,61 @@ type VoteRecord struct {
 	VotedValidators     []VotedValidator
 }
 
+type ConfigurationVotes struct {
+	votes map[uint64]map[string]map[mir.NodeID]struct{}
+}
+
+func NewConfigurationVotes(v map[uint64]map[string]map[mir.NodeID]struct{}) *ConfigurationVotes {
+	return &ConfigurationVotes{
+		votes: v,
+	}
+}
+
+func NewConfigurationVotesFromRecords(votes []VoteRecord) *ConfigurationVotes {
+	return &ConfigurationVotes{
+		votes: GetConfigurationVotes(votes),
+	}
+}
+
+func (c *ConfigurationVotes) DeleteVotesForConfiguration(n uint64) {
+	delete(c.votes, n)
+}
+
+func (c *ConfigurationVotes) VoteForConfiguration(n uint64, h string, v mir.NodeID) error {
+	if _, exist := c.votes[n]; !exist {
+		c.votes[n] = make(map[string]map[mir.NodeID]struct{})
+	}
+
+	if _, exist := c.votes[n][h]; !exist {
+		c.votes[n][h] = make(map[mir.NodeID]struct{})
+	}
+
+	// Prevent double voting.
+	if _, voted := c.votes[n][h][v]; voted {
+		return xerrors.Errorf("validator %s has already voted for configuration %d", v, n)
+	}
+
+	c.votes[n][h][v] = struct{}{}
+
+	return nil
+}
+
+func (c *ConfigurationVotes) GetVotesForConfiguration(n uint64, h string) int {
+	return len(c.votes[n][h])
+}
+
+func (c *ConfigurationVotes) ClearOldVotes(nextConfigNumber uint64) {
+	for n := range c.votes {
+		if n < nextConfigNumber {
+			delete(c.votes, n)
+		}
+	}
+}
+
+func (c *ConfigurationVotes) GetVoteRecords() VoteRecords {
+	return VoteRecords{Records: StoreConfigurationVotes(c.votes)}
+}
+
 type Checkpoint struct {
 	// Height of the checkpoint
 	Height abi.ChainEpoch

@@ -7,13 +7,15 @@ import (
 	"path"
 	"time"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/xerrors"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"
@@ -73,8 +75,7 @@ type StateManager struct {
 
 	requestPool *fifo.Pool
 
-	// reconfigurationVotes implements ConfigurationNumber->ValSetHash->[]NodeID mapping.
-	reconfigurationVotes map[uint64]map[string]map[t.NodeID]struct{}
+	configurationVotes *ConfigurationVotes
 
 	// nextConfigurationNumber is the acceptable configuration number.
 	// The initial nextConfigurationNumber is 1.
@@ -119,7 +120,7 @@ func NewStateManager(
 		configOffset:            cfg.Consensus.ConfigOffset,
 	}
 
-	sm.reconfigurationVotes = sm.confManager.GetConfigurationVotes()
+	sm.configurationVotes = NewConfigurationVotes(sm.confManager.GetConfigurationVotes())
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
@@ -262,8 +263,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
 		sm.nextConfigurationNumber = ch.NextConfigNumber
-		fmt.Println(">>> before GetConfigurationVotes", sm.id, ch.Votes.Records)
-		sm.reconfigurationVotes = GetConfigurationVotes(ch.Votes.Records)
+		sm.configurationVotes = NewConfigurationVotesFromRecords(ch.Votes.Records)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -300,7 +300,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
 		case ConfigurationRequest:
-			fmt.Println(">>> votes map", sm.height, sm.id, sm.reconfigurationVotes)
 			votedValSet, err := sm.applyConfigMsg(req)
 			if err != nil {
 				return err
@@ -391,7 +390,6 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 
 	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
-		panic(err)
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
 		// This error is not critical for the operation of the validator process, we should notify
 		// the user but not kill the process. Returning an error here would exit the validator
@@ -415,11 +413,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 	}
 
 	sm.nextConfigurationNumber = valSet.ConfigurationNumber
-	for n := range sm.reconfigurationVotes {
-		if n < sm.nextConfigurationNumber {
-			delete(sm.reconfigurationVotes, n)
-		}
-	}
+	sm.configurationVotes.ClearOldVotes(sm.nextConfigurationNumber)
 
 	return &valSet, nil
 }
@@ -455,25 +449,11 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 		return false, false, err
 	}
 
-	if _, exist := sm.reconfigurationVotes[set.ConfigurationNumber]; !exist {
-		sm.reconfigurationVotes[set.ConfigurationNumber] = make(map[string]map[t.NodeID]struct{})
+	if err := sm.configurationVotes.VoteForConfiguration(set.ConfigurationNumber, string(h), votingValidator); err != nil {
+		return false, false, err
 	}
 
-	if _, exist := sm.reconfigurationVotes[set.ConfigurationNumber][string(h)]; !exist {
-		sm.reconfigurationVotes[set.ConfigurationNumber][string(h)] = make(map[t.NodeID]struct{})
-	}
-
-	// Prevent double voting.
-	if _, voted := sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator]; voted {
-		return false, false, xerrors.Errorf("validator %s has already voted for configuration %d", votingValidator, set.ConfigurationNumber)
-	}
-
-	sm.reconfigurationVotes[set.ConfigurationNumber][string(h)][votingValidator] = struct{}{}
-	if err := sm.confManager.StoreConfigurationVotes(sm.reconfigurationVotes); err != nil {
-		return false, false, xerrors.Errorf("validator %s failed to store votes in epoch %d: %w", votingValidator, sm.currentEpoch, err)
-	}
-
-	votes := len(sm.reconfigurationVotes[set.ConfigurationNumber][string(h)])
+	votes := sm.configurationVotes.GetVotesForConfiguration(set.ConfigurationNumber, string(h))
 	nodes := len(sm.memberships[sm.currentEpoch])
 	log.With("validator", sm.id).
 		Infof("countVote: valset number %d, epoch %d: votes %d, nodes %d",
@@ -536,18 +516,14 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 	nextHeight := sm.height + 1
 	log.With("validator", sm.id).Infof("Snapshot started: epoch - %d, height - %d", sm.currentEpoch, sm.height)
 
-	fmt.Println(">>> before Snapshot", sm.id, sm.currentEpoch, sm.reconfigurationVotes)
-
 	// populating checkpoint template
 	ch := Checkpoint{
 		Height:           nextHeight,
 		Parent:           sm.prevCheckpoint,
 		BlockCids:        make([]cid.Cid, 0),
 		NextConfigNumber: sm.nextConfigurationNumber,
-		Votes:            VoteRecords{Records: StoreConfigurationVotes(sm.reconfigurationVotes)},
+		Votes:            sm.configurationVotes.GetVoteRecords(),
 	}
-
-	fmt.Println(">>> after snapshotting", sm.id, sm.currentEpoch, ch.Votes)
 
 	// put blocks in descending order.
 	i := nextHeight - 1
@@ -779,14 +755,14 @@ func (sm *StateManager) firstEpochCheckpoint() (*Checkpoint, error) {
 	chb, err := sm.ds.Get(sm.ctx, LatestCheckpointKey)
 	if err != nil {
 		if err == datastore.ErrNotFound {
-			genesis, err := sm.api.ChainGetGenesis(sm.ctx)
+			gs, err := sm.api.ChainGetGenesis(sm.ctx)
 			if err != nil {
 				return nil, xerrors.Errorf("error getting genesis block: %w", err)
 			}
 			// return genesis checkpoint
 			return &Checkpoint{
-				Height:    1,                                                     // we assume the genesis has been verified, we start from 1
-				Parent:    ParentMeta{Height: 0, Cid: genesis.Blocks()[0].Cid()}, // genesis checkpoint
+				Height:    1,                                                // we assume the genesis has been verified, we start from 1
+				Parent:    ParentMeta{Height: 0, Cid: gs.Blocks()[0].Cid()}, // genesis checkpoint
 				BlockCids: make([]cid.Cid, 0),
 			}, nil
 		}
