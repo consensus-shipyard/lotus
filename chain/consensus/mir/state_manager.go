@@ -291,7 +291,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	)
 
 	sm.height++
-	fmt.Println(">>> input transactions", sm.id, sm.height, txs)
+	fmt.Println(">>> input transactions", sm.height, sm.id, txs)
 
 	// For each request in the batch
 	for _, req := range txs {
@@ -304,7 +304,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				return err
 			}
 			if votedValSet != nil {
-				fmt.Println(">>> votedValset ! nil", sm.id, sm.height, req)
+				fmt.Println(">>> votedValset ! nil", sm.height, sm.id, req)
 				// FIXME: We should pick up the genesis address and not use the default one
 				// once we move into the user-defined gateway territory
 				reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, votedValSet)
@@ -346,15 +346,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	}
 
 	// FIXME DENIS
-	fmt.Println(">>>", valSetMsgs, sm.id)
-	if len(valSetMsgs) != 0 {
-		for _, m := range valSetMsgs {
-			fmt.Println(">>> valmsgs", m)
-		}
-	}
-	fmt.Println(">>>", base.Key(), sm.id)
-	fmt.Println(">>>", sm.height, sm.id)
-	fmt.Println(">>>", base.Key(), sm.id)
+	fmt.Println(">>>", valSetMsgs, sm.height, sm.id)
 	// Include config messages into the block to update on-chain membership.
 	msgs = append(msgs, valSetMsgs...)
 
@@ -398,7 +390,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, err
 	}
 
-	fmt.Println("!!! reconfigVotes before", sm.id, sm.height, sm.reconfigurationVotes)
+	fmt.Println("!!! reconfigVotes before", sm.height, sm.id, sm.reconfigurationVotes)
 
 	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
@@ -409,7 +401,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, nil
 	}
 
-	fmt.Println("!!! reconfigVotes after", sm.id, sm.height, sm.reconfigurationVotes)
+	fmt.Println("!!! reconfigVotes after", sm.height, sm.id, sm.reconfigurationVotes)
 
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.id {
@@ -417,9 +409,9 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 			log.With("validator", sm.id).Errorf("failed to mark config message as done: %v", err)
 		}
 	}
-	fmt.Println("!!!", sm.id, sm.height, "enoughVotes:", enoughVotes, "finished:", finished)
+	fmt.Println("!!!", sm.height, sm.id, "enoughVotes:", enoughVotes, "finished:", finished)
 	if !enoughVotes || finished {
-		fmt.Println("!!!", sm.id, sm.height, "!enoughVotes || finished")
+		fmt.Println("!!!", sm.height, sm.id, "!enoughVotes || finished")
 		return nil, nil
 	}
 
@@ -434,7 +426,7 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 			delete(sm.reconfigurationVotes, n)
 		}
 	}
-	fmt.Println("!!!", sm.id, sm.height, "return &valSet")
+	fmt.Println("!!!", sm.height, sm.id, "return &valSet")
 
 	return &valSet, nil
 }
