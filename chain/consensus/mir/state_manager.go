@@ -344,10 +344,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	}
 
 	// FIXME DENIS
-	fmt.Println(">>>", valSetMsgs, sm.id)
-	fmt.Println(">>>", base.Key(), sm.id)
-	fmt.Println(">>>", sm.height, sm.id)
-	fmt.Println(">>>", msgs, sm.id)
+	fmt.Println(">>>", sm.id, sm.height, base.Key(), valSetMsgs, msgs, vrfCheckpoint, eproofCheckpoint)
+	
 	// Include config messages into the block to update on-chain membership.
 	msgs = append(msgs, valSetMsgs...)
 
