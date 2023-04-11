@@ -341,7 +341,7 @@ type FullNodeMethods struct {
 
 	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
 
-	IPCGetVotesForCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) `perm:"read"`
+	IPCHasVotedBottomUpCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) `perm:"read"`
 
 	IPCListCheckpoints func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) `perm:"read"`
 
@@ -2573,15 +2573,15 @@ func (s *FullNodeStub) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address,
 	return *new([]*gateway.CrossMsg), ErrNotSupported
 }
 
-func (s *FullNodeStruct) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) {
-	if s.Internal.IPCGetVotesForCheckpoint == nil {
-		return nil, ErrNotSupported
+func (s *FullNodeStruct) IPCHasVotedBottomUpCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
+	if s.Internal.IPCHasVotedBottomUpCheckpoint == nil {
+		return false, ErrNotSupported
 	}
-	return s.Internal.IPCGetVotesForCheckpoint(p0, p1, p2)
+	return s.Internal.IPCHasVotedBottomUpCheckpoint(p0, p1, p2, p3)
 }
 
-func (s *FullNodeStub) IPCGetVotesForCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 cid.Cid) (*subnetactor.Votes, error) {
-	return nil, ErrNotSupported
+func (s *FullNodeStub) IPCHasVotedBottomUpCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
+	return false, ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {

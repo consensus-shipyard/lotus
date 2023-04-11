@@ -101,6 +101,10 @@ func TestIPCAccessors(t *testing.T) {
 	chs, err := api.IPCListCheckpoints(ctx, sn, 0, 2*genesis.DefaultCheckpointPeriod)
 	require.NoError(t, err)
 	require.Equal(t, len(chs), 1)
+	// get votes
+	hasVoted, err := api.IPCHasVotedBottomUpCheckpoint(ctx, sn, genesis.DefaultCheckpointPeriod, src)
+	require.NoError(t, err)
+	require.False(t, hasVoted)
 }
 
 func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from, snActor address.Address) {

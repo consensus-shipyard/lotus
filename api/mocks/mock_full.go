@@ -1674,19 +1674,19 @@ func (mr *MockFullNodeMockRecorder) IPCGetTopDownMsgs(arg0, arg1, arg2, arg3 int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetTopDownMsgs", reflect.TypeOf((*MockFullNode)(nil).IPCGetTopDownMsgs), arg0, arg1, arg2, arg3)
 }
 
-// IPCGetVotesForCheckpoint mocks base method.
-func (m *MockFullNode) IPCGetVotesForCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 cid.Cid) (*subnetactor.Votes, error) {
+// IPCHasVotedBottomUpCheckpoint mocks base method.
+func (m *MockFullNode) IPCHasVotedBottomUpCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch, arg3 address.Address) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IPCGetVotesForCheckpoint", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*subnetactor.Votes)
+	ret := m.ctrl.Call(m, "IPCHasVotedBottomUpCheckpoint", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IPCGetVotesForCheckpoint indicates an expected call of IPCGetVotesForCheckpoint.
-func (mr *MockFullNodeMockRecorder) IPCGetVotesForCheckpoint(arg0, arg1, arg2 interface{}) *gomock.Call {
+// IPCHasVotedBottomUpCheckpoint indicates an expected call of IPCHasVotedBottomUpCheckpoint.
+func (mr *MockFullNodeMockRecorder) IPCHasVotedBottomUpCheckpoint(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetVotesForCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCGetVotesForCheckpoint), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCHasVotedBottomUpCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCHasVotedBottomUpCheckpoint), arg0, arg1, arg2, arg3)
 }
 
 // IPCListCheckpoints mocks base method.
