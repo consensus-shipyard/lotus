@@ -284,6 +284,8 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	log.With("validator", sm.id).Info("ApplyTXs started")
 	defer log.With("validator", sm.id).Info("ApplyTXs finished")
 
+	fmt.Println(">>>", sm.id, sm.height, txs)
+
 	var (
 		mirMsgs    []Message
 		valSetMsgs []*types.SignedMessage
@@ -303,6 +305,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				return err
 			}
 			if votedValSet != nil {
+				fmt.Println(">>>", sm.id, sm.height, req)
 				// FIXME: We should pick up the genesis address and not use the default one
 				// once we move into the user-defined gateway territory
 				reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, votedValSet)
@@ -344,8 +347,15 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	}
 
 	// FIXME DENIS
-	fmt.Println(">>>", sm.id, sm.height, base.Key(), valSetMsgs, msgs, vrfCheckpoint, eproofCheckpoint)
-	
+	fmt.Println(">>>", valSetMsgs, sm.id)
+	if len(valSetMsgs) !=0 {
+		for _, m := range valSetMsgs {
+			fmt.Println(">>> valmsgs", m.)
+		}
+	}
+	fmt.Println(">>>", base.Key(), sm.id)
+	fmt.Println(">>>", sm.height, sm.id)
+	fmt.Println(">>>", base.Key(), sm.id)
 	// Include config messages into the block to update on-chain membership.
 	msgs = append(msgs, valSetMsgs...)
 
