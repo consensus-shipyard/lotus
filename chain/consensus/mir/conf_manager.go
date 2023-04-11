@@ -30,8 +30,8 @@ var (
 	// NextAppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
 	// that is the maximum configuration request number that has been applied.
 	NextAppliedConfigurationNumberKey = datastore.NewKey("mir/next-applied-config-number")
-	// ReconfigurationVotesKey is used to store configuration votes.
-	ReconfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
+	// ConfigurationVotesKey is used to store configuration votes.
+	ConfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
 )
 
 var _ client.Client = &ConfigurationManager{}
@@ -205,7 +205,7 @@ func (cm *ConfigurationManager) getAppliedConfigurationNumber() uint64 {
 
 func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string]map[t.NodeID]struct{} {
 	votes := make(map[uint64]map[string]map[t.NodeID]struct{})
-	b, err := cm.ds.Get(cm.ctx, ReconfigurationVotesKey)
+	b, err := cm.ds.Get(cm.ctx, ConfigurationVotesKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", cm.id).Info("stored reconfiguration votes not found")
 		return votes
@@ -235,7 +235,7 @@ func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[str
 	if err := r.MarshalCBOR(b); err != nil {
 		return err
 	}
-	if err := cm.ds.Put(cm.ctx, ReconfigurationVotesKey, b.Bytes()); err != nil {
+	if err := cm.ds.Put(cm.ctx, ConfigurationVotesKey, b.Bytes()); err != nil {
 		log.With("validator", cm.id).Warnf("failed to put reconfiguration votes: %v", err)
 	}
 

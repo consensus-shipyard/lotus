@@ -303,7 +303,7 @@ func TestMirReconfiguration_MembershipMessagesSent(t *testing.T) {
 }
 
 // TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery tests that the reconfiguration mechanism operates normally
-// if a new validator join the network and after recovery.
+// if a new validator join the network after recovery of four other nodes.
 // TODO: refactor this test by separating DB test primitives.
 func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.T) {
 	membershipFileName := kit.TempFileName("membership")
@@ -326,35 +326,37 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+1)
 	ens.SaveValidatorSetToFile(0, membershipFileName, validators[:MirTotalValidatorNumber]...)
 
-	bn := make([]byte, 8)
 	recoveredRequestNonce := uint64(4)
-	binary.LittleEndian.PutUint64(bn, recoveredRequestNonce)
+	recoveredRequestNonceBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(recoveredRequestNonceBytes, recoveredRequestNonce)
 
 	dbs := make(map[string]*kit.TestDB)
 	for i, m := range validators[:MirTotalValidatorNumber] {
 		_ = i
 		db := kit.NewTestDB()
-		err := db.Put(ctx, mir.NextConfigurationNumberKey, bn)
+		err := db.Put(ctx, mir.NextConfigurationNumberKey, recoveredRequestNonceBytes)
 		require.NoError(t, err)
-		err = db.Put(ctx, mir.NextAppliedConfigurationNumberKey, bn)
+		err = db.Put(ctx, mir.NextAppliedConfigurationNumberKey, recoveredRequestNonceBytes)
 		require.NoError(t, err)
 
 		// -- store fake votes
-		recs := []mir.VoteRecord{{
-			ConfigurationNumber: 0, ValSetHash: "hash", VotedValidators: []mir.VotedValidator{{ID: "id1"}},
-		}}
 		r := mir.VoteRecords{
-			Records: recs,
+			Records: []mir.VoteRecord{
+				{
+					ConfigurationNumber: 0, ValSetHash: "hash", VotedValidators: []mir.VotedValidator{{ID: "id1"}},
+				},
+			},
 		}
 
 		br := new(bytes.Buffer)
 		err = r.MarshalCBOR(br)
 		require.NoError(t, err)
-		err = db.Put(ctx, mir.ReconfigurationVotesKey, br.Bytes())
+		err = db.Put(ctx, mir.ConfigurationVotesKey, br.Bytes())
 		require.NoError(t, err)
 
 		dbs[m.GetMirID()] = db
 	}
+	// Use a new empty DB for a joined validator.
 	for i, m := range validators[MirTotalValidatorNumber:] {
 		_ = i
 		dbs[m.GetMirID()] = kit.NewTestDB()
@@ -379,7 +381,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
 	require.NoError(t, err)
 
-	t.Log(">>> check that persisted votes restored")
+	t.Log(">>> initial check that persisted votes restored")
 	for _, m := range validators[:MirTotalValidatorNumber] {
 		db := m.GetDB()
 
@@ -391,27 +393,29 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		require.NoError(t, err)
 		require.Equal(t, recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 
-		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
+		b, err := db.Get(ctx, mir.ConfigurationVotesKey)
 		require.NoError(t, err)
 		var r mir.VoteRecords
 		err = r.UnmarshalCBOR(bytes.NewReader(b))
 		require.NoError(t, err)
+
+		require.Equal(t, 1, len(r.Records))
 		for _, v := range r.Records {
 			require.Equal(t, uint64(0), v.ConfigurationNumber)
 			require.Equal(t, "hash", v.ValSetHash)
 		}
 		votes := mir.GetConfigurationVotes(r.Records)
-		require.Greater(t, MirTotalValidatorNumber, len(votes))
+		require.Equal(t, 1, len(votes))
 	}
 
-	var cn uint64 = 1
+	var newConfigNumber uint64 = 1
 
 	t.Log(">>> new validators have been added to the membership")
-	ens.SaveValidatorSetToFile(1, membershipFileName, validators...)
+	ens.SaveValidatorSetToFile(newConfigNumber, membershipFileName, validators...)
 	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
-	require.Equal(t, cn, membership.GetConfigurationNumber())
+	require.Equal(t, newConfigNumber, membership.GetConfigurationNumber())
 	// Start new validators.
 	ens.InterconnectFullNodes()
 
@@ -428,6 +432,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
+	t.Log(">>> final consistency check")
 	// Core validators must send 1 message with recovered "nonce".
 	for _, m := range validators[:MirTotalValidatorNumber] {
 		db := m.GetDB()
@@ -439,13 +444,13 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 		require.NoError(t, err)
 		require.Equal(t, uint64(1)+recoveredRequestNonce, binary.LittleEndian.Uint64(nonce))
 
-		b, err := db.Get(ctx, mir.ReconfigurationVotesKey)
+		b, err := db.Get(ctx, mir.ConfigurationVotesKey)
 		require.NoError(t, err)
 		var r mir.VoteRecords
 		err = r.UnmarshalCBOR(bytes.NewReader(b))
 		require.NoError(t, err)
 		for _, v := range r.Records {
-			require.Equal(t, cn, v.ConfigurationNumber)
+			require.Equal(t, newConfigNumber, v.ConfigurationNumber)
 		}
 		votes := mir.GetConfigurationVotes(r.Records)
 		require.Greater(t, MirTotalValidatorNumber, len(votes))

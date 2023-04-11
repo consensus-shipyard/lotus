@@ -452,6 +452,10 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 	if err := sm.configurationVotes.VoteForConfiguration(set.ConfigurationNumber, string(h), votingValidator); err != nil {
 		return false, false, err
 	}
+	if err := sm.confManager.StoreConfigurationVotes(sm.configurationVotes.Votes()); err != nil {
+		log.With("validator", sm.id).
+			Error("countVote: failed to store votes in epoch %d: %w", sm.currentEpoch, err)
+	}
 
 	votes := sm.configurationVotes.GetVotesForConfiguration(set.ConfigurationNumber, string(h))
 	nodes := len(sm.memberships[sm.currentEpoch])

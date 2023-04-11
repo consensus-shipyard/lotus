@@ -195,6 +195,10 @@ func (c *ConfigurationVotes) GetVoteRecords() VoteRecords {
 	return VoteRecords{Records: StoreConfigurationVotes(c.votes)}
 }
 
+func (c *ConfigurationVotes) Votes() map[uint64]map[string]map[mir.NodeID]struct{} {
+	return c.votes
+}
+
 type Checkpoint struct {
 	// Height of the checkpoint
 	Height abi.ChainEpoch
