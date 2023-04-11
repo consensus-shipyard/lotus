@@ -8,11 +8,10 @@ import (
 	"math"
 	"sort"
 
+	abi "github.com/filecoin-project/go-state-types/abi"
 	cid "github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	xerrors "golang.org/x/xerrors"
-
-	abi "github.com/filecoin-project/go-state-types/abi"
 )
 
 var _ = xerrors.Errorf
@@ -20,7 +19,7 @@ var _ = cid.Undef
 var _ = math.E
 var _ = sort.Sort
 
-var lengthBufCheckpoint = []byte{132}
+var lengthBufCheckpoint = []byte{133}
 
 func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 	if t == nil {
@@ -70,6 +69,10 @@ func (t *Checkpoint) MarshalCBOR(w io.Writer) error {
 		return err
 	}
 
+	// t.Votes (mir.VoteRecords) (struct)
+	if err := t.Votes.MarshalCBOR(cw); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -92,7 +95,7 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 		return fmt.Errorf("cbor input should be of type array")
 	}
 
-	if extra != 4 {
+	if extra != 5 {
 		return fmt.Errorf("cbor input had wrong number of fields")
 	}
 
@@ -170,6 +173,15 @@ func (t *Checkpoint) UnmarshalCBOR(r io.Reader) (err error) {
 			return fmt.Errorf("wrong type for uint64 field")
 		}
 		t.NextConfigNumber = uint64(extra)
+
+	}
+	// t.Votes (mir.VoteRecords) (struct)
+
+	{
+
+		if err := t.Votes.UnmarshalCBOR(cr); err != nil {
+			return xerrors.Errorf("unmarshaling t.Votes: %w", err)
+		}
 
 	}
 	return nil

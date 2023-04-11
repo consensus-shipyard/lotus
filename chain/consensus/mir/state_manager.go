@@ -345,7 +345,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		log.With("validator", sm.id).Infof("Including Mir checkpoint for in block %d", sm.height)
 	}
 
-	// FIXME DENIS
 	// Include config messages into the block to update on-chain membership.
 	msgs = append(msgs, valSetMsgs...)
 
