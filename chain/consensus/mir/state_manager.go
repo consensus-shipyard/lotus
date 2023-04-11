@@ -348,9 +348,9 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 
 	// FIXME DENIS
 	fmt.Println(">>>", valSetMsgs, sm.id)
-	if len(valSetMsgs) !=0 {
+	if len(valSetMsgs) != 0 {
 		for _, m := range valSetMsgs {
-			fmt.Println(">>> valmsgs", m.)
+			fmt.Println(">>> valmsgs", m)
 		}
 	}
 	fmt.Println(">>>", base.Key(), sm.id)
