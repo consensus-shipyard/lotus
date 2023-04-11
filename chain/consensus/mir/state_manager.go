@@ -262,6 +262,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 		// Restore the height, and configuration number and configuration votes.
 		sm.height = ch.Height - 1
 		sm.nextConfigurationNumber = ch.NextConfigNumber
+		sm.reconfigurationVotes = GetConfigurationVotes(ch.Votes.Records)
 
 		// purge any state previous to the checkpoint
 		if err = sm.api.SyncPurgeForRecovery(sm.ctx, ch.Height); err != nil {
@@ -291,7 +292,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	)
 
 	sm.height++
-	fmt.Println(">>> input transactions", sm.height, sm.id, txs)
 
 	// For each request in the batch
 	for _, req := range txs {
@@ -304,7 +304,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				return err
 			}
 			if votedValSet != nil {
-				fmt.Println(">>> votedValset ! nil", sm.height, sm.id, req)
 				// FIXME: We should pick up the genesis address and not use the default one
 				// once we move into the user-defined gateway territory
 				reconfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, votedValSet)
@@ -346,9 +345,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	}
 
 	// FIXME DENIS
-	fmt.Println(">>> valset", sm.height, sm.id, valSetMsgs)
-	fmt.Println(">>> msgs", sm.height, sm.id, msgs)
-	fmt.Println(">>> basekey", sm.height, sm.id, base.Key())
 	// Include config messages into the block to update on-chain membership.
 	msgs = append(msgs, valSetMsgs...)
 
@@ -392,8 +388,6 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, err
 	}
 
-	fmt.Println("!!! reconfigVotes before", sm.height, sm.id, sm.reconfigurationVotes)
-
 	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
 	if err != nil {
 		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
@@ -403,17 +397,13 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 		return nil, nil
 	}
 
-	fmt.Println("!!! reconfigVotes after", sm.height, sm.id, sm.reconfigurationVotes)
-
 	// If we get the configuration message we have sent then we remove it from the configuration request storage.
 	if msg.ClientId == sm.id {
 		if err := sm.confManager.Done(t.ReqNo(msg.ReqNo)); err != nil {
 			log.With("validator", sm.id).Errorf("failed to mark config message as done: %v", err)
 		}
 	}
-	fmt.Println("!!!", sm.height, sm.id, "enoughVotes:", enoughVotes, "finished:", finished)
 	if !enoughVotes || finished {
-		fmt.Println("!!!", sm.height, sm.id, "!enoughVotes || finished")
 		return nil, nil
 	}
 
@@ -428,7 +418,6 @@ func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, 
 			delete(sm.reconfigurationVotes, n)
 		}
 	}
-	fmt.Println("!!!", sm.height, sm.id, "return &valSet")
 
 	return &valSet, nil
 }
@@ -551,6 +540,7 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 		Parent:           sm.prevCheckpoint,
 		BlockCids:        make([]cid.Cid, 0),
 		NextConfigNumber: sm.nextConfigurationNumber,
+		Votes:            VoteRecords{Records: StoreConfigurationVotes(sm.reconfigurationVotes)},
 	}
 
 	// put blocks in descending order.
@@ -604,7 +594,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 	}
 
 	// Reset fifo between checkpoints to avoid requests getting stuck.
-	// See https://github.com/consensus-shipyard/lotus/issues/28
+	// See https://github.com/consensus-shipyard/lotus/issues/28.
 	sm.requestPool.Purge()
 	return nil
 }

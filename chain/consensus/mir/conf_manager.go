@@ -225,7 +225,7 @@ func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string]ma
 }
 
 func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) error {
-	recs := storeConfigurationVotes(votes)
+	recs := StoreConfigurationVotes(votes)
 	r := VoteRecords{
 		Records: recs,
 	}
@@ -269,7 +269,7 @@ func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string]map[t.NodeID]s
 	return m
 }
 
-func storeConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) []VoteRecord {
+func StoreConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) []VoteRecord {
 	var vs []VoteRecord
 	for n, hashToValidatorsVotes := range votes {
 		for h, nodeIDs := range hashToValidatorsVotes {

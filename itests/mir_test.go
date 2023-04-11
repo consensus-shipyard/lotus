@@ -496,6 +496,8 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 		})
 	}
 
+	t.Log(">>> start a joined node")
+
 	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirConfig{
 		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFiles[MirTotalValidatorNumber],

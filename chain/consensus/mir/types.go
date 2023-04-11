@@ -150,6 +150,8 @@ type Checkpoint struct {
 	Parent ParentMeta
 	// The configuration number that can be accepted.
 	NextConfigNumber uint64
+	// Reconfiguration votes.
+	Votes VoteRecords
 }
 
 func (ch *Checkpoint) isEmpty() bool {

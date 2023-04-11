@@ -215,12 +215,6 @@ jobs:
         type: string
         default: -coverprofile=/tmp/conformance.out -coverpkg ./chain/consensus/,./ipcagent,./eudico-core
         description: Coverage flag. Set to the empty string to disable.
-      codecov-upload:
-        type: boolean
-        default: true
-        description: |
-          Upload coverage report to https://codecov.io/. Requires the codecov API token to be
-          set as an environment variable for private projects.
     executor: << parameters.executor >>
     steps:
       - prepare
@@ -259,7 +253,7 @@ jobs:
               << parameters.coverage >> \
               << parameters.go-test-flags >> \
               << parameters.target >>
-            go tool cover -html=/tmp/conformance.out -o /tmp/test-artifacts/conformance-coverage.html
+            go tool cover -html=/tmp/conformance.out -o /tmp/test-artifacts/test-coverage.html
           no_output_timeout: 30m
       - run:
           command: |
@@ -276,14 +270,7 @@ jobs:
       - store_artifacts:
           path: /tmp/test-artifacts/test-coverage.html
       - store_artifacts:
-          path: /tmp/test-artifacts/conformance.out
-      - when:
-          condition: << parameters.codecov-upload >>
-          steps:
-            - run:
-                shell: /bin/bash -eo pipefail
-                command: |
-                  bash <(curl -s https://codecov.io/bash)
+          path: /tmp/conformance.out
 
   test-mir-smoke:
     <<: *basic_test
