@@ -44,7 +44,7 @@ func TestStoreConfigurationVotes(t *testing.T) {
 	m[0]["bb"] = make(map[types.NodeID]struct{})
 	m[0]["bb"]["id1"] = struct{}{}
 
-	voteRecords := storeConfigurationVotes(m)
+	voteRecords := StoreConfigurationVotes(m)
 	require.Equal(t, 2, len(voteRecords))
 	require.Equal(t, uint64(0), voteRecords[0].ConfigurationNumber, uint64(0))
 	require.Equal(t, uint64(0), voteRecords[1].ConfigurationNumber, uint64(0))

@@ -299,6 +299,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		case TransportRequest:
 			mirMsgs = append(mirMsgs, req.Data)
 		case ConfigurationRequest:
+			fmt.Println(">>> votes map", sm.height, sm.id, sm.reconfigurationVotes)
 			votedValSet, err := sm.applyConfigMsg(req)
 			if err != nil {
 				return err
