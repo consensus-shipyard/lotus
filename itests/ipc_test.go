@@ -1,6 +1,7 @@
 package itests
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"testing"
@@ -89,11 +90,29 @@ func TestIPCAccessors(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(l), 1)
 	// get checkpoint for epoch
-	_, err = api.IPCGetCheckpoint(ctx, sn, checkEpoch)
+	ch, err := api.IPCGetCheckpoint(ctx, sn, checkEpoch)
 	require.NoError(t, err)
+	// see that the serialized version is the same
+	b, err := api.IPCGetCheckpointSerialized(ctx, sn, checkEpoch)
+	require.NoError(t, err)
+	ser := gateway.BottomUpCheckpoint{}
+	err = ser.UnmarshalCBOR(bytes.NewReader(b))
+	require.NoError(t, err)
+	require.Equal(t, *ch, ser)
 	// get empty checkpoint template
-	_, err = api.IPCGetCheckpointTemplate(ctx, genesis.DefaultIPCGatewayAddr, 0)
+	ch, err = api.IPCGetCheckpointTemplate(ctx, genesis.DefaultIPCGatewayAddr, 0)
 	require.NoError(t, err)
+	// see that the serialized version is the same
+	b, err = api.IPCGetCheckpointTemplateSerialized(ctx, genesis.DefaultIPCGatewayAddr, 0)
+	require.NoError(t, err)
+	ser = gateway.BottomUpCheckpoint{}
+	err = ser.UnmarshalCBOR(bytes.NewReader(b))
+	// to make the comparison we need to set the previous checkpoint to
+	// cid.Undef, the serialized function uses a dummyCid to allow the serialization,
+	// as cid.Undef can't be cbor serialized.
+	ser.Data.PrevCheck = cid.Undef
+	require.NoError(t, err)
+	require.Equal(t, *ch, ser)
 	// get previous checkpoint for child
 	_, err = api.IPCGetPrevCheckpointForChild(ctx, genesis.DefaultIPCGatewayAddr, sn)
 	require.NoError(t, err)
@@ -105,6 +124,26 @@ func TestIPCAccessors(t *testing.T) {
 	hasVoted, err := api.IPCHasVotedBottomUpCheckpoint(ctx, sn, genesis.DefaultCheckpointPeriod, src)
 	require.NoError(t, err)
 	require.False(t, hasVoted)
+
+	// fund subnet with a number of top-down messages
+	for i := 0; i < 5; i++ {
+		FundSubnet(t, ctx, api, sn, src)
+	}
+	// get the topdown messages
+	msgs, err := api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, 0)
+	require.NoError(t, err)
+	require.Equal(t, len(msgs), 5)
+	msgs, err = api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, 1)
+	require.NoError(t, err)
+	require.Equal(t, len(msgs), 4)
+	// check its serialization form
+	bmsgs, err := api.IPCGetTopDownMsgsSerialized(ctx, genesis.DefaultIPCGatewayAddr, sn, 1)
+	require.NoError(t, err)
+	require.Equal(t, len(msgs), 4)
+	serMsg := gateway.CrossMsg{}
+	err = serMsg.UnmarshalCBOR(bytes.NewReader(bmsgs[0]))
+	require.NoError(t, err)
+	require.Equal(t, *msgs[0], serMsg)
 }
 
 func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from, snActor address.Address) {
@@ -115,6 +154,23 @@ func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from,
 		From:   from,
 		Value:  abi.TokenAmount(types.MustParseFIL("10")),
 		Method: MustGenerateFRCMethodNum("Join"),
+		Params: params,
+	}, nil)
+	require.NoError(t, aerr)
+
+	_, aerr = node.StateWaitMsg(ctx, smsg.Cid(), build.MessageConfidence, api.LookbackNoLimit, true)
+	require.NoError(t, aerr)
+
+}
+
+func FundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID, from address.Address) {
+	params, err := actors.SerializeParams(&sn)
+	require.NoError(t, err)
+	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
+		To:     genesis.DefaultIPCGatewayAddr,
+		From:   from,
+		Value:  abi.TokenAmount(types.MustParseFIL("10")),
+		Method: MustGenerateFRCMethodNum("Fund"),
 		Params: params,
 	}, nil)
 	require.NoError(t, aerr)
