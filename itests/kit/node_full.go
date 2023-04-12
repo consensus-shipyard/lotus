@@ -71,7 +71,7 @@ func MergeFullNodes(fullNodes []*TestFullNode) *TestFullNode {
 	return &wrappedFullNode
 }
 
-func (f *TestFullNode) Shutdown(ctx context.Context) error {
+func (f TestFullNode) Shutdown(ctx context.Context) error {
 	return f.Stop(ctx)
 }
 
