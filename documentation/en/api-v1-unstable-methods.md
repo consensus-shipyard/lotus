@@ -116,11 +116,15 @@
   * [ID](#ID)
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
   * [IPCGetCheckpoint](#IPCGetCheckpoint)
+  * [IPCGetCheckpointSerialized](#IPCGetCheckpointSerialized)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
+  * [IPCGetCheckpointTemplateSerialized](#IPCGetCheckpointTemplateSerialized)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
   * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
+  * [IPCGetTopDownMsgsSerialized](#IPCGetTopDownMsgsSerialized)
   * [IPCHasVotedBottomUpCheckpoint](#IPCHasVotedBottomUpCheckpoint)
   * [IPCListCheckpoints](#IPCListCheckpoints)
+  * [IPCListCheckpointsSerialized](#IPCListCheckpointsSerialized)
   * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
   * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
@@ -3396,9 +3400,7 @@ Response:
               "RawAddress": "f01234"
             },
             "Method": 1,
-            "Params": {
-              "Bytes": "Ynl0ZSBhcnJheQ=="
-            },
+            "Params": "Ynl0ZSBhcnJheQ==",
             "Value": "0",
             "Nonce": 42
           },
@@ -3411,6 +3413,28 @@ Response:
   "Sig": "Ynl0ZSBhcnJheQ=="
 }
 ```
+
+### IPCGetCheckpointSerialized
+Serialized representation of IPC calls.
+This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
+version of the output of the call. These are really convenient to use the same type of serialization used
+in actor's state, removing the need of then intermediate serialization introduced by the Lotus API.
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  10101
+]
+```
+
+Response: `"Ynl0ZSBhcnJheQ=="`
 
 ### IPCGetCheckpointTemplate
 
@@ -3470,9 +3494,7 @@ Response:
               "RawAddress": "f01234"
             },
             "Method": 1,
-            "Params": {
-              "Bytes": "Ynl0ZSBhcnJheQ=="
-            },
+            "Params": "Ynl0ZSBhcnJheQ==",
             "Value": "0",
             "Nonce": 42
           },
@@ -3485,6 +3507,21 @@ Response:
   "Sig": "Ynl0ZSBhcnJheQ=="
 }
 ```
+
+### IPCGetCheckpointTemplateSerialized
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  10101
+]
+```
+
+Response: `"Ynl0ZSBhcnJheQ=="`
 
 ### IPCGetPrevCheckpointForChild
 
@@ -3546,14 +3583,36 @@ Response:
         "RawAddress": "f01234"
       },
       "Method": 1,
-      "Params": {
-        "Bytes": "Ynl0ZSBhcnJheQ=="
-      },
+      "Params": "Ynl0ZSBhcnJheQ==",
       "Value": "0",
       "Nonce": 42
     },
     "Wrapped": true
   }
+]
+```
+
+### IPCGetTopDownMsgsSerialized
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  42
+]
+```
+
+Response:
+```json
+[
+  "Ynl0ZSBhcnJheQ=="
 ]
 ```
 
@@ -3639,9 +3698,7 @@ Response:
                 "RawAddress": "f01234"
               },
               "Method": 1,
-              "Params": {
-                "Bytes": "Ynl0ZSBhcnJheQ=="
-              },
+              "Params": "Ynl0ZSBhcnJheQ==",
               "Value": "0",
               "Nonce": 42
             },
@@ -3653,6 +3710,30 @@ Response:
     },
     "Sig": "Ynl0ZSBhcnJheQ=="
   }
+]
+```
+
+### IPCListCheckpointsSerialized
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  10101,
+  10101
+]
+```
+
+Response:
+```json
+[
+  "Ynl0ZSBhcnJheQ=="
 ]
 ```
 
@@ -3726,9 +3807,7 @@ Response:
                   "RawAddress": "f01234"
                 },
                 "Method": 1,
-                "Params": {
-                  "Bytes": "Ynl0ZSBhcnJheQ=="
-                },
+                "Params": "Ynl0ZSBhcnJheQ==",
                 "Value": "0",
                 "Nonce": 42
               },

@@ -335,15 +335,23 @@ type FullNodeMethods struct {
 
 	IPCGetCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) `perm:"read"`
 
+	IPCGetCheckpointSerialized func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) ([]byte, error) `perm:"read"`
+
 	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) `perm:"read"`
+
+	IPCGetCheckpointTemplateSerialized func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) `perm:"read"`
 
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
 	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
 
+	IPCGetTopDownMsgsSerialized func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([][]byte, error) `perm:"read"`
+
 	IPCHasVotedBottomUpCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) `perm:"read"`
 
 	IPCListCheckpoints func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) `perm:"read"`
+
+	IPCListCheckpointsSerialized func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([][]byte, error) `perm:"read"`
 
 	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) `perm:"read"`
 
@@ -2540,6 +2548,17 @@ func (s *FullNodeStub) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 
 	return nil, ErrNotSupported
 }
 
+func (s *FullNodeStruct) IPCGetCheckpointSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) ([]byte, error) {
+	if s.Internal.IPCGetCheckpointSerialized == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpointSerialized(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetCheckpointSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
+}
+
 func (s *FullNodeStruct) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	if s.Internal.IPCGetCheckpointTemplate == nil {
 		return nil, ErrNotSupported
@@ -2549,6 +2568,17 @@ func (s *FullNodeStruct) IPCGetCheckpointTemplate(p0 context.Context, p1 address
 
 func (s *FullNodeStub) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	return nil, ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCGetCheckpointTemplateSerialized(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) {
+	if s.Internal.IPCGetCheckpointTemplateSerialized == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpointTemplateSerialized(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetCheckpointTemplateSerialized(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
@@ -2573,6 +2603,17 @@ func (s *FullNodeStub) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address,
 	return *new([]*gateway.CrossMsg), ErrNotSupported
 }
 
+func (s *FullNodeStruct) IPCGetTopDownMsgsSerialized(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([][]byte, error) {
+	if s.Internal.IPCGetTopDownMsgsSerialized == nil {
+		return *new([][]byte), ErrNotSupported
+	}
+	return s.Internal.IPCGetTopDownMsgsSerialized(p0, p1, p2, p3)
+}
+
+func (s *FullNodeStub) IPCGetTopDownMsgsSerialized(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 uint64) ([][]byte, error) {
+	return *new([][]byte), ErrNotSupported
+}
+
 func (s *FullNodeStruct) IPCHasVotedBottomUpCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
 	if s.Internal.IPCHasVotedBottomUpCheckpoint == nil {
 		return false, ErrNotSupported
@@ -2593,6 +2634,17 @@ func (s *FullNodeStruct) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID,
 
 func (s *FullNodeStub) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
 	return *new([]*gateway.BottomUpCheckpoint), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCListCheckpointsSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([][]byte, error) {
+	if s.Internal.IPCListCheckpointsSerialized == nil {
+		return *new([][]byte), ErrNotSupported
+	}
+	return s.Internal.IPCListCheckpointsSerialized(p0, p1, p2, p3)
+}
+
+func (s *FullNodeStub) IPCListCheckpointsSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([][]byte, error) {
+	return *new([][]byte), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {

@@ -895,6 +895,14 @@ type FullNode interface {
 	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error)              //perm:read
 	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                     //perm:read
 	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error)       //perm:read
+	// Serialized representation of IPC calls.
+	// This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
+	// version of the output of the call. These are really convenient to use the same type of serialization used
+	// in actor's state, removing the need of then intermediate serialization introduced by the Lotus API.
+	IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error)                         //perm:read
+	IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error)                  //perm:read
+	IPCGetCheckpointTemplateSerialized(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) ([]byte, error)     //perm:read
+	IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([][]byte, error) //perm:read
 
 }
 
