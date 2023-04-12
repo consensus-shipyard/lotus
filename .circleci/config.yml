@@ -362,14 +362,6 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration_AddAndRemoveOneValidator"
           target: "./itests/mir_test.go"
-      - build-spacenet
-      - build-linux-spacenet
-      - build-macos-spacenet
-      - build-all:
-          filters:
-            tags:
-              only:
-                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
 
   nightly:
     triggers:
