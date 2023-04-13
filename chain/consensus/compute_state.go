@@ -221,8 +221,8 @@ func (t *TipSetExecutor) ApplyBlocks(ctx context.Context,
 			// FIXME: Setting default gateway address here, this should
 			// maybe change
 			if membership.IsConfigMsg(DefaultGatewayAddr, m) {
-				continue // nolint
-				r, err := vmi.ApplyImplicitMessage(ctx, m)
+				continue                                   // nolint
+				r, err := vmi.ApplyImplicitMessage(ctx, m) // nolint
 				if err != nil {
 					return cid.Undef, cid.Undef, xerrors.Errorf("running cron: %w", err)
 				}
