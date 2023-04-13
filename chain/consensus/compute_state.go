@@ -221,19 +221,20 @@ func (t *TipSetExecutor) ApplyBlocks(ctx context.Context,
 			// FIXME: Setting default gateway address here, this should
 			// maybe change
 			if membership.IsConfigMsg(DefaultGatewayAddr, m) {
-				ret, err := vmi.ApplyImplicitMessage(ctx, m)
+				r, err := vmi.ApplyImplicitMessage(ctx, m)
 				if err != nil {
 					return cid.Undef, cid.Undef, xerrors.Errorf("running cron: %w", err)
 				}
 
 				if em != nil {
-					if err := em.MessageApplied(ctx, ts, m.Cid(), m, ret, true); err != nil {
+					if err := em.MessageApplied(ctx, ts, cm.Cid(), m, r, true); err != nil {
 						return cid.Undef, cid.Undef, xerrors.Errorf("callback failed on set-membership: %w", err)
 					}
 				}
-				if ret.ExitCode != 0 {
-					return cid.Undef, cid.Undef, xerrors.Errorf("membership exit was non-zero: %d", ret.ExitCode)
+				if r.ExitCode != 0 {
+					return cid.Undef, cid.Undef, xerrors.Errorf("membership exit was non-zero: %d", r.ExitCode)
 				}
+				processedMsgs[m.Cid()] = struct{}{}
 				// if config message executed we can move to the next one
 				continue
 			}
