@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -142,7 +141,6 @@ type VoteRecord struct {
 }
 
 type ConfigurationVotes struct {
-	lock  sync.Mutex
 	votes map[uint64]map[string]map[mir.NodeID]struct{}
 }
 
@@ -159,8 +157,6 @@ func NewConfigurationVotesFromRecords(votes []VoteRecord) *ConfigurationVotes {
 }
 
 func (c *ConfigurationVotes) VoteForConfiguration(n uint64, h string, v mir.NodeID) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	if _, exist := c.votes[n]; !exist {
 		c.votes[n] = make(map[string]map[mir.NodeID]struct{})
 	}
@@ -180,14 +176,10 @@ func (c *ConfigurationVotes) VoteForConfiguration(n uint64, h string, v mir.Node
 }
 
 func (c *ConfigurationVotes) GetVotesForConfiguration(n uint64, h string) int {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	return len(c.votes[n][h])
 }
 
 func (c *ConfigurationVotes) ClearOldVotes(nextConfigNumber uint64) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	for n := range c.votes {
 		if n < nextConfigNumber {
 			delete(c.votes, n)
@@ -196,14 +188,10 @@ func (c *ConfigurationVotes) ClearOldVotes(nextConfigNumber uint64) {
 }
 
 func (c *ConfigurationVotes) GetVoteRecords() VoteRecords {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	return VoteRecords{Records: StoreConfigurationVotes(c.votes)}
 }
 
 func (c *ConfigurationVotes) Votes() map[uint64]map[string]map[mir.NodeID]struct{} {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	return c.votes
 }
 

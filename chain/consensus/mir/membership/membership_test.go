@@ -7,7 +7,7 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/stretchr/testify/require"
 
-	"github.com/filecoin-project/lotus/chain/gen/genesis"
+	"github.com/filecoin-project/go-address"
 )
 
 func TestMembership(t *testing.T) {
@@ -55,7 +55,8 @@ func TestOnchainMembershipInfo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reintroduce the address to avoid looping.
-	gw := genesis.DefaultIPCGatewayAddr
+	gw, err := address.NewIDAddress(64)
+	require.NoError(t, err)
 
 	vs := validator.NewValidatorSet(0, []*validator.Validator{v1, v2, v3})
 	require.Equal(t, 3, vs.Size())
