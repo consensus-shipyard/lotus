@@ -226,11 +226,14 @@ func (t *TipSetExecutor) ApplyBlocks(ctx context.Context,
 					return cid.Undef, cid.Undef, xerrors.Errorf("running cron: %w", err)
 				}
 
-				if em != nil {
-					if err := em.MessageApplied(ctx, ts, cm.Cid(), m, r, true); err != nil {
-						return cid.Undef, cid.Undef, xerrors.Errorf("callback failed on set-membership: %w", err)
+				/*
+					if em != nil {
+						if err := em.MessageApplied(ctx, ts, cm.Cid(), m, r, true); err != nil {
+							return cid.Undef, cid.Undef, xerrors.Errorf("callback failed on set-membership: %w", err)
+						}
 					}
-				}
+				
+				*/
 				if r.ExitCode != 0 {
 					return cid.Undef, cid.Undef, xerrors.Errorf("membership exit was non-zero: %d", r.ExitCode)
 				}
