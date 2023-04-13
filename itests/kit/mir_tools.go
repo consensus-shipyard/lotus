@@ -102,29 +102,48 @@ func WaitForMessageWithAvailable(ctx context.Context, n *TestFullNode, c cid.Cid
 	}
 }
 
-func MirNodesWaitMembershipMsg(ctx context.Context, expected *validator.Set, nodes ...*TestFullNode) error {
-	g, ctx := errgroup.WithContext(ctx)
-
+func MirNodesWaitForMembershipMsg(ctx context.Context, expected *validator.Set, nodes ...*TestFullNode) error {
 	for _, node := range nodes {
-		node := node
-		g.Go(func() error {
-			gw, err := node.IPCReadGatewayState(ctx, genesis.DefaultIPCGatewayAddr, types.TipSetKey{})
-			if err != nil {
-				return err
-			}
-			if !gw.Validators.Validators.Equal(expected) {
-				return fmt.Errorf("expected %v, got %v", expected, gw.Validators.Validators)
-			}
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return err
+		gw, err := node.IPCReadGatewayState(ctx, genesis.DefaultIPCGatewayAddr, types.TipSetKey{})
+		if err != nil {
+			return err
+		}
+		if !gw.Validators.Validators.Equal(expected) {
+			return fmt.Errorf("expected %v, got %v", expected, gw.Validators.Validators)
+		}
+		return nil
 	}
 	return nil
 }
 
-func MirNodesWaitMsg(ctx context.Context, msg cid.Cid, nodes ...*TestFullNode) error {
+func MirNodesWaitForInitialConfigInFirstBlock(ctx context.Context, expected *validator.Set, nodes ...*TestFullNode) error {
+	for _, node := range nodes {
+		ts, err := node.ChainGetTipSetByHeight(ctx, 1, types.TipSetKey{})
+		if err != nil {
+			return err
+		}
+
+		msgs, err := node.ChainGetBlockMessages(ctx, ts.Cids()[0])
+		if err != nil {
+			return err
+		}
+
+		for _, msg := range msgs.SecpkMessages {
+			var valSet validator.Set
+			if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Message.Params)); err != nil {
+				return err
+			}
+
+			if !valSet.Equal(expected) {
+				return fmt.Errorf("expected %v, got %v", expected, valSet)
+			}
+		}
+	}
+
+	return nil
+}
+
+func MirNodesWaitForMsg(ctx context.Context, msg cid.Cid, nodes ...*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for _, node := range nodes {

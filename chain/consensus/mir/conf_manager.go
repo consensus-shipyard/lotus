@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/mir/pkg/client"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	t "github.com/filecoin-project/mir/pkg/types"
@@ -37,20 +38,22 @@ var (
 var _ client.Client = &ConfigurationManager{}
 
 type ConfigurationManager struct {
-	ctx           context.Context // Parent context
-	ds            db.DB           // Persistent storage.
-	id            string          // Manager ID.
-	nextReqNo     uint64          // The number that will be used in the next configuration Mir request.
-	nextAppliedNo uint64          // The number of the next configuration Mir request that will be applied.
+	ctx                  context.Context // Parent context
+	ds                   db.DB           // Persistent storage.
+	id                   string          // Manager ID.
+	nextReqNo            uint64          // The number that will be used in the next configuration Mir request.
+	nextAppliedNo        uint64          // The number of the next configuration Mir request that will be applied.
+	initialConfiguration membership.Info // Initial membership information.
 }
 
-func NewConfigurationManager(ctx context.Context, ds db.DB, id string) (*ConfigurationManager, error) {
+func NewConfigurationManager(ctx context.Context, ds db.DB, id string, info *membership.Info) (*ConfigurationManager, error) {
 	cm := &ConfigurationManager{
-		ctx:           ctx,
-		ds:            ds,
-		id:            id,
-		nextReqNo:     0,
-		nextAppliedNo: 0,
+		ctx:                  ctx,
+		ds:                   ds,
+		id:                   id,
+		nextReqNo:            0,
+		nextAppliedNo:        0,
+		initialConfiguration: *info,
 	}
 	err := cm.recover()
 	if err != nil {
@@ -85,6 +88,10 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request,
 	cm.storeNextConfigurationNumber(cm.nextReqNo)
 
 	return &r, nil
+}
+
+func (cm *ConfigurationManager) GetInitialMembershipInfo() membership.Info {
+	return cm.initialConfiguration
 }
 
 // Done marks a configuration request as done. It will no longer be among the request returned by Pending.

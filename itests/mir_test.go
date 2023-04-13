@@ -16,10 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/big"
 
@@ -79,6 +80,8 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+
+	initialMembership := membership
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
@@ -147,6 +150,12 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
 	}
+
+	err = kit.MirNodesWaitForInitialConfigInFirstBlock(ctx, initialMembership, nodes...)
+	require.NoError(t, err)
+
+	err = kit.MirNodesWaitForMembershipMsg(ctx, membership, nodes...)
+	require.NoError(t, err)
 }
 
 // TestMirReconfigurationOnChain_RunSubnet tests that the membership can be received using a stub JSON RPC client.
@@ -297,7 +306,7 @@ func TestMirReconfiguration_MembershipMessagesSent(t *testing.T) {
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
-	err = kit.MirNodesWaitMembershipMsg(ctx, membership, nodes...)
+	err = kit.MirNodesWaitForMembershipMsg(ctx, membership, nodes...)
 	require.NoError(t, err)
 
 }
@@ -965,7 +974,7 @@ func TestMirBasic_MessageFromLearner(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
+		err = kit.MirNodesWaitForMsg(ctx, smsg.Cid(), nodes...)
 		require.NoError(t, err)
 	}
 
@@ -990,7 +999,7 @@ func TestMirBasic_MessageFromLearner(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 
-		err = kit.MirNodesWaitMsg(ctx, smsg.Cid(), nodes...)
+		err = kit.MirNodesWaitForMsg(ctx, smsg.Cid(), nodes...)
 		require.NoError(t, err)
 
 		// no message pending in message pool
@@ -1094,7 +1103,7 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, id := range cids {
-		err = kit.MirNodesWaitMsg(ctx, id, nodes[0])
+		err = kit.MirNodesWaitForMsg(ctx, id, nodes[0])
 		require.NoError(t, err)
 	}
 }

@@ -294,6 +294,16 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 
 	sm.height++
 
+	// Include initial membership into the block 1.
+	if sm.height == 1 {
+		info := sm.confManager.GetInitialMembershipInfo()
+		initialConfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, info.ValidatorSet)
+		if err != nil {
+			return err
+		}
+		valSetMsgs = append(valSetMsgs, initialConfigMsg)
+	}
+
 	// For each request in the batch
 	for _, req := range txs {
 		switch req.Type {
@@ -662,7 +672,7 @@ func (sm *StateManager) getSignedMessages(mirMsgs []Message) (msgs []*types.Sign
 				log.With("validator", sm.id).
 					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
 				// TODO: If we try to remove something from the pool, we should remember that
-				// we already tried to remove that to avoid adding as it may lead to a dead-lock.
+				// we already tried to remove that to avoid adding as it may lead to a deadlock.
 				// FIFO should be updated because we don't have the support for in-flight supports.
 				// continue
 			}
