@@ -360,7 +360,7 @@ workflows:
       - test-mir-reconfiguration:
           name: mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration_AddAndRemoveOneValidator"
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration_AddAndRemoveOneValidatorDebug"
           target: "./itests/mir_test.go"
 
   nightly:
