@@ -111,7 +111,6 @@ func MirNodesWaitForMembershipMsg(ctx context.Context, expected *validator.Set, 
 		if !gw.Validators.Validators.Equal(expected) {
 			return fmt.Errorf("expected %v, got %v", expected, gw.Validators.Validators)
 		}
-		return nil
 	}
 	return nil
 }
