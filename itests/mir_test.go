@@ -81,7 +81,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
-	initialMembership := membership
+	// initialMembership := membership
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirConfig{
