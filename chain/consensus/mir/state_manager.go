@@ -298,11 +298,10 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if sm.height == 1 {
 		info := sm.confManager.GetInitialMembershipInfo()
 		initialConfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, info.ValidatorSet)
-		_ = initialConfigMsg
 		if err != nil {
 			return err
 		}
-		// valSetMsgs = append(valSetMsgs, initialConfigMsg)
+		valSetMsgs = append(valSetMsgs, initialConfigMsg)
 	}
 
 	// For each request in the batch
@@ -322,8 +321,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 				if err != nil {
 					return err
 				}
-				_ = reconfigMsg
-				// valSetMsgs = append(valSetMsgs, reconfigMsg)
+				valSetMsgs = append(valSetMsgs, reconfigMsg)
 			}
 		}
 	}
