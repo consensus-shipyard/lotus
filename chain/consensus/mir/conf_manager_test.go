@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/types"
 
@@ -89,7 +90,7 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	})
 	ds, err := mirkv.NewLevelDB(dbFile, false)
 	require.NoError(t, err)
-	cm, err := NewConfigurationManager(context.Background(), ds, "id1", nil)
+	cm, err := NewConfigurationManager(context.Background(), ds, "id1", &membership.Info{})
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), cm.nextReqNo)
 	require.Equal(t, uint64(0), cm.nextAppliedNo)
@@ -125,7 +126,7 @@ func TestConfigurationManagerRecoverData_NoCrash(t *testing.T) {
 	})
 	ds, err := mirkv.NewLevelDB(dbFile, false)
 	require.NoError(t, err)
-	cm, err := NewConfigurationManager(context.Background(), ds, "id1", nil)
+	cm, err := NewConfigurationManager(context.Background(), ds, "id1", &membership.Info{})
 	require.NoError(t, err)
 
 	_, err = cm.NewTX(ConfigurationRequest, []byte{0})
@@ -169,7 +170,7 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 
 	ds1, err := mirkv.NewLevelDB(dbFile1, false)
 	require.NoError(t, err)
-	cm1, err := NewConfigurationManager(context.Background(), ds1, "id1", nil)
+	cm1, err := NewConfigurationManager(context.Background(), ds1, "id1", &membership.Info{})
 	require.NoError(t, err)
 
 	_, err = cm1.NewTX(ConfigurationRequest, []byte{0})
@@ -182,7 +183,7 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 
 	ds2, err := mirkv.NewLevelDB(dbFile2, false)
 	require.NoError(t, err)
-	cm2, err := NewConfigurationManager(context.Background(), ds2, "id2", nil)
+	cm2, err := NewConfigurationManager(context.Background(), ds2, "id2", &membership.Info{})
 	require.NoError(t, err)
 
 	// Store the first request.
@@ -234,7 +235,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 	})
 	ds, err := mirkv.NewLevelDB(dbFile, false)
 	require.NoError(t, err)
-	cm, err := NewConfigurationManager(context.Background(), ds, "id1", nil)
+	cm, err := NewConfigurationManager(context.Background(), ds, "id1", &membership.Info{})
 	require.NoError(t, err)
 
 	// Store the first request.
@@ -254,7 +255,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 
 	// Recover the state and check it is correct.
 
-	cm, err = NewConfigurationManager(context.Background(), ds, "id1", nil)
+	cm, err = NewConfigurationManager(context.Background(), ds, "id1", &membership.Info{})
 	require.NoError(t, err)
 
 	reqs, err := cm.Pending()
@@ -288,7 +289,7 @@ func TestConfigurationManagerRecoverData_WithZeroNonce0(t *testing.T) {
 	})
 	ds, err := mirkv.NewLevelDB(dbFile, false)
 	require.NoError(t, err)
-	cm, err := NewConfigurationManager(context.Background(), ds, "id1", nil)
+	cm, err := NewConfigurationManager(context.Background(), ds, "id1", &membership.Info{})
 	require.NoError(t, err)
 
 	// Store the first request.
