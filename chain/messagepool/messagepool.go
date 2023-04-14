@@ -34,6 +34,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -1283,8 +1284,10 @@ func (mp *MessagePool) HeadChange(ctx context.Context, revert []*types.TipSet, a
 			}
 
 			for _, msg := range smsgs {
-				rm(msg.Message.From, msg.Message.Nonce)
-				maybeRepub(msg.Cid())
+				if membership.IsConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
+					rm(msg.Message.From, msg.Message.Nonce)
+					maybeRepub(msg.Cid())
+				}
 			}
 
 			for _, msg := range bmsgs {
