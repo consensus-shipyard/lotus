@@ -4,8 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/stretchr/testify/require"
+
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
+	"github.com/filecoin-project/go-address"
 )
 
 func TestMembership(t *testing.T) {
@@ -42,6 +45,28 @@ func TestStringMembershipInfo(t *testing.T) {
 	require.Equal(t, uint64(0), info.MinValidators)
 	require.Equal(t, uint64(3), info.ValidatorSet.ConfigurationNumber)
 	require.Equal(t, 3, len(info.ValidatorSet.Validators))
+}
+
+func TestOnchainMembershipInfo(t *testing.T) {
+	v1, err := validator.NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
+	require.NoError(t, err)
+	v2, err := validator.NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10001/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
+	require.NoError(t, err)
+	v3, err := validator.NewValidatorFromString("t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10002/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ")
+	require.NoError(t, err)
+
+	// Reintroduce the address to avoid looping.
+	gw, err := address.NewIDAddress(64)
+	require.NoError(t, err)
+
+	vs := validator.NewValidatorSet(0, []*validator.Validator{v1, v2, v3})
+	require.Equal(t, 3, vs.Size())
+	require.Equal(t, uint64(0), vs.GetConfigurationNumber())
+
+	mb, err := NewSetMembershipMsg(gw, vs)
+	require.NoError(t, err)
+
+	require.True(t, IsConfigMsg(gw, &mb.Message))
 }
 
 func TestFileMembershipInfo(t *testing.T) {

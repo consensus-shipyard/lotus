@@ -3,7 +3,6 @@ package mir
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -25,7 +24,8 @@ func TestRestoreConfigurationVotes(t *testing.T) {
 	}
 
 	m := GetConfigurationVotes(votes)
-	fmt.Println(m)
+	require.Equal(t, 2, len(valSet1))
+	require.Equal(t, 1, len(valSet2))
 	require.Equal(t, 2, len(m))
 	require.Equal(t, 2, len(m[0]["hash1"]))
 	require.Equal(t, struct{}{}, m[0]["hash1"]["id1"])
@@ -44,7 +44,7 @@ func TestStoreConfigurationVotes(t *testing.T) {
 	m[0]["bb"] = make(map[types.NodeID]struct{})
 	m[0]["bb"]["id1"] = struct{}{}
 
-	voteRecords := storeConfigurationVotes(m)
+	voteRecords := StoreConfigurationVotes(m)
 	require.Equal(t, 2, len(voteRecords))
 	require.Equal(t, uint64(0), voteRecords[0].ConfigurationNumber, uint64(0))
 	require.Equal(t, uint64(0), voteRecords[1].ConfigurationNumber, uint64(0))

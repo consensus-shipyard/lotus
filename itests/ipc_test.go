@@ -3,21 +3,20 @@ package itests
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"testing"
-	"unicode"
+
+	"github.com/ipfs/go-cid"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
-	"github.com/ipfs/go-cid"
-	"github.com/minio/blake2b-simd"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
+
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
@@ -153,7 +152,7 @@ func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from,
 		To:     snActor,
 		From:   from,
 		Value:  abi.TokenAmount(types.MustParseFIL("10")),
-		Method: MustGenerateFRCMethodNum("Join"),
+		Method: builtin.MustGenerateFRCMethodNum("Join"),
 		Params: params,
 	}, nil)
 	require.NoError(t, aerr)
@@ -189,59 +188,11 @@ func SubmitCheckpoint(t *testing.T, ctx context.Context, node *kit.TestFullNode,
 		To:     sn.Actor,
 		From:   from,
 		Value:  abi.NewTokenAmount(0),
-		Method: MustGenerateFRCMethodNum("SubmitCheckpoint"),
+		Method: builtin.MustGenerateFRCMethodNum("SubmitCheckpoint"),
 		Params: params,
 	}, nil)
 	require.NoError(t, aerr)
 
 	_, aerr = node.StateWaitMsg(ctx, smsg.Cid(), build.MessageConfidence, api.LookbackNoLimit, true)
 	require.NoError(t, aerr)
-}
-
-// Generates a standard FRC-42 compliant method number
-// Reference: https://github.com/filecoin-project/FIPs/blob/master/FRCs/frc-0042.md
-// This code was borrowed from: https://github.com/filecoin-project/go-state-types/blob/master/builtin/frc_0042.go
-// In the future consider using directly that library.
-func GenerateFRCMethodNum(name string) (abi.MethodNum, error) {
-	err := validateMethodName(name)
-	if err != nil {
-		return 0, err
-	}
-
-	digest := blake2b.Sum512([]byte("1|" + name))
-
-	for i := 0; i < 64; i += 4 {
-		methodId := binary.BigEndian.Uint32(digest[i : i+4])
-		if methodId >= (1 << 24) {
-			return abi.MethodNum(methodId), nil
-		}
-	}
-
-	return abi.MethodNum(0), xerrors.Errorf("Could not generate method num from method name %s:", name)
-}
-
-func validateMethodName(name string) error {
-	if name == "" {
-		return xerrors.Errorf("empty name string")
-	}
-
-	if !(unicode.IsUpper(rune(name[0])) || name[0] == "_"[0]) {
-		return xerrors.Errorf("Method name first letter must be uppercase or underscore, method name: %s", name)
-	}
-
-	for _, c := range name {
-		if !(unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_') {
-			return xerrors.Errorf("method name has illegal characters, method name: %s", name)
-		}
-	}
-
-	return nil
-}
-
-func MustGenerateFRCMethodNum(name string) abi.MethodNum {
-	methodNum, err := GenerateFRCMethodNum(name)
-	if err != nil {
-		panic(err)
-	}
-	return methodNum
 }

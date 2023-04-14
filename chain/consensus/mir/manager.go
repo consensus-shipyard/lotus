@@ -96,19 +96,19 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
 	}
 
-	mInfo, err := membership.GetMembershipInfo()
+	membershipInfo, err := membership.GetMembershipInfo()
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to get membership info: %w", id, err)
 	}
 
-	initialValidatorSet := mInfo.ValidatorSet
+	initialValidatorSet := membershipInfo.ValidatorSet
 	valSize := initialValidatorSet.Size()
 	// There needs to be at least one validator in the membership
 	if valSize == 0 {
 		return nil, fmt.Errorf("validator %v: empty validator set", id)
 	}
 	// Check the minimum number of validators.
-	if mInfo.MinValidators > uint64(valSize) {
+	if membershipInfo.MinValidators > uint64(valSize) {
 		return nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
 	}
 
@@ -135,7 +135,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", id, err)
 	}
 
-	confManager, err := NewConfigurationManager(ctx, ds, id)
+	confManager, err := NewConfigurationManagerWithMembershipInfo(ctx, ds, id, membershipInfo)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create configuration manager: %w", id, err)
 	}

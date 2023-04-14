@@ -4,13 +4,22 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
-	"github.com/multiformats/go-multiaddr"
+
+	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/builtin"
+	"github.com/filecoin-project/go-state-types/crypto"
 
 	t "github.com/filecoin-project/mir/pkg/types"
 
+	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
+	"github.com/filecoin-project/lotus/chain/types"
 )
 
 const (
@@ -157,4 +166,31 @@ func Membership(validators []*validator.Validator) ([]t.NodeID, map[t.NodeID]t.N
 	}
 
 	return nodeIDs, nodeAddrs, nil
+}
+
+// NewSetMembershipMsg creates a new message to update implicitly
+// the membership in the gateway actor of the subnet
+func NewSetMembershipMsg(gw address.Address, valSet *validator.Set) (*types.SignedMessage, error) {
+	params, err := actors.SerializeParams(valSet)
+	if err != nil {
+		return nil, err
+	}
+	msg := types.Message{
+		To:         gw,
+		From:       builtin.SystemActorAddr,
+		Value:      abi.NewTokenAmount(0),
+		Method:     builtin.MustGenerateFRCMethodNum("SetMembership"),
+		Params:     params,
+		GasFeeCap:  types.NewInt(0),
+		GasPremium: types.NewInt(0),
+		GasLimit:   build.BlockGasLimit, // Make super sure this is never too little
+	}
+	return &types.SignedMessage{Message: msg, Signature: crypto.Signature{Type: crypto.SigTypeDelegated}}, nil
+}
+
+// IsConfigMsg determines if the message is a config message to set on-chain membership.
+func IsConfigMsg(gw address.Address, msg *types.Message) bool {
+	return msg.To == gw &&
+		msg.From == builtin.SystemActorAddr &&
+		msg.Method == builtin.MustGenerateFRCMethodNum("SetMembership")
 }

@@ -213,14 +213,8 @@ jobs:
         description: gotestsum format. https://github.com/gotestyourself/gotestsum#format
       coverage:
         type: string
-        default: -coverprofile=coverage.txt -coverpkg=github.com/filecoin-project/lotus/...
+        default: "-coverprofile=/tmp/conformance.out -coverpkg ./chain/consensus/...,./chain/ipcagent/...,./chain/eudico-core/..."
         description: Coverage flag. Set to the empty string to disable.
-      codecov-upload:
-        type: boolean
-        default: true
-        description: |
-          Upload coverage report to https://codecov.io/. Requires the codecov API token to be
-          set as an environment variable for private projects.
     executor: << parameters.executor >>
     steps:
       - prepare
@@ -245,7 +239,6 @@ jobs:
           name: go test
           environment:
             TEST_RUSTPROOFS_LOGS: << parameters.proofs-log-test >>
-            SKIP_CONFORMANCE: "1"
             MIR_INTERCEPTOR_OUTPUT: "mir-interceptor"
             GOLOG_LOG_LEVEL: "info,mir-consensus=info,mir-manager=info"
           command: |
@@ -259,6 +252,7 @@ jobs:
               << parameters.coverage >> \
               << parameters.go-test-flags >> \
               << parameters.target >>
+            go tool cover -html=/tmp/conformance.out -o /tmp/test-artifacts/test-coverage.html
           no_output_timeout: 30m
       - run:
           command: |
@@ -272,13 +266,10 @@ jobs:
           path: /tmp/test-artifacts/<< parameters.suite >>.json
       - store_artifacts:
           path: /tmp/test-mir-interceptor
-      - when:
-          condition: << parameters.codecov-upload >>
-          steps:
-            - run:
-                shell: /bin/bash -eo pipefail
-                command: |
-                  bash <(curl -s https://codecov.io/bash)
+      - store_artifacts:
+          path: /tmp/test-artifacts/test-coverage.html
+      - store_artifacts:
+          path: /tmp/conformance.out
 
   test-mir-smoke:
     <<: *basic_test
@@ -372,10 +363,12 @@ workflows:
       - test-chain-unit:
           name: chain-unit-tests
           suite: consensus
+          go-test-flags: "-tags=spacenet -race -shuffle=on -v -count=1"
           target: "./chain/consensus/..."
       - test-ipcagent-unit:
           name: ipcagent-unit-tests
           suite: consensus
+          go-test-flags: "-tags=spacenet -race -shuffle=on -v -count=1"
           target: "./chain/ipcagent/..."
       - test-mir-smoke:
           name: mir-smoke-tests
@@ -418,15 +411,15 @@ workflows:
       - nightly-test-mir-with-mangler:
           name: nightly-mir-mangler-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 120m -run TestMirWithMangler"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
       - nightly-test-mir-basic:
           name: nightly-mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - nightly-test-mir-reconfiguration:
           name: nightly-mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"

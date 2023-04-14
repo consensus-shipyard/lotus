@@ -91,6 +91,11 @@ issues:
       - staticcheck
       text: "SA1019: \"github.com/libp2p/go-libp2p-core"
 
+    - path: itests/wdpost_dispute_test.go
+      text: "cannot use client"
+      linters:
+        - typecheck
+
 linters-settings:
   goconst:
     min-occurrences: 6

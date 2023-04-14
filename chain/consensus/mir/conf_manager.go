@@ -14,8 +14,10 @@ import (
 	"github.com/filecoin-project/mir/pkg/client"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	t "github.com/filecoin-project/mir/pkg/types"
+	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
 const (
@@ -29,27 +31,45 @@ var (
 	// NextAppliedConfigurationNumberKey is used to store AppliedConfigurationNumber
 	// that is the maximum configuration request number that has been applied.
 	NextAppliedConfigurationNumberKey = datastore.NewKey("mir/next-applied-config-number")
-	// ReconfigurationVotesKey is used to store configuration votes.
-	ReconfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
+	// ConfigurationVotesKey is used to store configuration votes.
+	ConfigurationVotesKey = datastore.NewKey("mir/reconfiguration-votes")
 )
 
 var _ client.Client = &ConfigurationManager{}
 
 type ConfigurationManager struct {
-	ctx           context.Context // Parent context
-	ds            db.DB           // Persistent storage.
-	id            string          // Manager ID.
-	nextReqNo     uint64          // The number that will be used in the next configuration Mir request.
-	nextAppliedNo uint64          // The number of the next configuration Mir request that will be applied.
+	ctx                  context.Context // Parent context
+	ds                   db.DB           // Persistent storage.
+	id                   string          // Manager ID.
+	nextReqNo            uint64          // The number that will be used in the next configuration Mir request.
+	nextAppliedNo        uint64          // The number of the next configuration Mir request that will be applied.
+	initialConfiguration membership.Info // Initial membership information.
 }
 
 func NewConfigurationManager(ctx context.Context, ds db.DB, id string) (*ConfigurationManager, error) {
 	cm := &ConfigurationManager{
-		ctx:           ctx,
-		ds:            ds,
-		id:            id,
-		nextReqNo:     0,
-		nextAppliedNo: 0,
+		ctx:                  ctx,
+		ds:                   ds,
+		id:                   id,
+		nextReqNo:            0,
+		nextAppliedNo:        0,
+		initialConfiguration: membership.Info{},
+	}
+	err := cm.recover()
+	if err != nil {
+		return nil, err
+	}
+	return cm, nil
+}
+
+func NewConfigurationManagerWithMembershipInfo(ctx context.Context, ds db.DB, id string, info *membership.Info) (*ConfigurationManager, error) {
+	cm := &ConfigurationManager{
+		ctx:                  ctx,
+		ds:                   ds,
+		id:                   id,
+		nextReqNo:            0,
+		nextAppliedNo:        0,
+		initialConfiguration: *info,
 	}
 	err := cm.recover()
 	if err != nil {
@@ -84,6 +104,10 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request,
 	cm.storeNextConfigurationNumber(cm.nextReqNo)
 
 	return &r, nil
+}
+
+func (cm *ConfigurationManager) GetInitialMembershipInfo() membership.Info {
+	return cm.initialConfiguration
 }
 
 // Done marks a configuration request as done. It will no longer be among the request returned by Pending.
@@ -204,7 +228,7 @@ func (cm *ConfigurationManager) getAppliedConfigurationNumber() uint64 {
 
 func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string]map[t.NodeID]struct{} {
 	votes := make(map[uint64]map[string]map[t.NodeID]struct{})
-	b, err := cm.ds.Get(cm.ctx, ReconfigurationVotesKey)
+	b, err := cm.ds.Get(cm.ctx, ConfigurationVotesKey)
 	if errors.Is(err, datastore.ErrNotFound) {
 		log.With("validator", cm.id).Info("stored reconfiguration votes not found")
 		return votes
@@ -225,7 +249,7 @@ func (cm *ConfigurationManager) GetConfigurationVotes() map[uint64]map[string]ma
 }
 
 func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) error {
-	recs := storeConfigurationVotes(votes)
+	recs := StoreConfigurationVotes(votes)
 	r := VoteRecords{
 		Records: recs,
 	}
@@ -234,7 +258,7 @@ func (cm *ConfigurationManager) StoreConfigurationVotes(votes map[uint64]map[str
 	if err := r.MarshalCBOR(b); err != nil {
 		return err
 	}
-	if err := cm.ds.Put(cm.ctx, ReconfigurationVotesKey, b.Bytes()); err != nil {
+	if err := cm.ds.Put(cm.ctx, ConfigurationVotesKey, b.Bytes()); err != nil {
 		log.With("validator", cm.id).Warnf("failed to put reconfiguration votes: %v", err)
 	}
 
@@ -269,15 +293,18 @@ func GetConfigurationVotes(vr []VoteRecord) map[uint64]map[string]map[t.NodeID]s
 	return m
 }
 
-func storeConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) []VoteRecord {
+func StoreConfigurationVotes(votes map[uint64]map[string]map[t.NodeID]struct{}) []VoteRecord {
 	var vs []VoteRecord
-	for n, hashToValidatorsVotes := range votes {
-		for h, nodeIDs := range hashToValidatorsVotes {
+
+	for _, n := range maputil.GetSortedKeys(votes) {
+		hashToValidatorsVotes := votes[n]
+		for _, h := range maputil.GetSortedKeys(hashToValidatorsVotes) {
+			nodeIDs := hashToValidatorsVotes[h]
 			e := VoteRecord{
 				ConfigurationNumber: n,
 				ValSetHash:          h,
 			}
-			for n := range nodeIDs {
+			for _, n := range maputil.GetSortedKeys(nodeIDs) {
 				e.VotedValidators = append(e.VotedValidators, VotedValidator{n.Pb()})
 			}
 			vs = append(vs, e)
