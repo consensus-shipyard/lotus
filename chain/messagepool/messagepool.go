@@ -1284,7 +1284,7 @@ func (mp *MessagePool) HeadChange(ctx context.Context, revert []*types.TipSet, a
 			}
 
 			for _, msg := range smsgs {
-				if membership.IsConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
+				if !membership.IsConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
 					rm(msg.Message.From, msg.Message.Nonce)
 					maybeRepub(msg.Cid())
 				}
