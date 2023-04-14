@@ -11,13 +11,13 @@ import (
 	"github.com/ipfs/go-datastore"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/mir/pkg/client"
 	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
 const (
@@ -46,7 +46,23 @@ type ConfigurationManager struct {
 	initialConfiguration membership.Info // Initial membership information.
 }
 
-func NewConfigurationManager(ctx context.Context, ds db.DB, id string, info *membership.Info) (*ConfigurationManager, error) {
+func NewConfigurationManager(ctx context.Context, ds db.DB, id string) (*ConfigurationManager, error) {
+	cm := &ConfigurationManager{
+		ctx:                  ctx,
+		ds:                   ds,
+		id:                   id,
+		nextReqNo:            0,
+		nextAppliedNo:        0,
+		initialConfiguration: membership.Info{},
+	}
+	err := cm.recover()
+	if err != nil {
+		return nil, err
+	}
+	return cm, nil
+}
+
+func NewConfigurationManagerWithMembershipInfo(ctx context.Context, ds db.DB, id string, info *membership.Info) (*ConfigurationManager, error) {
 	cm := &ConfigurationManager{
 		ctx:                  ctx,
 		ds:                   ds,

@@ -4,8 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/stretchr/testify/require"
+
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-address"
 )

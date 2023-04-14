@@ -135,7 +135,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", id, err)
 	}
 
-	confManager, err := NewConfigurationManager(ctx, ds, id, membershipInfo)
+	confManager, err := NewConfigurationManagerWithMembershipInfo(ctx, ds, id, membershipInfo)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create configuration manager: %w", id, err)
 	}
