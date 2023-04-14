@@ -169,7 +169,7 @@ func FundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sd
 		To:     genesis.DefaultIPCGatewayAddr,
 		From:   from,
 		Value:  abi.TokenAmount(types.MustParseFIL("10")),
-		Method: MustGenerateFRCMethodNum("Fund"),
+		Method: builtin.MustGenerateFRCMethodNum("Fund"),
 		Params: params,
 	}, nil)
 	require.NoError(t, aerr)
