@@ -1,4 +1,4 @@
-// stm: #unit
+//stm: #unit
 package events
 
 import (
@@ -358,7 +358,7 @@ func (fcs *fakeCS) advance(rev, app, drop int, msgs map[int]cid.Cid, nulls ...in
 var _ EventAPI = &fakeCS{}
 
 func TestAt(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 	events, err := NewEvents(context.Background(), fcs)
 	require.NoError(t, err)
@@ -419,7 +419,7 @@ func TestAt(t *testing.T) {
 }
 
 func TestAtNullTrigger(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001
 	fcs := newFakeCS(t)
 	events, err := NewEvents(context.Background(), fcs)
 	require.NoError(t, err)
@@ -449,7 +449,7 @@ func TestAtNullTrigger(t *testing.T) {
 }
 
 func TestAtNullConf(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001, @EVENTS_HEIGHT_REVERT_001
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -488,7 +488,7 @@ func TestAtNullConf(t *testing.T) {
 }
 
 func TestAtStart(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -519,7 +519,7 @@ func TestAtStart(t *testing.T) {
 }
 
 func TestAtStartConfidence(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -546,7 +546,7 @@ func TestAtStartConfidence(t *testing.T) {
 }
 
 func TestAtChained(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -577,7 +577,7 @@ func TestAtChained(t *testing.T) {
 }
 
 func TestAtChainedConfidence(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -608,7 +608,7 @@ func TestAtChainedConfidence(t *testing.T) {
 }
 
 func TestAtChainedConfidenceNull(t *testing.T) {
-	// stm: @EVENTS_HEIGHT_CHAIN_AT_001
+	//stm: @EVENTS_HEIGHT_CHAIN_AT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -640,7 +640,7 @@ func matchAddrMethod(to address.Address, m abi.MethodNum) func(msg *types.Messag
 }
 
 func TestCalled(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -846,7 +846,7 @@ func TestCalled(t *testing.T) {
 }
 
 func TestCalledTimeout(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -907,7 +907,7 @@ func TestCalledTimeout(t *testing.T) {
 }
 
 func TestCalledOrder(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -964,7 +964,7 @@ func TestCalledOrder(t *testing.T) {
 }
 
 func TestCalledNull(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -1023,7 +1023,7 @@ func TestCalledNull(t *testing.T) {
 }
 
 func TestRemoveTriggersOnMessage(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -1107,7 +1107,7 @@ type testStateChange struct {
 }
 
 func TestStateChanged(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -1193,7 +1193,7 @@ func TestStateChanged(t *testing.T) {
 }
 
 func TestStateChangedRevert(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -1270,7 +1270,7 @@ func TestStateChangedRevert(t *testing.T) {
 }
 
 func TestStateChangedTimeout(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	timeoutHeight := abi.ChainEpoch(20)
 	confidence := 3
 
@@ -1348,7 +1348,7 @@ func TestStateChangedTimeout(t *testing.T) {
 }
 
 func TestCalledMultiplePerEpoch(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	events, err := NewEvents(context.Background(), fcs)
@@ -1401,7 +1401,7 @@ func TestCalledMultiplePerEpoch(t *testing.T) {
 }
 
 func TestCachedSameBlock(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	fcs := newFakeCS(t)
 
 	_, err := NewEvents(context.Background(), fcs)
@@ -1436,7 +1436,7 @@ func (t *testObserver) Revert(_ context.Context, from, to *types.TipSet) error {
 }
 
 func TestReconnect(t *testing.T) {
-	// stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
+	//stm: @EVENTS_EVENTS_CALLED_001, @EVENTS_HEIGHT_REVERT_001
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
