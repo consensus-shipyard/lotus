@@ -26,9 +26,8 @@ const (
 	DefaultCheckpointPeriod = 10
 	DefaultIPCGatewayAddrID = 64
 
-	bitWidth  = 5
-	minStake  = 1000000000000000000
-	MaxUint64 = ^uint64(0)
+	bitWidth = 5
+	minStake = 1000000000000000000
 )
 
 var (
@@ -57,7 +56,7 @@ func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeri
 		BottomUpCheckpoints:  emptyMapCid,
 		Postbox:              emptyMapCid,
 		BottomupNonce:        0,
-		AppliedBottomupNonce: MaxUint64,
+		AppliedBottomupNonce: 0,
 		AppliedTopdownNonce:  0,
 		TopDownCheckVoting:   voting,
 	}, nil
