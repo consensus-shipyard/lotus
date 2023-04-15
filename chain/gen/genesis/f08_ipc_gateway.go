@@ -47,17 +47,17 @@ func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeri
 	}
 
 	return &gateway.State{
-		NetworkName:         network,
-		TotalSubnets:        0,
-		MinStake:            big.NewInt(minStake),
-		Subnets:             emptyMapCid,
-		BottomUpCheckPeriod: abi.ChainEpoch(buPeriod),
-		TopDownCheckPeriod:  abi.ChainEpoch(tdPeriod),
-		BottomUpCheckpoints: emptyMapCid,
-		Postbox:             emptyMapCid,
-		BottomupNonce:       0,
-		AppliedTopdownNonce: 0,
-		TopDownCheckVoting:  voting,
+		NetworkName:             network,
+		TotalSubnets:            0,
+		MinStake:                big.NewInt(minStake),
+		Subnets:                 emptyMapCid,
+		BottomUpCheckPeriod:     abi.ChainEpoch(buPeriod),
+		TopDownCheckPeriod:      abi.ChainEpoch(tdPeriod),
+		BottomUpCheckpoints:     emptyMapCid,
+		Postbox:                 emptyMapCid,
+		BottomupNonce:           0,
+		AppliedTopdownNonce:     0,
+		TopDownCheckpointVoting: voting,
 	}, nil
 }
 
