@@ -123,6 +123,7 @@
   * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
   * [IPCGetTopDownMsgsSerialized](#IPCGetTopDownMsgsSerialized)
   * [IPCHasVotedBottomUpCheckpoint](#IPCHasVotedBottomUpCheckpoint)
+  * [IPCHasVotedTopDownCheckpoint](#IPCHasVotedTopDownCheckpoint)
   * [IPCListCheckpoints](#IPCListCheckpoints)
   * [IPCListCheckpointsSerialized](#IPCListCheckpointsSerialized)
   * [IPCListChildSubnets](#IPCListChildSubnets)
@@ -3559,6 +3560,14 @@ Inputs:
     "Parent": "string value",
     "Actor": "f01234"
   },
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
   42
 ]
 ```
@@ -3605,6 +3614,14 @@ Inputs:
     "Parent": "string value",
     "Actor": "f01234"
   },
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
   42
 ]
 ```
@@ -3628,6 +3645,22 @@ Inputs:
     "Parent": "string value",
     "Actor": "f01234"
   },
+  10101,
+  "f01234"
+]
+```
+
+Response: `true`
+
+### IPCHasVotedTopDownCheckpoint
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
   10101,
   "f01234"
 ]
@@ -3818,7 +3851,8 @@ Response:
         }
       },
       "Sig": "Ynl0ZSBhcnJheQ=="
-    }
+    },
+    "AppliedBottomupNonce": 42
   }
 ]
 ```
@@ -3864,9 +3898,8 @@ Response:
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   "BottomupNonce": 42,
-  "AppliedBottomupNonce": 42,
   "AppliedTopdownNonce": 42,
-  "TopDownCheckVoting": {
+  "TopDownCheckpointVoting": {
     "GenesisEpoch": 10101,
     "SubmissionPeriod": 10101,
     "LastVotingExecuted": 10101,

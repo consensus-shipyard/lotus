@@ -7,15 +7,13 @@ import (
 	"path"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/xerrors"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
-
 	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	"github.com/filecoin-project/mir/pkg/pb/requestpb"
 	"github.com/filecoin-project/mir/pkg/systems/trantor"

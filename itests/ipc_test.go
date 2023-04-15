@@ -5,16 +5,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/consensus-shipyard/go-ipc-types/gateway"
-	"github.com/consensus-shipyard/go-ipc-types/sdk"
-	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
-
 	"github.com/filecoin-project/go-address"
-
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 
@@ -123,20 +121,23 @@ func TestIPCAccessors(t *testing.T) {
 	hasVoted, err := api.IPCHasVotedBottomUpCheckpoint(ctx, sn, genesis.DefaultCheckpointPeriod, src)
 	require.NoError(t, err)
 	require.False(t, hasVoted)
+	hasVoted, err = api.IPCHasVotedTopDownCheckpoint(ctx, genesis.DefaultIPCGatewayAddr, genesis.DefaultCheckpointPeriod, src)
+	require.NoError(t, err)
+	require.False(t, hasVoted)
 
 	// fund subnet with a number of top-down messages
 	for i := 0; i < 5; i++ {
 		FundSubnet(t, ctx, api, sn, src)
 	}
 	// get the topdown messages
-	msgs, err := api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, 0)
+	msgs, err := api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, types.EmptyTSK, 0)
 	require.NoError(t, err)
 	require.Equal(t, len(msgs), 5)
-	msgs, err = api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, 1)
+	msgs, err = api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, types.EmptyTSK, 1)
 	require.NoError(t, err)
 	require.Equal(t, len(msgs), 4)
 	// check its serialization form
-	bmsgs, err := api.IPCGetTopDownMsgsSerialized(ctx, genesis.DefaultIPCGatewayAddr, sn, 1)
+	bmsgs, err := api.IPCGetTopDownMsgsSerialized(ctx, genesis.DefaultIPCGatewayAddr, sn, types.EmptyTSK, 1)
 	require.NoError(t, err)
 	require.Equal(t, len(msgs), 4)
 	serMsg := gateway.CrossMsg{}

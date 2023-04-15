@@ -885,24 +885,25 @@ type FullNode interface {
 	// IPC-specific methods //
 
 	// IPCAddSubnetActor deploys a new subnet actor.
-	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)           //perm:write
-	IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)                          //perm:read
-	IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error)                        //perm:read
-	IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)                  //perm:read
-	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) //perm:read
-	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)                                       //perm:read
-	IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error)                //perm:read
-	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error)              //perm:read
-	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                     //perm:read
-	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error)       //perm:read
+	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)                          //perm:write
+	IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)                                         //perm:read
+	IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error)                                       //perm:read
+	IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)                                 //perm:read
+	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                //perm:read
+	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)                                                      //perm:read
+	IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error)                               //perm:read
+	IPCHasVotedTopDownCheckpoint(ctx context.Context, gw address.Address, e abi.ChainEpoch, v address.Address) (bool, error)                             //perm:read
+	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error)                             //perm:read
+	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                                    //perm:read
+	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) //perm:read
 	// Serialized representation of IPC calls.
 	// This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
 	// version of the output of the call. These are really convenient to use the same type of serialization used
 	// in actor's state, removing the need of then intermediate serialization introduced by the Lotus API.
-	IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error)                         //perm:read
-	IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error)                  //perm:read
-	IPCGetCheckpointTemplateSerialized(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) ([]byte, error)     //perm:read
-	IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([][]byte, error) //perm:read
+	IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error)                                              //perm:read
+	IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error)                                       //perm:read
+	IPCGetCheckpointTemplateSerialized(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) ([]byte, error)                          //perm:read
+	IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([][]byte, error) //perm:read
 
 }
 

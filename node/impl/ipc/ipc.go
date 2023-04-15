@@ -209,13 +209,29 @@ func (a *IPCAPI) IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.Subne
 	if err != nil {
 		return false, err
 	}
-	// ValidatorHasVote=d expects on-chain IDs. This is how votes are indexed in the StateAPI
+	// ValidatorHasVoted expects on-chain IDs. This is how votes are indexed in the StateAPI
 	// of the actor.
 	v, err = a.StateManager.LookupID(ctx, v, a.Chain.GetHeaviestTipSet())
 	if err != nil {
 		return false, xerrors.Errorf("error getting on-chain ID for validator: %w", err)
 	}
 	return st.BottomUpCheckpointVoting.ValidatorHasVoted(a.Chain.ActorStore(ctx), e, v)
+}
+
+// IPCHasVotedTopDownCheckpoint checks if a validator has already voted a specific checkpoint
+// for certain epoch
+func (a *IPCAPI) IPCHasVotedTopDownCheckpoint(ctx context.Context, gw address.Address, e abi.ChainEpoch, v address.Address) (bool, error) {
+	st, err := a.IPCReadGatewayState(ctx, gw, types.EmptyTSK)
+	if err != nil {
+		return false, err
+	}
+	// ValidatorHasVoted expects on-chain IDs. This is how votes are indexed in the StateAPI
+	// of the actor.
+	v, err = a.StateManager.LookupID(ctx, v, a.Chain.GetHeaviestTipSet())
+	if err != nil {
+		return false, xerrors.Errorf("error getting on-chain ID for validator: %w", err)
+	}
+	return st.TopDownCheckpointVoting.ValidatorHasVoted(a.Chain.ActorStore(ctx), e, v)
 }
 
 // IPCListCheckpoints returns a list of checkpoints committed for a submit between two epochs
@@ -320,8 +336,8 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 
 // IPCGetTopDownMsgs returns the list of top down-messages from a specific nonce
 // to the latest one that has been committed in the subnet.
-func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([]*gateway.CrossMsg, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, tsk)
 	if err != nil {
 		return nil, err
 	}
@@ -337,8 +353,8 @@ func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Addr
 
 // IPCGetTopDownMsgsSerialized returns the list of top down-messages
 // cbor serialized
-func (a *IPCAPI) IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, nonce uint64) ([][]byte, error) {
-	l, err := a.IPCGetTopDownMsgs(ctx, gatewayAddr, sn, nonce)
+func (a *IPCAPI) IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([][]byte, error) {
+	l, err := a.IPCGetTopDownMsgs(ctx, gatewayAddr, sn, tsk, nonce)
 	if err != nil {
 		return nil, err
 	}
