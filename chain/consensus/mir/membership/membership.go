@@ -215,10 +215,21 @@ func NewInitGenesisEpochMsg(gw address.Address, genesisEpoch abi.ChainEpoch) (*t
 	return &types.SignedMessage{Message: msg, Signature: crypto.Signature{Type: crypto.SigTypeDelegated}}, nil
 }
 
-// IsConfigMsg determines if the message is a config message to set on-chain membership.
+// IsConfigMsg determines if the message is an on-chain configuration message.
 func IsConfigMsg(gw address.Address, msg *types.Message) bool {
+	return IsSetMembershipConfigMsg(gw, msg) || IsInitGenesisEpochConfigMsg(gw, msg)
+}
+
+// IsSetMembershipConfigMsg determines if the message sets membership.
+func IsSetMembershipConfigMsg(gw address.Address, msg *types.Message) bool {
 	return msg.To == gw &&
 		msg.From == builtin.SystemActorAddr &&
-		(msg.Method == builtin.MustGenerateFRCMethodNum("SetMembership") ||
-			msg.Method == builtin.MustGenerateFRCMethodNum("InitGenesisEpoch"))
+		msg.Method == builtin.MustGenerateFRCMethodNum("SetMembership")
+}
+
+// IsInitGenesisEpochConfigMsg determines if the message initializes the genesis epoch.
+func IsInitGenesisEpochConfigMsg(gw address.Address, msg *types.Message) bool {
+	return msg.To == gw &&
+		msg.From == builtin.SystemActorAddr &&
+		msg.Method == builtin.MustGenerateFRCMethodNum("InitGenesisEpoch")
 }
