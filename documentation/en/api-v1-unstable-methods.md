@@ -119,6 +119,7 @@
   * [IPCGetCheckpointSerialized](#IPCGetCheckpointSerialized)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
   * [IPCGetCheckpointTemplateSerialized](#IPCGetCheckpointTemplateSerialized)
+  * [IPCGetGenesisEpochForSubnet](#IPCGetGenesisEpochForSubnet)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
   * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
   * [IPCGetTopDownMsgsSerialized](#IPCGetTopDownMsgsSerialized)
@@ -3524,6 +3525,24 @@ Inputs:
 
 Response: `"Ynl0ZSBhcnJheQ=="`
 
+### IPCGetGenesisEpochForSubnet
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response: `10101`
+
 ### IPCGetPrevCheckpointForChild
 
 
@@ -3852,7 +3871,8 @@ Response:
       },
       "Sig": "Ynl0ZSBhcnJheQ=="
     },
-    "AppliedBottomupNonce": 42
+    "AppliedBottomupNonce": 42,
+    "GenesisEpoch": 10101
   }
 ]
 ```
@@ -3926,7 +3946,8 @@ Response:
       "configuration_number": 42
     },
     "TotalWeight": "0"
-  }
+  },
+  "Initialized": true
 }
 ```
 
@@ -3972,7 +3993,6 @@ Response:
   "Genesis": "Ynl0ZSBhcnJheQ==",
   "BottomUpCheckPeriod": 10101,
   "TopDownCheckPeriod": 10101,
-  "GenesisEpoch": 10101,
   "CommittedCheckpoints": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },

@@ -102,6 +102,7 @@ func NewManager(ctx context.Context,
 	}
 
 	initialValidatorSet := membershipInfo.ValidatorSet
+	genesisEpoch := membershipInfo.GenesisEpoch
 	valSize := initialValidatorSet.Size()
 	// There needs to be at least one validator in the membership
 	if valSize == 0 {
@@ -157,7 +158,7 @@ func NewManager(ctx context.Context,
 	m.mirErrChan = make(chan error, 1)
 	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
-	m.stateManager, err = NewStateManager(ctx, initialMembership, m.confManager, node, ds, m.requestPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, m.netName, initialMembership, abi.ChainEpoch(genesisEpoch), m.confManager, node, ds, m.requestPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}

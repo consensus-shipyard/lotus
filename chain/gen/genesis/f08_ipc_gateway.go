@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/voting"
 	cbor "github.com/ipfs/go-ipld-cbor"
@@ -46,6 +47,12 @@ func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeri
 		return nil, xerrors.Errorf("failed to create empty map: %w", err)
 	}
 
+	// if it is the rootnet no need to explicitly initialize the gateway.
+	initialized := false
+	if network == sdk.RootSubnet {
+		initialized = true
+	}
+
 	return &gateway.State{
 		NetworkName:             network,
 		TotalSubnets:            0,
@@ -58,6 +65,7 @@ func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeri
 		BottomupNonce:           0,
 		AppliedTopdownNonce:     0,
 		TopDownCheckpointVoting: voting,
+		Initialized:             initialized,
 	}, nil
 }
 

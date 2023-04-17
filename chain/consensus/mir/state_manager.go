@@ -7,6 +7,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -28,6 +29,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/types"
 	ltypes "github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
 var (
@@ -52,7 +54,9 @@ type StateManager struct {
 	ctx context.Context
 
 	// Lotus API
-	api v1api.FullNode
+	api          v1api.FullNode
+	netName      dtypes.NetworkName
+	genesisEpoch abi.ChainEpoch
 
 	// The current epoch number.
 	currentEpoch t.EpochNr
@@ -97,7 +101,9 @@ type StateManager struct {
 
 func NewStateManager(
 	ctx context.Context,
+	netName dtypes.NetworkName,
 	initialMembership map[t.NodeID]t.NodeAddress,
+	genesisEpoch abi.ChainEpoch,
 	cm *ConfigurationManager,
 	api v1api.FullNode,
 	ds db.DB,
@@ -106,6 +112,8 @@ func NewStateManager(
 ) (*StateManager, error) {
 	sm := StateManager{
 		ctx:                     ctx,
+		netName:                 netName,
+		genesisEpoch:            genesisEpoch,
 		nextCheckpointChan:      make(chan *checkpoint.StableCheckpoint, 1),
 		confManager:             cm,
 		ds:                      ds,
@@ -292,14 +300,22 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 
 	sm.height++
 
-	// Include initial membership into the block 1.
+	// Include initial configuration and subnet initialization into the block 1.
 	if sm.height == 1 {
 		info := sm.confManager.GetInitialMembershipInfo()
 		initialConfigMsg, err := membership.NewSetMembershipMsg(genesis.DefaultIPCGatewayAddr, info.ValidatorSet)
 		if err != nil {
-			return err
+			return xerrors.Errorf("error setting initial on-chain membership: %w", err)
 		}
 		valSetMsgs = append(valSetMsgs, initialConfigMsg)
+		// the rootnet doesn't need to be explicitly initialized.
+		if string(sm.netName) != sdk.RootStr {
+			initializeMsg, err := membership.NewInitGenesisEpochMsg(genesis.DefaultIPCGatewayAddr, sm.genesisEpoch)
+			if err != nil {
+				return xerrors.Errorf("error initializing subnet: %w", err)
+			}
+			valSetMsgs = append(valSetMsgs, initializeMsg)
+		}
 	}
 
 	// For each request in the batch
@@ -384,7 +400,6 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	if err != nil {
 		return xerrors.Errorf("validator %v unable to sync a block: %w", sm.id, err)
 	}
-
 	log.With("validator", sm.id).With("epoch", sm.currentEpoch).Infof("mined block %d : %v ", bh.Header.Height, bh.Header.Cid())
 
 	return nil

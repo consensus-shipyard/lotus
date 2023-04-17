@@ -1674,6 +1674,21 @@ func (mr *MockFullNodeMockRecorder) IPCGetCheckpointTemplateSerialized(arg0, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpointTemplateSerialized", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpointTemplateSerialized), arg0, arg1, arg2)
 }
 
+// IPCGetGenesisEpochForSubnet mocks base method.
+func (m *MockFullNode) IPCGetGenesisEpochForSubnet(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID) (abi.ChainEpoch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetGenesisEpochForSubnet", arg0, arg1, arg2)
+	ret0, _ := ret[0].(abi.ChainEpoch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetGenesisEpochForSubnet indicates an expected call of IPCGetGenesisEpochForSubnet.
+func (mr *MockFullNodeMockRecorder) IPCGetGenesisEpochForSubnet(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetGenesisEpochForSubnet", reflect.TypeOf((*MockFullNode)(nil).IPCGetGenesisEpochForSubnet), arg0, arg1, arg2)
+}
+
 // IPCGetPrevCheckpointForChild mocks base method.
 func (m *MockFullNode) IPCGetPrevCheckpointForChild(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID) (cid.Cid, error) {
 	m.ctrl.T.Helper()
