@@ -26,9 +26,10 @@ cp ./scripts/mir/mir-config/node$INDEX/* $LOTUS_PATH
 mkdir $LOTUS_PATH/mir.db
 
 # Set interceptor output
-n=$(cat mir-event-logs/counter)
-export MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run-${n}"
-echo $((n + 1)) > mir-event-logs/counter
+if [[ -z "${MIR_INTERCEPTOR_OUTPUT}" ]]; then
+  n=`date '+%Y-%m-%dT%T'`
+  MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run/$INDEX/$n"
+fi
 
 # Run validator
 ./eudico mir validator run --nosync --max-block-delay="1s"

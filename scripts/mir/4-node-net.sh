@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+n=`date '+%Y-%m-%dT%T'`
+export MIR_INTERCEPTOR_OUTPUT="mir-event-logs/run-$n"
+
 tmux new-session -d -s "mir" \; \
   new-window   -t "mir" \; \
   split-window -t "mir:0" -v \; \
