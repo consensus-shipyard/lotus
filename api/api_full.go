@@ -896,6 +896,8 @@ type FullNode interface {
 	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error)                             //perm:read
 	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                                    //perm:read
 	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) //perm:read
+	IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error)                               //perm:read
+
 	// Serialized representation of IPC calls.
 	// This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
 	// version of the output of the call. These are really convenient to use the same type of serialization used

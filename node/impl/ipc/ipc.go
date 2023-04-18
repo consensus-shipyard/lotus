@@ -370,6 +370,23 @@ func (a *IPCAPI) IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr ad
 	return out, nil
 }
 
+// IPCGetGenesisEpochForSubnet returns the genesis epoch from which a subnet has been
+// registered in the parent.
+func (a *IPCAPI) IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return 0, err
+	}
+	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
+	if err != nil {
+		return 0, xerrors.Errorf("error getting subnet: %w", err)
+	}
+	if !found {
+		return 0, xerrors.Errorf("subnet not found in gateway")
+	}
+	return subnet.GenesisEpoch, nil
+}
+
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.
 //
 // The function accepts the address actor and the tipSetKet from which to read the state as an input, along

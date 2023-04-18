@@ -341,6 +341,8 @@ type FullNodeMethods struct {
 
 	IPCGetCheckpointTemplateSerialized func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) `perm:"read"`
 
+	IPCGetGenesisEpochForSubnet func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (abi.ChainEpoch, error) `perm:"read"`
+
 	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) `perm:"read"`
 
 	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([]*gateway.CrossMsg, error) `perm:"read"`
@@ -2581,6 +2583,17 @@ func (s *FullNodeStruct) IPCGetCheckpointTemplateSerialized(p0 context.Context, 
 
 func (s *FullNodeStub) IPCGetCheckpointTemplateSerialized(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) {
 	return *new([]byte), ErrNotSupported
+}
+
+func (s *FullNodeStruct) IPCGetGenesisEpochForSubnet(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (abi.ChainEpoch, error) {
+	if s.Internal.IPCGetGenesisEpochForSubnet == nil {
+		return *new(abi.ChainEpoch), ErrNotSupported
+	}
+	return s.Internal.IPCGetGenesisEpochForSubnet(p0, p1, p2)
+}
+
+func (s *FullNodeStub) IPCGetGenesisEpochForSubnet(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (abi.ChainEpoch, error) {
+	return *new(abi.ChainEpoch), ErrNotSupported
 }
 
 func (s *FullNodeStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {

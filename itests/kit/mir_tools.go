@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus"
 
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
@@ -127,7 +128,18 @@ func MirNodesWaitForInitialConfigInFirstBlock(ctx context.Context, expected *val
 			return err
 		}
 
+		var membershipMsgNumber int
+		epochMsgSeen := false
+
 		for _, msg := range msgs.SecpkMessages {
+
+			if membership.IsSetMembershipConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
+				membershipMsgNumber++
+			}
+			if membership.IsInitGenesisEpochConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
+				epochMsgSeen = true
+			}
+
 			var valSet validator.Set
 			if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Message.Params)); err != nil {
 				return err
@@ -136,6 +148,14 @@ func MirNodesWaitForInitialConfigInFirstBlock(ctx context.Context, expected *val
 			if !valSet.Equal(expected) {
 				return fmt.Errorf("expected %v, got %v", expected, valSet)
 			}
+		}
+
+		if membershipMsgNumber != 1 {
+			return fmt.Errorf("%d SetMembershipConfigMsg were received", membershipMsgNumber)
+		}
+		// The tests are running on the rootnet only.
+		if epochMsgSeen {
+			return fmt.Errorf("epochMsgSeen message was received on the rootnet")
 		}
 	}
 

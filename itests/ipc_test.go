@@ -73,6 +73,11 @@ func TestIPCAccessors(t *testing.T) {
 
 	JoinSubnet(t, ctx, api, src, actorAddr)
 
+	e, err := api.IPCGetGenesisEpochForSubnet(ctx, genesis.DefaultIPCGatewayAddr, sn)
+	require.NoError(t, err)
+	// require that the genesis epoch is greater than zero
+	require.True(t, e > 0)
+
 	// get subnet actor state
 	_, err = api.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
 	require.NoError(t, err)
