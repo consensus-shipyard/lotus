@@ -95,8 +95,11 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 
 	// the gateway receives the same initial balance as the reward actor, this is used
 	// to mint new tokens in subnets when top-down messages are executed.
-	// This balance is zero in the root, as now top-down messages can be executed in the root.
-	balance := abi.NewTokenAmount(0)
+	// This balance is really low in the root, as now top-down messages can be executed in the root
+	// and is only used to fund the initial validators.
+	// We assume that there won't be more than 1000 initial validators, if this is the case
+	// we should change this.
+	balance := abi.TokenAmount(types.MustParseFIL("1000FIL"))
 	if network != ipctypes.RootSubnet {
 		balance = types.BigInt{Int: build.InitialRewardBalance}
 	}
