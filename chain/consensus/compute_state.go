@@ -223,7 +223,7 @@ func (t *TipSetExecutor) ApplyBlocks(ctx context.Context,
 			if membership.IsConfigMsg(DefaultGatewayAddr, m) {
 				r, err := vmi.ApplyImplicitMessage(ctx, m) // nolint
 				if err != nil {
-					return cid.Undef, cid.Undef, xerrors.Errorf("running cron: %w", err)
+					return cid.Undef, cid.Undef, xerrors.Errorf("applying Mir config message: %w", err)
 				}
 
 				if em != nil {

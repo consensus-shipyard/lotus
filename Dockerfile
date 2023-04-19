@@ -116,6 +116,7 @@ COPY --from=lotus-builder /opt/filecoin/eudico         /usr/local/bin/
 
 # Copy subnets genesis template
 COPY --from=lotus-builder /opt/filecoin/eudico-core/genesis/genesis.json /
+COPY --from=lotus-builder /opt/filecoin/eudico-core/genesis/genesis-test.json /
 # Copy ipc scripts
 COPY --from=lotus-builder /opt/filecoin/scripts/ipc /scripts/ipc
 
