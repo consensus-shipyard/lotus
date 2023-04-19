@@ -30,5 +30,5 @@ rm -rf $LOTUS_PATH
 #    rm ./scripts/mir/devgen.car
 #    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
-./eudico mir daemon --genesis=./build/genesis/spacenet.car --bootstrap=false --api=123$INDEX
+./eudico mir daemon --genesis=./scripts/mir/genesis.car --bootstrap=false --api=123$INDEX
 # fi
