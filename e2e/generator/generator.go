@@ -16,7 +16,6 @@ import (
 
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 )
@@ -49,7 +48,7 @@ type ValidatorSetData struct {
 }
 
 func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
-	w := big.NewInt(0)
+	w := abi.NewTokenAmount(0)
 	v := Validator{
 		N:       n,
 		APIPort: fmt.Sprintf("123%d", n),
@@ -86,6 +85,7 @@ func (v *Validator) Data() *ValidatorData {
 	return &ValidatorData{
 		Addr:    v.Addr,
 		NetAddr: v.NetAddr,
+		Weight:  v.Weight,
 	}
 }
 

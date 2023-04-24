@@ -1,3 +1,5 @@
+[ChainStore]
+  EnableSplitstore = true
 [API]
   # Binding address for the Lotus API
   #
