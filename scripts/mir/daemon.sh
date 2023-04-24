@@ -10,7 +10,7 @@ fi
 INDEX=$1
 PORT=$2
 EUDICO=${EUDICO:-./eudico}
-CONFIG_DATA=${CONFIG_DATA:-./scripts/mir/mir-config}
+CONFIG_DATA=${CONFIG_DATA:-./scripts/mir}
 BUILD_DATA=${BUILD_DATA:-./build}
 
 
@@ -23,7 +23,7 @@ export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
 mkdir $LOTUS_PATH
-cp -r $CONFIG_DATA/node$INDEX/config.toml $LOTUS_PATH/
+cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json
@@ -37,10 +37,11 @@ cp -r $CONFIG_DATA/node$INDEX/config.toml $LOTUS_PATH/
 #    rm ./scripts/mir/devgen.car
 #    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
+
 API_PORT=""
 if [ ! -z "$PORT" ]
 then
   API_PORT="--api=$PORT"
 fi
-$EUDICO mir daemon --genesis=$BUILD_DATA/genesis/spacenet.car --bootstrap=false $API_PORT
+$EUDICO mir daemon --genesis=$CONFIG_DATA/genesis.car --bootstrap=false $API_PORT
 # fi

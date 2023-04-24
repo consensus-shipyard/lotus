@@ -7,11 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 	"github.com/stretchr/testify/require"
-
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 )
 
 type TestService struct{}

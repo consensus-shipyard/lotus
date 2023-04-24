@@ -21,6 +21,7 @@ import (
 
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 )
@@ -34,6 +35,7 @@ var EvmCmd = &cli.Command{
 		EvmGetInfoCmd,
 		EvmCallSimulateCmd,
 		EvmGetContractAddress,
+		EvmGetBytecode,
 	},
 }
 
@@ -75,13 +77,18 @@ var EvmGetInfoCmd = &cli.Command{
 		}
 
 		actor, err := api.StateGetActor(ctx, faddr, types.EmptyTSK)
-		if err != nil {
-			return err
-		}
-
 		fmt.Println("Filecoin address: ", faddr)
 		fmt.Println("Eth address: ", eaddr)
-		fmt.Println("Code cid: ", actor.Code.String())
+		if err != nil {
+			fmt.Printf("Actor lookup failed for faddr %s with error: %s\n", faddr, err)
+		} else {
+			idAddr, err := api.StateLookupID(ctx, faddr, types.EmptyTSK)
+			if err == nil {
+				fmt.Println("ID address: ", idAddr)
+				fmt.Println("Code cid: ", actor.Code.String())
+				fmt.Println("Actor Type: ", builtin.ActorNameByCode(actor.Code))
+			}
+		}
 
 		return nil
 	},
@@ -479,4 +486,52 @@ func ethAddrFromFilecoinAddress(ctx context.Context, addr address.Address, fnapi
 	}
 
 	return ethAddr, faddr, nil
+}
+
+var EvmGetBytecode = &cli.Command{
+	Name:      "bytecode",
+	Usage:     "Write the bytecode of a smart contract to a file",
+	ArgsUsage: "[contract-address] [file-name]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "bin",
+			Usage: "write the bytecode as raw binary and don't hex-encode",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+
+		if cctx.NArg() != 2 {
+			return IncorrectNumArgs(cctx)
+		}
+
+		contractAddr, err := ethtypes.ParseEthAddress(cctx.Args().Get(0))
+		if err != nil {
+			return err
+		}
+
+		fileName := cctx.Args().Get(1)
+
+		api, closer, err := GetFullNodeAPIV1(cctx)
+		if err != nil {
+			return err
+		}
+		defer closer()
+		ctx := ReqContext(cctx)
+
+		code, err := api.EthGetCode(ctx, contractAddr, "latest")
+		if err != nil {
+			return err
+		}
+		if !cctx.Bool("bin") {
+			newCode := make([]byte, hex.EncodedLen(len(code)))
+			hex.Encode(newCode, code)
+			code = newCode
+		}
+		if err := os.WriteFile(fileName, code, 0o666); err != nil {
+			return xerrors.Errorf("failed to write bytecode to file %s: %w", fileName, err)
+		}
+
+		fmt.Printf("Code for %s written to %s\n", contractAddr, fileName)
+		return nil
+	},
 }

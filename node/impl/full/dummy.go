@@ -6,7 +6,9 @@ import (
 
 	"github.com/ipfs/go-cid"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
@@ -15,6 +17,10 @@ import (
 var ErrModuleDisabled = errors.New("module disabled, enable with Fevm.EnableEthRPC / LOTUS_FEVM_ENABLEETHRPC")
 
 type EthModuleDummy struct{}
+
+func (e *EthModuleDummy) EthAddressToFilecoinAddress(ctx context.Context, ethAddress ethtypes.EthAddress) (address.Address, error) {
+	return address.Undef, ErrModuleDisabled
+}
 
 func (e *EthModuleDummy) EthGetMessageCidByTransactionHash(ctx context.Context, txHash *ethtypes.EthHash) (*cid.Cid, error) {
 	return nil, ErrModuleDisabled
@@ -52,11 +58,19 @@ func (e *EthModuleDummy) EthGetTransactionByHash(ctx context.Context, txHash *et
 	return nil, ErrModuleDisabled
 }
 
+func (e *EthModuleDummy) EthGetTransactionByHashLimited(ctx context.Context, txHash *ethtypes.EthHash, limit abi.ChainEpoch) (*ethtypes.EthTx, error) {
+	return nil, ErrModuleDisabled
+}
+
 func (e *EthModuleDummy) EthGetTransactionCount(ctx context.Context, sender ethtypes.EthAddress, blkOpt string) (ethtypes.EthUint64, error) {
 	return 0, ErrModuleDisabled
 }
 
 func (e *EthModuleDummy) EthGetTransactionReceipt(ctx context.Context, txHash ethtypes.EthHash) (*api.EthTxReceipt, error) {
+	return nil, ErrModuleDisabled
+}
+
+func (e *EthModuleDummy) EthGetTransactionReceiptLimited(ctx context.Context, txHash ethtypes.EthHash, limit abi.ChainEpoch) (*api.EthTxReceipt, error) {
 	return nil, ErrModuleDisabled
 }
 

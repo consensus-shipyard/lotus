@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -269,6 +268,13 @@ var walletExport = &cli.Command{
 	Name:      "export",
 	Usage:     "export keys",
 	ArgsUsage: "[address]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "lotus-json",
+			Value: false,
+			Usage: "export in lotus-json compatible format",
+		},
+	},
 	Action: func(cctx *cli.Context) error {
 		api, closer, err := GetFullNodeAPI(cctx)
 		if err != nil {
@@ -298,6 +304,10 @@ var walletExport = &cli.Command{
 			return err
 		}
 
+		if cctx.Bool("lotus-json") {
+			afmt.Println(string(b))
+			return nil
+		}
 		afmt.Println(hex.EncodeToString(b))
 		return nil
 	},
@@ -337,7 +347,7 @@ var walletImport = &cli.Command{
 			inpdata = indata
 
 		} else {
-			fdata, err := ioutil.ReadFile(cctx.Args().First())
+			fdata, err := os.ReadFile(cctx.Args().First())
 			if err != nil {
 				return err
 			}

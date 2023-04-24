@@ -19,9 +19,13 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/gen/genesis"
+
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -87,6 +91,7 @@ func WaitForMessageWithAvailable(ctx context.Context, n api.FullNode, c cid.Cid,
 		default:
 
 		}
+
 		_, err := n.StateWaitMsg(ctx, c, 5, 100, true)
 		if err != nil {
 			if !strict {
@@ -100,7 +105,66 @@ func WaitForMessageWithAvailable(ctx context.Context, n api.FullNode, c cid.Cid,
 	}
 }
 
-func WaitForMsg(ctx context.Context, msg cid.Cid, nodes ...api.FullNode) error {
+func MirNodesWaitForMembershipMsg(ctx context.Context, expected *validator.Set, nodes ...*TestFullNode) error {
+	for _, node := range nodes {
+		gw, err := node.IPCReadGatewayState(ctx, genesis.DefaultIPCGatewayAddr, types.TipSetKey{})
+		if err != nil {
+			return err
+		}
+		if !gw.Validators.Validators.Equal(expected) {
+			return fmt.Errorf("expected %v, got %v", expected, gw.Validators.Validators)
+		}
+	}
+	return nil
+}
+
+func MirNodesWaitForInitialConfigInFirstBlock(ctx context.Context, expected *validator.Set, nodes ...*TestFullNode) error {
+	for _, node := range nodes {
+		ts, err := node.ChainGetTipSetByHeight(ctx, 1, types.TipSetKey{})
+		if err != nil {
+			return err
+		}
+
+		msgs, err := node.ChainGetBlockMessages(ctx, ts.Cids()[0])
+		if err != nil {
+			return err
+		}
+
+		var membershipMsgNumber int
+		epochMsgSeen := false
+
+		for _, msg := range msgs.SecpkMessages {
+
+			if membership.IsSetMembershipConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
+				membershipMsgNumber++
+			}
+			if membership.IsInitGenesisEpochConfigMsg(consensus.DefaultGatewayAddr, &msg.Message) {
+				epochMsgSeen = true
+			}
+
+			var valSet validator.Set
+			if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Message.Params)); err != nil {
+				return err
+			}
+
+			if !valSet.Equal(expected) {
+				return fmt.Errorf("expected %v, got %v", expected, valSet)
+			}
+		}
+
+		if membershipMsgNumber != 1 {
+			return fmt.Errorf("%d SetMembershipConfigMsg were received", membershipMsgNumber)
+		}
+		// The tests are running on the rootnet only.
+		if epochMsgSeen {
+			return fmt.Errorf("epochMsgSeen message was received on the rootnet")
+		}
+	}
+
+	return nil
+}
+
+func MirNodesWaitForMsg(ctx context.Context, msg cid.Cid, nodes ...*TestFullNode) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for _, node := range nodes {
@@ -137,10 +201,12 @@ func RandomDelay(seconds int) {
 	time.Sleep(time.Duration(rand.Intn(seconds)) * time.Second)
 }
 
+var _ membership.Reader = &fakeMembership{}
+
 type fakeMembership struct {
 }
 
-func (f fakeMembership) GetValidatorSet() (*validator.Set, error) {
+func (f fakeMembership) GetMembershipInfo() (*membership.Info, error) {
 	return nil, fmt.Errorf("no validators")
 }
 

@@ -7,21 +7,22 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
-
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 
 	lcli "github.com/filecoin-project/lotus/cli"
 )
 
 // TODO: Make these config files configurable.
 const (
-	PrivKeyPath       = "mir.key"
-	MaddrPath         = "mir.maddr"
-	MembershipCfgPath = "mir.validators"
-	LevelDSPath       = "mir.db"
+	PrivKeyPath           = "mir.key"
+	MaddrPath             = "mir.maddr"
+	MembershipCfgPath     = "mir.validators"
+	LevelDSPath           = "mir.db"
+	DefaultTCPLibP2PPort  = 1347
+	DefaultQuicLibP2PPort = 1348
 )
 
 var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath, LevelDSPath}

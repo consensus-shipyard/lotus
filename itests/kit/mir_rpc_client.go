@@ -5,6 +5,7 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/ipcagent/rpc"
 )
 
@@ -23,7 +24,8 @@ func (c *StubJSONRPCClient) SendRequest(method string, params interface{}, reply
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(set)
+	resp := membership.AgentResponse{ValidatorSet: *set}
+	b, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}

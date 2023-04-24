@@ -4,9 +4,10 @@ import (
 	"context"
 	"math"
 	"math/rand"
+	"os"
 	"sort"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
@@ -61,7 +62,7 @@ type GasAPI struct {
 
 func NewGasPriceCache() *GasPriceCache {
 	// 50 because we usually won't access more than 40
-	c, err := lru.New2Q(50)
+	c, err := lru.New2Q[types.TipSetKey, []GasMeta](50)
 	if err != nil {
 		// err only if parameter is bad
 		panic(err)
@@ -73,7 +74,7 @@ func NewGasPriceCache() *GasPriceCache {
 }
 
 type GasPriceCache struct {
-	c *lru.TwoQueueCache
+	c *lru.TwoQueueCache[types.TipSetKey, []GasMeta]
 }
 
 type GasMeta struct {
@@ -84,7 +85,7 @@ type GasMeta struct {
 func (g *GasPriceCache) GetTSGasStats(ctx context.Context, cstore *store.ChainStore, ts *types.TipSet) ([]GasMeta, error) {
 	i, has := g.c.Get(ts.Key())
 	if has {
-		return i.([]GasMeta), nil
+		return i, nil
 	}
 
 	var prices []GasMeta
@@ -276,10 +277,15 @@ func gasEstimateCallWithGas(
 		priorMsgs = append(priorMsgs, m)
 	}
 
+	applyTsMessages := true
+	if os.Getenv("LOTUS_SKIP_APPLY_TS_MESSAGE_CALL_WITH_GAS") == "1" {
+		applyTsMessages = false
+	}
+
 	// Try calling until we find a height with no migration.
 	var res *api.InvocResult
 	for {
-		res, err = smgr.CallWithGas(ctx, &msg, priorMsgs, ts)
+		res, err = smgr.CallWithGas(ctx, &msg, priorMsgs, ts, applyTsMessages)
 		if err != stmgr.ErrExpensiveFork {
 			break
 		}
@@ -327,10 +333,15 @@ func gasEstimateGasLimit(
 
 	transitionalMulti := 1.0
 	// Overestimate gas around the upgrade
-	if ts.Height() <= build.UpgradeSkyrHeight && (build.UpgradeSkyrHeight-ts.Height() <= 20) {
-		transitionalMulti = 2.0
-
+	if ts.Height() <= build.UpgradeHyggeHeight && (build.UpgradeHyggeHeight-ts.Height() <= 20) {
 		func() {
+
+			// Bare transfers get about 3x more expensive: https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0057.md#product-considerations
+			if msgIn.Method == builtin.MethodSend {
+				transitionalMulti = 3.0
+				return
+			}
+
 			st, err := smgr.ParentState(ts)
 			if err != nil {
 				return
@@ -342,26 +353,27 @@ func gasEstimateGasLimit(
 
 			if lbuiltin.IsStorageMinerActor(act.Code) {
 				switch msgIn.Method {
-				case 5:
-					transitionalMulti = 3.954
+				case 3:
+					transitionalMulti = 1.92
+				case 4:
+					transitionalMulti = 1.72
 				case 6:
-					transitionalMulti = 4.095
+					transitionalMulti = 1.06
 				case 7:
-					// skip, stay at 2.0
-					// transitionalMulti = 1.289
-				case 11:
-					transitionalMulti = 17.8758
+					transitionalMulti = 1.2
 				case 16:
-					transitionalMulti = 2.1704
-				case 25:
-					transitionalMulti = 3.1177
+					transitionalMulti = 1.19
+				case 18:
+					transitionalMulti = 1.73
+				case 23:
+					transitionalMulti = 1.73
 				case 26:
-					transitionalMulti = 2.3322
+					transitionalMulti = 1.15
+				case 27:
+					transitionalMulti = 1.18
 				default:
 				}
 			}
-
-			// skip storage market, 80th percentie for everything ~1.9, leave it at 2.0
 		}()
 	}
 	ret = (ret * int64(transitionalMulti*1024)) >> 10
@@ -405,6 +417,8 @@ func (m *GasModule) GasEstimateMessageGas(ctx context.Context, msg *types.Messag
 		}
 		msg.GasFeeCap = feeCap
 	}
+
+	messagepool.CapGasFee(m.GetMaxFee, msg, spec)
 
 	return msg, nil
 }

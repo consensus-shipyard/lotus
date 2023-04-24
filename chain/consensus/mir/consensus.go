@@ -83,22 +83,12 @@ func (bft *Mir) ValidateBlockHeader(_ context.Context, b *types.BlockHeader) (re
 		return "", nil
 	}
 
-	// get the latest checkpoint in cache
-	prev, err := bft.cache.getLatestCheckpoint()
-	if err != nil {
-		return "err_latest_checkpoint", xerrors.Errorf("couldn't get latests checkpoint: %w", err)
-	}
-
 	// if there is a checkpoint, verify it before accepting the block.
 	if hasCheckpoint(b) {
 		if _, err := bft.verifyCheckpointInHeader(b); err != nil {
 			log.Warnf("checkpoint validation failed in block: %s", err)
 			return "checkpoint_verification_failed", err
 		}
-	}
-	// check that the block is in the right range.
-	if b.Height < prev.Height {
-		return "block_out_of_range", xerrors.Errorf("the height of the received block is over the latest checkpoint received")
 	}
 	b.SetValidated()
 

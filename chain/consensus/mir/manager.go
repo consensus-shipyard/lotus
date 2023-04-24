@@ -1,4 +1,3 @@
-// Package mir implements ISS consensus protocol using the Mir protocol framework.
 package mir
 
 import (
@@ -11,9 +10,8 @@ import (
 	"path"
 	"time"
 
-	"golang.org/x/xerrors"
-
 	"github.com/consensus-shipyard/go-ipc-types/validator"
+	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir"
@@ -59,13 +57,15 @@ type Manager struct {
 	lotusNode v1api.FullNode
 
 	// Mir types.
+	mirCtx          context.Context
+	mirErrChan      chan error
+	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
 	requestPool     *fifo.Pool
 	wal             *simplewal.WAL
 	net             net.Transport
 	interceptor     *eventlog.Recorder
 	readyForTxsChan chan chan []*mirproto.Request
-	stopChan        chan struct{}
 	stopped         bool
 	cryptoManager   *CryptoManager
 	confManager     *ConfigurationManager
@@ -96,12 +96,21 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
 	}
 
-	initialValidatorSet, err := membership.GetValidatorSet()
+	membershipInfo, err := membership.GetMembershipInfo()
 	if err != nil {
-		return nil, fmt.Errorf("validator %v failed to get validator set: %w", id, err)
+		return nil, fmt.Errorf("validator %v failed to get membership info: %w", id, err)
 	}
-	if initialValidatorSet.Size() == 0 {
+
+	initialValidatorSet := membershipInfo.ValidatorSet
+	genesisEpoch := membershipInfo.GenesisEpoch
+	valSize := initialValidatorSet.Size()
+	// There needs to be at least one validator in the membership
+	if valSize == 0 {
 		return nil, fmt.Errorf("validator %v: empty validator set", id)
+	}
+	// Check the minimum number of validators.
+	if membershipInfo.MinValidators > uint64(valSize) {
+		return nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
 	}
 
 	_, initialMembership, err := mirmembership.Membership(initialValidatorSet.Validators)
@@ -127,7 +136,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create crypto manager: %w", id, err)
 	}
 
-	confManager, err := NewConfigurationManager(ctx, ds, id)
+	confManager, err := NewConfigurationManagerWithMembershipInfo(ctx, ds, id, membershipInfo)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create configuration manager: %w", id, err)
 	}
@@ -138,7 +147,6 @@ func NewManager(ctx context.Context,
 		ds:                  ds,
 		netName:             netName,
 		lotusNode:           node,
-		stopChan:            make(chan struct{}),
 		readyForTxsChan:     make(chan chan []*mirproto.Request),
 		requestPool:         fifo.New(),
 		cryptoManager:       cryptoManager,
@@ -147,26 +155,22 @@ func NewManager(ctx context.Context,
 		initialValidatorSet: initialValidatorSet,
 		membership:          membership,
 	}
+	m.mirErrChan = make(chan error, 1)
+	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
-	m.stateManager, err = NewStateManager(ctx, initialMembership, m.confManager, node, ds, m.requestPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, m.netName, initialMembership, abi.ChainEpoch(genesisEpoch), m.confManager, node, ds, m.requestPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
 
-	// Create SMR modules.
-	mpool := pool.NewModule(
-		m.readyForTxsChan,
-		pool.DefaultModuleConfig(),
-		pool.DefaultModuleParams(),
-	)
-
 	params := trantor.DefaultParams(initialMembership)
 	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
-	params.Mempool.MaxTransactionsInBatch = 1024
-	params.Iss.AdjustSpeed(1 * time.Second)
-	params.Iss.ConfigOffset = ConfigOffset
-	params.Iss.PBFTViewChangeSNTimeout = 6 * time.Second
-	params.Iss.PBFTViewChangeSegmentTimeout = 6 * time.Second
+	params.Iss.ConfigOffset = cfg.Consensus.ConfigOffset
+	params.Iss.AdjustSpeed(cfg.Consensus.MaxProposeDelay)
+	params.Iss.PBFTViewChangeSNTimeout = cfg.Consensus.PBFTViewChangeSNTimeout
+	params.Iss.PBFTViewChangeSegmentTimeout = cfg.Consensus.PBFTViewChangeSegmentTimeout
+	params.Mempool.MaxTransactionsInBatch = cfg.Consensus.MaxTransactionsInBatch
+	params.Mempool.TxFetcher = pool.NewFetcher(ctx, m.readyForTxsChan).Fetch
 
 	initCh := cfg.InitialCheckpoint
 	// if no initial checkpoint provided in config
@@ -190,9 +194,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to create SMR system: %w", id, err)
 	}
 
-	smrSystem = smrSystem.
-		WithModule("mempool", mpool).
-		WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
+	smrSystem = smrSystem.WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
 	mirManglerParams := os.Getenv(ManglerEnv)
 	if mirManglerParams != "" {
@@ -239,22 +241,22 @@ func NewManager(ctx context.Context,
 }
 
 func (m *Manager) Serve(ctx context.Context) error {
-	log.With("validator", m.id).Info("Mir manager serve starting")
+	log.With("validator", m.id).Info("Mir manager serve started")
 	defer log.With("validator", m.id).Info("Mir manager serve stopped")
 
 	log.With("validator", m.id).
 		Infof("Mir info:\n\tNetwork - %v\n\tValidator ID - %v\n\tMir peerID - %v\n\tValidators - %v",
 			m.netName, m.id, m.id, m.initialValidatorSet.GetValidators())
 
-	mirErrChan := make(chan error, 1)
 	go func() {
 		// Run Mir node until it stops.
-		mirErrChan <- m.mirNode.Run(ctx)
+		// We pass a new cancellable context to Run() to be sure that if the Lotus context is closed then the Mir
+		// node will not be stopped implicitly and there will be no race between Lotus and Mir during shutdown process.
+		// In this case we also know that if we receive an error on mirErrChan before cancelling mirCtx
+		// then that error is not ErrStopped.
+		m.mirErrChan <- m.mirNode.Run(m.mirCtx)
 	}()
-	// Perform cleanup of Node's modules and ensure that mir is closed when we stop mining.
-	defer func() {
-		m.Stop()
-	}()
+	defer m.stop()
 
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
@@ -270,26 +272,20 @@ func (m *Manager) Serve(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			log.With("validator", m.id).Debug("Mir manager: context closed")
+			log.With("validator", m.id).Info("Mir manager: context closed")
 			return nil
 
-		// First catch potential errors when mining.
-		case err := <-mirErrChan:
-			log.With("validator", m.id).Info("manager received error:", err)
-			if err != nil && !errors.Is(err, mir.ErrStopped) {
-				panic(fmt.Sprintf("validator %s consensus error: %v", m.id, err))
-			}
-			log.With("validator", m.id).Infof("Mir node stopped signal")
-			return nil
+		case err := <-m.mirErrChan:
+			panic(fmt.Sprintf("Mir node %v running error: %v", m.id, err))
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
-			newSet, err := m.membership.GetValidatorSet()
+			mInfo, err := m.membership.GetMembershipInfo()
 			if err != nil {
 				log.With("validator", m.id).Warnf("failed to get subnet validators: %v", err)
 				continue
 			}
-
+			newSet := mInfo.ValidatorSet
 			if lastValidatorSet.Equal(newSet) {
 				continue
 			}
@@ -305,11 +301,15 @@ func (m *Manager) Serve(ctx context.Context) error {
 			}
 
 		case mirChan := <-m.readyForTxsChan:
-			base, err := m.stateManager.api.ChainHead(ctx)
+			if ctx.Err() != nil {
+				log.With("validator", m.id).Info("Mir manager: context closed before calling ChainHead")
+				return nil
+			}
+			base, err := m.lotusNode.ChainHead(ctx)
 			if err != nil {
 				return xerrors.Errorf("validator %v failed to get chain head: %w", m.id, err)
 			}
-			log.With("validator", m.id).Debugf("selecting messages from mempool from base: %v", base.Key())
+			log.With("validator", m.id).Debugf("selecting messages from mempool for base: %v", base.Key())
 			msgs, err := m.lotusNode.MpoolSelect(ctx, base.Key(), 1)
 			if err != nil {
 				log.With("validator", m.id).With("epoch", base.Height()).
@@ -322,15 +322,20 @@ func (m *Manager) Serve(ctx context.Context) error {
 				requests = append(requests, configRequests...)
 			}
 
-			mirChan <- requests
+			select {
+			case <-ctx.Done():
+				log.With("validator", m.id).Info("Mir manager: context closed while sending txs")
+				return nil
+			case mirChan <- requests:
+			}
 		}
 	}
 }
 
-// Stop stops the manager and all its components.
-func (m *Manager) Stop() {
-	log.With("validator", m.id).Infof("Mir manager stopping")
-	defer log.With("validator", m.id).Info("Mir manager stopped")
+// stop stops the manager and all its components.
+func (m *Manager) stop() {
+	log.With("validator", m.id).Infof("Mir manager stop() started")
+	defer log.With("validator", m.id).Info("Mir manager stop() finished")
 
 	if m.stopped {
 		log.With("validator", m.id).Warnf("Mir manager has already been stopped")
@@ -338,18 +343,29 @@ func (m *Manager) Stop() {
 	}
 	m.stopped = true
 
+	// Cancel Mir Context.
+	m.mirCancel()
+
+	// Stop components used by the Mir node.
+
 	if m.interceptor != nil {
 		if err := m.interceptor.Stop(); err != nil {
-			log.With("validator", m.id).Errorf("Could not close interceptor: %s", err)
+			log.With("validator", m.id).Errorf("Could not stop interceptor: %s", err)
+		} else {
+			log.With("validator", m.id).Info("Interceptor stopped")
 		}
-		log.With("validator", m.id).Info("Interceptor closed")
 	}
 
 	m.net.Stop()
 	log.With("validator", m.id).Info("Network transport stopped")
 
-	close(m.stopChan)
 	m.mirNode.Stop()
+	err := <-m.mirErrChan
+	if !errors.Is(err, mir.ErrStopped) {
+		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", err)
+	} else {
+		log.With("validator", m.id).Infof("Mir node stopped")
+	}
 }
 
 func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (*checkpoint.StableCheckpoint, error) {

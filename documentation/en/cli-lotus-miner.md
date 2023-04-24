@@ -7,7 +7,7 @@ USAGE:
    lotus-miner [global options] command [command options] [arguments...]
 
 VERSION:
-   1.19.1-dev
+   1.21.0-rc2
 
 COMMANDS:
    init     Initialize a lotus miner repo
@@ -839,7 +839,6 @@ USAGE:
 
 COMMANDS:
      selection  Configure acceptance criteria for retrieval deal proposals
-     list       List all active retrieval deals for this miner
      set-ask    Configure the provider's retrieval ask
      get-ask    Get the provider's current retrieval ask configured by the provider in the ask-store using the set-ask CLI command
      help, h    Shows a list of commands or help for one command
@@ -905,19 +904,6 @@ USAGE:
 OPTIONS:
    --offline  (default: false)
    --online   (default: false)
-   
-```
-
-### lotus-miner retrieval-deals list
-```
-NAME:
-   lotus-miner retrieval-deals list - List all active retrieval deals for this miner
-
-USAGE:
-   lotus-miner retrieval-deals list [command options] [arguments...]
-
-OPTIONS:
-   --help, -h  show help (default: false)
    
 ```
 
@@ -1717,13 +1703,14 @@ USAGE:
    lotus-miner sectors list [command options] [arguments...]
 
 OPTIONS:
-   --events, -e          display number of events the sector has received (default: false)
-   --fast, -f            don't show on-chain info for better performance (default: false)
-   --initial-pledge, -p  display initial pledge (default: false)
-   --seal-time, -t       display how long it took for the sector to be sealed (default: false)
-   --show-removed, -r    show removed sectors (default: false)
-   --states value        filter sectors by a comma-separated list of states
-   --unproven, -u        only show sectors which aren't in the 'Proving' state (default: false)
+   --check-parallelism value  number of parallel requests to make for checking sector states (default: 300)
+   --events, -e               display number of events the sector has received (default: false)
+   --fast, -f                 don't show on-chain info for better performance (default: false)
+   --initial-pledge, -p       display initial pledge (default: false)
+   --seal-time, -t            display how long it took for the sector to be sealed (default: false)
+   --show-removed, -r         show removed sectors (default: false)
+   --states value             filter sectors by a comma-separated list of states
+   --unproven, -u             only show sectors which aren't in the 'Proving' state (default: false)
    
 ```
 
@@ -1888,11 +1875,12 @@ USAGE:
    lotus-miner sectors extend [command options] <sectorNumbers...(optional)>
 
 OPTIONS:
+   --drop-claims           drop claims for sectors that can be extended, but only by dropping some of their verified power claims (default: false)
    --exclude value         optionally provide a file containing excluding sectors
    --extension value       try to extend selected sectors by this number of epochs, defaults to 540 days (default: 1555200)
    --from value            only consider sectors whose current expiration epoch is in the range of [from, to], <from> defaults to: now + 120 (1 hour) (default: 0)
    --max-fee value         use up to this amount of FIL for one message. pass this flag to avoid message congestion. (default: "0")
-   --max-sectors value     the maximum number of sectors contained in each message message (default: 0)
+   --max-sectors value     the maximum number of sectors contained in each message (default: 0)
    --new-expiration value  try to extend selected sectors to this epoch, ignoring extension (default: 0)
    --only-cc               only extend CC sectors (useful for making sector ready for snap upgrade) (default: false)
    --really-do-it          pass this flag to really extend sectors, otherwise will only print out json representation of parameters (default: false)

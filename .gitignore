@@ -1,6 +1,3 @@
-/AppDir
-/appimage-builder-cache
-*.AppImage
 /eudico
 /lotus
 /lotus-miner
@@ -58,7 +55,6 @@ mir-event-logs
 devgen.car
 *.log
 fx.dot
-genesis.car
 
 
 # The following files are checked into git and result

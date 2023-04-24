@@ -275,7 +275,7 @@ func eudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.
 			}
 
 			defer closer()
-			liteModeDeps = fx.Supply(gapi)
+			liteModeDeps = fx.Provide(func() api.Gateway { return gapi })
 		}
 
 		// some libraries like ipfs/go-ds-measure and ipfs/go-ipfs-blockstore

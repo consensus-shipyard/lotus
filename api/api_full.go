@@ -11,12 +11,12 @@ import (
 	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-libipfs/blocks"
+	blocks "github.com/ipfs/go-libipfs/blocks"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-bitfield"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	datatransfer "github.com/filecoin-project/go-data-transfer/v2"
 	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/filecoin-project/go-fil-markets/storagemarket"
 	"github.com/filecoin-project/go-jsonrpc"
@@ -176,9 +176,23 @@ type FullNode interface {
 	// If oldmsgskip is set, messages from before the requested roots are also not included.
 	ChainExport(ctx context.Context, nroots abi.ChainEpoch, oldmsgskip bool, tsk types.TipSetKey) (<-chan []byte, error) //perm:read
 
-	// ChainPrune prunes the stored chain state and garbage collects; only supported if you
+	// ChainExportRangeInternal triggers the export of a chain
+	// CAR-snapshot directly to disk. It is similar to ChainExport,
+	// except, depending on options, the snapshot can include receipts,
+	// messages and stateroots for the length between the specified head
+	// and tail, thus producing "archival-grade" snapshots that include
+	// all the on-chain data.  The header chain is included back to
+	// genesis and these snapshots can be used to initialize Filecoin
+	// nodes.
+	ChainExportRangeInternal(ctx context.Context, head, tail types.TipSetKey, cfg ChainExportConfig) error //perm:admin
+
+	// ChainPrune forces compaction on cold store and garbage collects; only supported if you
 	// are using the splitstore
 	ChainPrune(ctx context.Context, opts PruneOpts) error //perm:admin
+
+	// ChainHotGC does online (badger) GC on the hot store; only supported if you are using
+	// the splitstore
+	ChainHotGC(ctx context.Context, opts HotGCOpts) error //perm:admin
 
 	// ChainCheckBlockstore performs an (asynchronous) health check on the chain/state blockstore
 	// if supported by the underlying implementation.
@@ -782,6 +796,10 @@ type FullNode interface {
 	//
 	// EthAccounts will always return [] since we don't expect Lotus to manage private keys
 	EthAccounts(ctx context.Context) ([]ethtypes.EthAddress, error) //perm:read
+	// EthAddressToFilecoinAddress converts an EthAddress into an f410 Filecoin Address
+	EthAddressToFilecoinAddress(ctx context.Context, ethAddress ethtypes.EthAddress) (address.Address, error) //perm:read
+	// FilecoinAddressToEthAddress converts an f410 or f0 Filecoin Address to an EthAddress
+	FilecoinAddressToEthAddress(ctx context.Context, filecoinAddress address.Address) (ethtypes.EthAddress, error) //perm:read
 	// EthBlockNumber returns the height of the latest (heaviest) TipSet
 	EthBlockNumber(ctx context.Context) (ethtypes.EthUint64, error) //perm:read
 	// EthGetBlockTransactionCountByNumber returns the number of messages in the TipSet
@@ -792,10 +810,12 @@ type FullNode interface {
 	EthGetBlockByHash(ctx context.Context, blkHash ethtypes.EthHash, fullTxInfo bool) (ethtypes.EthBlock, error)                               //perm:read
 	EthGetBlockByNumber(ctx context.Context, blkNum string, fullTxInfo bool) (ethtypes.EthBlock, error)                                        //perm:read
 	EthGetTransactionByHash(ctx context.Context, txHash *ethtypes.EthHash) (*ethtypes.EthTx, error)                                            //perm:read
+	EthGetTransactionByHashLimited(ctx context.Context, txHash *ethtypes.EthHash, limit abi.ChainEpoch) (*ethtypes.EthTx, error)               //perm:read
 	EthGetTransactionHashByCid(ctx context.Context, cid cid.Cid) (*ethtypes.EthHash, error)                                                    //perm:read
 	EthGetMessageCidByTransactionHash(ctx context.Context, txHash *ethtypes.EthHash) (*cid.Cid, error)                                         //perm:read
 	EthGetTransactionCount(ctx context.Context, sender ethtypes.EthAddress, blkOpt string) (ethtypes.EthUint64, error)                         //perm:read
 	EthGetTransactionReceipt(ctx context.Context, txHash ethtypes.EthHash) (*EthTxReceipt, error)                                              //perm:read
+	EthGetTransactionReceiptLimited(ctx context.Context, txHash ethtypes.EthHash, limit abi.ChainEpoch) (*EthTxReceipt, error)                 //perm:read
 	EthGetTransactionByBlockHashAndIndex(ctx context.Context, blkHash ethtypes.EthHash, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error)    //perm:read
 	EthGetTransactionByBlockNumberAndIndex(ctx context.Context, blkNum ethtypes.EthUint64, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error) //perm:read
 
@@ -865,14 +885,28 @@ type FullNode interface {
 	// IPC-specific methods //
 
 	// IPCAddSubnetActor deploys a new subnet actor.
-	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)   //perm:write
-	IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)                  //perm:read
-	IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error)                //perm:read
-	IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)          //perm:read
-	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) //perm:read
-	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)                               //perm:read
-	IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error)                         //perm:read
-	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error)                     //perm:read
+	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)                          //perm:write
+	IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)                                         //perm:read
+	IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error)                                       //perm:read
+	IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)                                 //perm:read
+	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                //perm:read
+	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)                                                      //perm:read
+	IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error)                               //perm:read
+	IPCHasVotedTopDownCheckpoint(ctx context.Context, gw address.Address, e abi.ChainEpoch, v address.Address) (bool, error)                             //perm:read
+	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error)                             //perm:read
+	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)                                    //perm:read
+	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) //perm:read
+	IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error)                               //perm:read
+
+	// Serialized representation of IPC calls.
+	// This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
+	// version of the output of the call. These are really convenient to use the same type of serialization used
+	// in actor's state, removing the need of then intermediate serialization introduced by the Lotus API.
+	IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error)                                              //perm:read
+	IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error)                                       //perm:read
+	IPCGetCheckpointTemplateSerialized(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) ([]byte, error)                          //perm:read
+	IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([][]byte, error) //perm:read
+
 }
 
 // reverse interface to the client, called after EthSubscribe
@@ -1363,6 +1397,12 @@ type MsigTransaction struct {
 type PruneOpts struct {
 	MovingGC    bool
 	RetainState int64
+}
+
+type HotGCOpts struct {
+	Threshold float64
+	Periodic  bool
+	Moving    bool
 }
 
 type EthTxReceipt struct {

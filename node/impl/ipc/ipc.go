@@ -117,6 +117,30 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
+
+	ts := new(types.TipSet)
+	if tsk != types.EmptyTSK {
+		tsCid, err := tsk.Cid()
+		if err != nil {
+			return nil, err
+		}
+		ts, err = a.Chain.GetTipSetByCid(ctx, tsCid)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ts = a.Chain.GetHeaviestTipSet()
+	}
+
+	// Resolve on-chain IDs of validators to f1/f3 addresses
+	for i, v := range st.ValidatorSet.Validators {
+		var err error
+		st.ValidatorSet.Validators[i].Addr, err = a.StateManagerAPI.ResolveToDeterministicAddress(ctx, v.Addr, ts)
+		if err != nil {
+			return nil, err
+		}
+
+	}
 	return &st, nil
 }
 
@@ -135,24 +159,83 @@ func (a *IPCAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr a
 	if !found {
 		return cid.Undef, xerrors.Errorf("no subnet registered with id %s", subnet)
 	}
-	return sn.PrevCheckpoint.Cid()
+	if sn.PrevCheckpoint != nil {
+		return sn.PrevCheckpoint.Cid()
+	}
+	return cid.Undef, nil
 }
 
 // IPCGetCheckpointTemplate to be populated and signed for the epoch given as input.
 // If the template for the epoch is empty (either because it has no data or an epoch from the
 // future was provided) an empty template is returned.
-func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+func (a *IPCAPI) IPCGetCheckpointTemplate(ctx context.Context, gw address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	st, err := a.IPCReadGatewayState(ctx, gw, types.EmptyTSK)
 	if err != nil {
 		return nil, err
 	}
 	return st.GetWindowCheckpoint(a.Chain.ActorStore(ctx), epoch)
 }
 
-// IPCGetVotesForCheckpoint returns if there is an active voting for a checkpoint with a specific cid.
-// If no active votings are found for a checkpoints is because the checkpoint has already been committed
-// or because no one has votes that checkpoint yet.
-func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, c cid.Cid) (*subnetactor.Votes, error) {
+// IPCGetCheckpointTemplateSerialized returns a cbor serialization of the template so the same
+// serialization used in actor state can be used to deserialize the checkpoint without
+// intermediate representations.
+func (a *IPCAPI) IPCGetCheckpointTemplateSerialized(ctx context.Context, gw address.Address, epoch abi.ChainEpoch) ([]byte, error) {
+	c, err := a.IPCGetCheckpointTemplate(ctx, gw, epoch)
+	if err != nil {
+		return nil, err
+	}
+	// NOTE: Templates use cid.Undef for prevCheck because validators need to populate
+	// the value. We can't serialize a cid.Undef, so we set a sample Cid here to
+	// allow the serialization. This cid shouldn't be considered as a valid previous checkpoint,
+	// or things may break.
+	if c.Data.PrevCheck == cid.Undef {
+		dummyCid, _ := cid.Parse("bafkqaaa")
+		c.Data.PrevCheck = dummyCid
+	}
+	buf := new(bytes.Buffer)
+	if err := c.MarshalCBOR(buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// IPCHasVotedBottomUpCheckpoint checks if a validator has already voted a specific checkpoint
+// for certain epoch
+func (a *IPCAPI) IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error) {
+	if err := a.checkParent(ctx, sn); err != nil {
+		return false, err
+	}
+	st, err := a.IPCReadSubnetActorState(ctx, sn, types.EmptyTSK)
+	if err != nil {
+		return false, err
+	}
+	// ValidatorHasVoted expects on-chain IDs. This is how votes are indexed in the StateAPI
+	// of the actor.
+	v, err = a.StateManager.LookupID(ctx, v, a.Chain.GetHeaviestTipSet())
+	if err != nil {
+		return false, xerrors.Errorf("error getting on-chain ID for validator: %w", err)
+	}
+	return st.BottomUpCheckpointVoting.ValidatorHasVoted(a.Chain.ActorStore(ctx), e, v)
+}
+
+// IPCHasVotedTopDownCheckpoint checks if a validator has already voted a specific checkpoint
+// for certain epoch
+func (a *IPCAPI) IPCHasVotedTopDownCheckpoint(ctx context.Context, gw address.Address, e abi.ChainEpoch, v address.Address) (bool, error) {
+	st, err := a.IPCReadGatewayState(ctx, gw, types.EmptyTSK)
+	if err != nil {
+		return false, err
+	}
+	// ValidatorHasVoted expects on-chain IDs. This is how votes are indexed in the StateAPI
+	// of the actor.
+	v, err = a.StateManager.LookupID(ctx, v, a.Chain.GetHeaviestTipSet())
+	if err != nil {
+		return false, xerrors.Errorf("error getting on-chain ID for validator: %w", err)
+	}
+	return st.TopDownCheckpointVoting.ValidatorHasVoted(a.Chain.ActorStore(ctx), e, v)
+}
+
+// IPCListCheckpoints returns a list of checkpoints committed for a submit between two epochs
+func (a *IPCAPI) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
 	if err := a.checkParent(ctx, sn); err != nil {
 		return nil, err
 	}
@@ -160,18 +243,43 @@ func (a *IPCAPI) IPCGetVotesForCheckpoint(ctx context.Context, sn sdk.SubnetID, 
 	if err != nil {
 		return nil, err
 	}
-	v, found, err := st.GetCheckpointVotes(a.Chain.ActorStore(ctx), c)
+	// get the first epoch with checkpoints after the from.
+	i := gateway.CheckpointEpoch(from, st.BottomUpCheckPeriod)
+	out := make([]*gateway.BottomUpCheckpoint, 0)
+	for i <= to {
+		ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), i)
+		if err != nil {
+			return nil, xerrors.Errorf("error getting checkpoint from actor store in epoch %d: %w", i, err)
+		}
+		if found {
+			out = append(out, ch)
+		}
+		i += st.BottomUpCheckPeriod
+	}
+	return out, nil
+}
+
+// IPCListCheckpointsSerialized returns a list of checkpoints committed for a submit between two epochs
+// where each checkpoint is conveniently CBOR serialized.
+func (a *IPCAPI) IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error) {
+	l, err := a.IPCListCheckpoints(ctx, sn, from, to)
 	if err != nil {
-		return nil, xerrors.Errorf("error getting votes from actor store: %w", err)
+		return nil, err
 	}
-	if !found {
-		return &subnetactor.Votes{make([]address.Address, 0)}, nil
+
+	out := make([][]byte, 0)
+	for _, c := range l {
+		buf := new(bytes.Buffer)
+		if err := c.MarshalCBOR(buf); err != nil {
+			return nil, err
+		}
+		out = append(out, buf.Bytes())
 	}
-	return v, nil
+	return out, nil
 }
 
 // IPCGetCheckpoint returns the checkpoint committed in the subnet actor for an epoch.
-func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	if err := a.checkParent(ctx, sn); err != nil {
 		return nil, err
 	}
@@ -179,6 +287,7 @@ func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch ab
 	if err != nil {
 		return nil, err
 	}
+
 	ch, found, err := st.GetCheckpoint(a.Chain.ActorStore(ctx), epoch)
 	if err != nil {
 		return nil, xerrors.Errorf("error getting checkpoint from actor store: %w", err)
@@ -187,6 +296,19 @@ func (a *IPCAPI) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch ab
 		return nil, xerrors.Errorf("no checkpoint committed for epoch %v", epoch)
 	}
 	return ch, nil
+}
+
+// IPCGetCheckpointSerialized returns the checkpoint committed in the subnet actor for an epoch.
+func (a *IPCAPI) IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error) {
+	c, err := a.IPCGetCheckpoint(ctx, sn, epoch)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	if err := c.MarshalCBOR(buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // IPCSubnetGenesisTemplate returns a genesis template for a subnet. From this template
@@ -210,6 +332,59 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 		return nil, err
 	}
 	return st.ListSubnets(a.Chain.ActorStore(ctx))
+}
+
+// IPCGetTopDownMsgs returns the list of top down-messages from a specific nonce
+// to the latest one that has been committed in the subnet.
+func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, tsk)
+	if err != nil {
+		return nil, err
+	}
+	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
+	if err != nil {
+		return nil, xerrors.Errorf("error getting subnet: %w", err)
+	}
+	if !found {
+		return nil, xerrors.Errorf("subnet not found in gateway")
+	}
+	return subnet.TopDownMsgsFromNonce(a.Chain.ActorStore(ctx), nonce)
+}
+
+// IPCGetTopDownMsgsSerialized returns the list of top down-messages
+// cbor serialized
+func (a *IPCAPI) IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([][]byte, error) {
+	l, err := a.IPCGetTopDownMsgs(ctx, gatewayAddr, sn, tsk, nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([][]byte, 0)
+	for _, c := range l {
+		buf := new(bytes.Buffer)
+		if err := c.MarshalCBOR(buf); err != nil {
+			return nil, err
+		}
+		out = append(out, buf.Bytes())
+	}
+	return out, nil
+}
+
+// IPCGetGenesisEpochForSubnet returns the genesis epoch from which a subnet has been
+// registered in the parent.
+func (a *IPCAPI) IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error) {
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return 0, err
+	}
+	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
+	if err != nil {
+		return 0, xerrors.Errorf("error getting subnet: %w", err)
+	}
+	if !found {
+		return 0, xerrors.Errorf("subnet not found in gateway")
+	}
+	return subnet.GenesisEpoch, nil
 }
 
 // readActorState reads the state of a specific actor at a specefic epoch determined by the tipset key.

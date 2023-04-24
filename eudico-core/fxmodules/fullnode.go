@@ -2,6 +2,8 @@ package fxmodules
 
 import (
 	"context"
+	"github.com/filecoin-project/lotus/chain/store"
+	"github.com/filecoin-project/lotus/node/repo"
 	"time"
 
 	metricsi "github.com/ipfs/go-metrics-interface"
@@ -15,7 +17,6 @@ import (
 	"github.com/filecoin-project/lotus/chain/messagesigner"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	rpcstmgr "github.com/filecoin-project/lotus/chain/stmgr/rpc"
-	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/chain/wallet"
 	"github.com/filecoin-project/lotus/journal"
@@ -29,7 +30,6 @@ import (
 	"github.com/filecoin-project/lotus/node/modules"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/filecoin-project/lotus/node/modules/helpers"
-	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/paychmgr"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -40,7 +40,7 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 	if isLite {
 		nodeAPIProviders = liteNodeAPIProviders
 	} else {
-		nodeAPIProviders = fullNodeAPIProviders
+		nodeAPIProviders = fullNodeAPIProviders(fevmCfg)
 	}
 
 	return fx.Module("fullnode",
@@ -60,21 +60,6 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 			chain.SyncManagerCtor(chain.NewSyncManager),
 
 			new(dtypes.MpoolLocker),
-		),
-		// Eth APIs
-		fx.Provide(
-			modules.EthEventAPI(fevmCfg),
-			func(event *full.EthEvent) full.EthEventAPI { return event },
-		),
-		fxEitherOr(
-			fevmCfg.EnableEthRPC,
-			fx.Provide(
-				// You may not like it, but this is what peak performance looks like
-				func(mctx helpers.MetricsCtx, r repo.LockedRepo, lc fx.Lifecycle, cs *store.ChainStore, sm *stmgr.StateManager, evapi modules.EventAPI, mp *messagepool.MessagePool, stateapi full.StateAPI, chainapi full.ChainAPI, mpoolapi full.MpoolAPI) (full.EthModuleAPI, error) {
-					return modules.EthModuleAPI(fevmCfg)(mctx, r, lc, cs, sm, evapi, mp, stateapi, chainapi, mpoolapi)
-				},
-			),
-			fx.Provide(func() full.EthModuleAPI { return &full.EthModuleDummy{} }),
 		),
 		// bootstrap settings
 		fxOptional(isBootstrap, fx.Provide(peermgr.NewPeerMgr)),
@@ -174,19 +159,38 @@ func Fullnode(isBootstrap bool, isLite bool, fevmCfg config.FevmConfig) fx.Optio
 }
 
 // Providers exclusive to full node
-var fullNodeAPIProviders = fx.Provide(
-	messagepool.NewProvider,
-	fx.Annotate(modules.MessagePool, fx.As(new(messagepool.MpoolNonceAPI))),
-	fx.Annotate(stmgr.NewStateManager, fx.As(new(stmgr.StateManagerAPI))),
-	func(
-		chainModule full.ChainModule,
-		gasModule full.GasModule,
-		mpoolModule full.MpoolModule,
-		stateModule full.StateModule,
-	) (full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI) {
-		return &chainModule, &gasModule, &mpoolModule, &stateModule
-	},
-)
+func fullNodeAPIProviders(fevmCfg config.FevmConfig) fx.Option {
+	return fx.Module(
+		"fullNodeAPIProviders",
+		fx.Provide(
+			messagepool.NewProvider,
+			fx.Annotate(modules.MessagePool, fx.As(new(messagepool.MpoolNonceAPI))),
+			fx.Annotate(modules.StateManager, fx.As(new(stmgr.StateManagerAPI))),
+			func(
+				chainModule full.ChainModule,
+				gasModule full.GasModule,
+				mpoolModule full.MpoolModule,
+				stateModule full.StateModule,
+			) (full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI) {
+				return &chainModule, &gasModule, &mpoolModule, &stateModule
+			},
+		),
+		fxEitherOr(
+			fevmCfg.EnableEthRPC,
+			fx.Provide(
+				func(mctx helpers.MetricsCtx, r repo.LockedRepo, lc fx.Lifecycle, cs *store.ChainStore, sm *stmgr.StateManager, evapi modules.EventAPI, mp *messagepool.MessagePool, stateapi full.StateAPI, chainapi full.ChainAPI, mpoolapi full.MpoolAPI) (full.EthModuleAPI, error) {
+					return modules.EthModuleAPI(fevmCfg)(mctx, r, lc, cs, sm, evapi, mp, stateapi, chainapi, mpoolapi)
+				},
+				modules.EthEventAPI(fevmCfg),
+				func(event *full.EthEvent) full.EthEventAPI { return event },
+			),
+			fx.Provide(
+				func() full.EthModuleAPI { return &full.EthModuleDummy{} },
+				func() full.EthEventAPI { return &full.EthModuleDummy{} },
+			),
+		),
+	)
+}
 
 // Providers exclusive to lite node
 var liteNodeAPIProviders = fx.Provide(
@@ -196,7 +200,7 @@ var liteNodeAPIProviders = fx.Provide(
 		return &nonceAPI
 	},
 	func(gateway api.Gateway) (
-		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI /*full.EthModuleAPI,*/, full.EthEventAPI) {
-		return gateway, gateway, gateway, gateway /*gateway,*/, gateway
+		full.ChainModuleAPI, full.GasModuleAPI, full.MpoolModuleAPI, full.StateModuleAPI, full.EthModuleAPI, full.EthEventAPI) {
+		return gateway, gateway, gateway, gateway, gateway, gateway
 	},
 )

@@ -170,10 +170,10 @@ an existing lotus binary in your PATH. This may cause problems if you don't run 
 
 .PHONY: build
 
-install: install-daemon install-miner install-worker
+install: install-daemon
 
 install-daemon:
-	install -C ./lotus /usr/local/bin/lotus
+	install -C ./eudico /usr/local/bin/eudico
 
 install-miner:
 	install -C ./lotus-miner /usr/local/bin/lotus-miner
@@ -347,7 +347,7 @@ actors-gen: actors-code-gen fiximports
 .PHONY: actors-gen
 
 bundle-gen:
-	$(GOCC) run ./gen/bundle $(RELEASE)
+	$(GOCC) run ./gen/bundle $(VERSION) $(RELEASE) $(RELEASE_OVERRIDES)
 	$(GOCC) fmt ./build/...
 .PHONY: bundle-gen
 

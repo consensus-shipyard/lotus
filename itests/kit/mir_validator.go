@@ -11,26 +11,20 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/chain/consensus/mir"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
-	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	mirlibp2pnet "github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net/libp2p"
 	mirtypes "github.com/filecoin-project/mir/pkg/types"
-)
 
-const (
-	FakeMembership    = 0
-	StringMembership  = 1
-	FileMembership    = 2
-	OnChainMembership = 3
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
+	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
 type MirConfig struct {
 	Delay              int
 	MembershipFileName string
 	MembershipString   string
-	MembershipType     int
+	MembershipType     string
 	MembershipFilename string
 	Databases          map[string]*TestDB
 	MockedTransport    bool
@@ -38,7 +32,7 @@ type MirConfig struct {
 
 func DefaultMirConfig() *MirConfig {
 	return &MirConfig{
-		MembershipType: StringMembership,
+		MembershipType: membership.StringSource,
 	}
 }
 
@@ -72,23 +66,23 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 	}
 
 	switch cfg.MembershipType {
-	case FakeMembership:
+	case membership.FakeSource:
 		v.membership = fakeMembership{}
-	case StringMembership:
+	case membership.StringSource:
 		if cfg.MembershipString == "" {
 			return nil, fmt.Errorf("empty membership string")
 		}
 		v.membershipString = cfg.MembershipString
 		v.membership = membership.StringMembership(cfg.MembershipString)
-	case FileMembership:
+	case membership.FileSource:
 		if cfg.MembershipFileName == "" {
 			return nil, fmt.Errorf("membership file is not specified")
 		}
 		v.membership = membership.FileMembership{FileName: cfg.MembershipFileName}
-	case OnChainMembership:
+	case membership.OnChainSource:
 		cl := NewStubJSONRPCClient()
 		cl.nextSet = cfg.MembershipString
-		v.membership = membership.NewOnChainMembershipClient(cl)
+		v.membership = membership.NewOnChainMembershipClient(cl, ITestSubnet)
 	default:
 		return nil, fmt.Errorf("unknown membership type")
 	}
@@ -106,13 +100,11 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 
 func (v *MirValidator) MineBlocks(ctx context.Context) error {
 	cfg := mir.Config{
-		Consensus: &mir.ConsensusConfig{
-			SegmentLength: 1,
-		},
 		BaseConfig: &mir.BaseConfig{
 			Addr:      v.addr,
 			GroupName: v.t.Name(),
 		},
+		Consensus: mir.DefaultConsensusConfig(),
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

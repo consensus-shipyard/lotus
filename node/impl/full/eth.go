@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
+	"github.com/zyedidia/generic/queue"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
@@ -30,6 +33,7 @@ import (
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	builtinactors "github.com/filecoin-project/lotus/chain/actors/builtin"
+	builtinevm "github.com/filecoin-project/lotus/chain/actors/builtin/evm"
 	"github.com/filecoin-project/lotus/chain/ethhashlookup"
 	"github.com/filecoin-project/lotus/chain/events/filter"
 	"github.com/filecoin-project/lotus/chain/messagepool"
@@ -37,8 +41,11 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"github.com/filecoin-project/lotus/chain/vm"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
+
+var ErrUnsupported = errors.New("unsupported method")
 
 type EthModuleAPI interface {
 	EthBlockNumber(ctx context.Context) (ethtypes.EthUint64, error)
@@ -48,12 +55,12 @@ type EthModuleAPI interface {
 	EthGetBlockByHash(ctx context.Context, blkHash ethtypes.EthHash, fullTxInfo bool) (ethtypes.EthBlock, error)
 	EthGetBlockByNumber(ctx context.Context, blkNum string, fullTxInfo bool) (ethtypes.EthBlock, error)
 	EthGetTransactionByHash(ctx context.Context, txHash *ethtypes.EthHash) (*ethtypes.EthTx, error)
+	EthGetTransactionByHashLimited(ctx context.Context, txHash *ethtypes.EthHash, limit abi.ChainEpoch) (*ethtypes.EthTx, error)
 	EthGetMessageCidByTransactionHash(ctx context.Context, txHash *ethtypes.EthHash) (*cid.Cid, error)
 	EthGetTransactionHashByCid(ctx context.Context, cid cid.Cid) (*ethtypes.EthHash, error)
 	EthGetTransactionCount(ctx context.Context, sender ethtypes.EthAddress, blkOpt string) (ethtypes.EthUint64, error)
 	EthGetTransactionReceipt(ctx context.Context, txHash ethtypes.EthHash) (*api.EthTxReceipt, error)
-	EthGetTransactionByBlockHashAndIndex(ctx context.Context, blkHash ethtypes.EthHash, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error)
-	EthGetTransactionByBlockNumberAndIndex(ctx context.Context, blkNum ethtypes.EthUint64, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error)
+	EthGetTransactionReceiptLimited(ctx context.Context, txHash ethtypes.EthHash, limit abi.ChainEpoch) (*api.EthTxReceipt, error)
 	EthGetCode(ctx context.Context, address ethtypes.EthAddress, blkOpt string) (ethtypes.EthBytes, error)
 	EthGetStorageAt(ctx context.Context, address ethtypes.EthAddress, position ethtypes.EthBytes, blkParam string) (ethtypes.EthBytes, error)
 	EthGetBalance(ctx context.Context, address ethtypes.EthAddress, blkParam string) (ethtypes.EthBigInt, error)
@@ -151,6 +158,8 @@ type EthAPI struct {
 	EthEventAPI
 }
 
+var ErrNullRound = errors.New("requested epoch was a null round")
+
 func (a *EthModule) StateNetworkName(ctx context.Context) (dtypes.NetworkName, error) {
 	return stmgr.GetNetworkName(ctx, a.StateManager, a.Chain.GetHeaviestTipSet().ParentState())
 }
@@ -178,6 +187,14 @@ func (a *EthModule) EthBlockNumber(ctx context.Context) (ethtypes.EthUint64, err
 func (a *EthModule) EthAccounts(context.Context) ([]ethtypes.EthAddress, error) {
 	// The lotus node is not expected to hold manage accounts, so we'll always return an empty array
 	return []ethtypes.EthAddress{}, nil
+}
+
+func (a *EthAPI) EthAddressToFilecoinAddress(ctx context.Context, ethAddress ethtypes.EthAddress) (address.Address, error) {
+	return ethAddress.ToFilecoinAddress()
+}
+
+func (a *EthAPI) FilecoinAddressToEthAddress(ctx context.Context, filecoinAddress address.Address) (ethtypes.EthAddress, error) {
+	return ethtypes.EthAddressFromFilecoinAddress(filecoinAddress)
 }
 
 func (a *EthModule) countTipsetMsgs(ctx context.Context, ts *types.TipSet) (int, error) {
@@ -221,7 +238,7 @@ func (a *EthModule) EthGetBlockByHash(ctx context.Context, blkHash ethtypes.EthH
 	return newEthBlockFromFilecoinTipSet(ctx, ts, fullTxInfo, a.Chain, a.StateAPI)
 }
 
-func (a *EthModule) parseBlkParam(ctx context.Context, blkParam string) (tipset *types.TipSet, err error) {
+func (a *EthModule) parseBlkParam(ctx context.Context, blkParam string, strict bool) (tipset *types.TipSet, err error) {
 	if blkParam == "earliest" {
 		return nil, fmt.Errorf("block param \"earliest\" is not supported")
 	}
@@ -242,16 +259,22 @@ func (a *EthModule) parseBlkParam(ctx context.Context, blkParam string) (tipset 
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse block number: %v", err)
 		}
-		ts, err := a.Chain.GetTipsetByHeight(ctx, abi.ChainEpoch(num), nil, false)
+		if abi.ChainEpoch(num) > head.Height()-1 {
+			return nil, fmt.Errorf("requested a future epoch (beyond 'latest')")
+		}
+		ts, err := a.ChainAPI.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(num), head.Key())
 		if err != nil {
 			return nil, fmt.Errorf("cannot get tipset at height: %v", num)
+		}
+		if strict && ts.Height() != abi.ChainEpoch(num) {
+			return nil, ErrNullRound
 		}
 		return ts, nil
 	}
 }
 
 func (a *EthModule) EthGetBlockByNumber(ctx context.Context, blkParam string, fullTxInfo bool) (ethtypes.EthBlock, error) {
-	ts, err := a.parseBlkParam(ctx, blkParam)
+	ts, err := a.parseBlkParam(ctx, blkParam, true)
 	if err != nil {
 		return ethtypes.EthBlock{}, err
 	}
@@ -259,6 +282,11 @@ func (a *EthModule) EthGetBlockByNumber(ctx context.Context, blkParam string, fu
 }
 
 func (a *EthModule) EthGetTransactionByHash(ctx context.Context, txHash *ethtypes.EthHash) (*ethtypes.EthTx, error) {
+	return a.EthGetTransactionByHashLimited(ctx, txHash, api.LookbackNoLimit)
+
+}
+
+func (a *EthModule) EthGetTransactionByHashLimited(ctx context.Context, txHash *ethtypes.EthHash, limit abi.ChainEpoch) (*ethtypes.EthTx, error) {
 	// Ethereum's behavior is to return null when the txHash is invalid, so we use nil to check if txHash is valid
 	if txHash == nil {
 		return nil, nil
@@ -275,7 +303,7 @@ func (a *EthModule) EthGetTransactionByHash(ctx context.Context, txHash *ethtype
 	}
 
 	// first, try to get the cid from mined transactions
-	msgLookup, err := a.StateAPI.StateSearchMsg(ctx, types.EmptyTSK, c, api.LookbackNoLimit, true)
+	msgLookup, err := a.StateAPI.StateSearchMsg(ctx, types.EmptyTSK, c, limit, true)
 	if err == nil && msgLookup != nil {
 		tx, err := newEthTxFromMessageLookup(ctx, msgLookup, -1, a.Chain, a.StateAPI)
 		if err == nil {
@@ -325,13 +353,13 @@ func (a *EthModule) EthGetMessageCidByTransactionHash(ctx context.Context, txHas
 		c = txHash.ToCid()
 	}
 
-	_, err = a.StateAPI.Chain.GetSignedMessage(ctx, c)
+	_, err = a.Chain.GetSignedMessage(ctx, c)
 	if err == nil {
 		// This is an Eth Tx, Secp message, Or BLS message in the mpool
 		return &c, nil
 	}
 
-	_, err = a.StateAPI.Chain.GetMessage(ctx, c)
+	_, err = a.Chain.GetMessage(ctx, c)
 	if err == nil {
 		// This is a BLS message
 		return &c, nil
@@ -357,9 +385,29 @@ func (a *EthModule) EthGetTransactionCount(ctx context.Context, sender ethtypes.
 		return ethtypes.EthUint64(0), nil
 	}
 
-	ts, err := a.parseBlkParam(ctx, blkParam)
+	ts, err := a.parseBlkParam(ctx, blkParam, false)
 	if err != nil {
 		return ethtypes.EthUint64(0), xerrors.Errorf("cannot parse block param: %s", blkParam)
+	}
+
+	// First, handle the case where the "sender" is an EVM actor.
+	if actor, err := a.StateManager.LoadActor(ctx, addr, ts); err != nil {
+		if xerrors.Is(err, types.ErrActorNotFound) {
+			return 0, nil
+		}
+		return 0, xerrors.Errorf("failed to lookup contract %s: %w", sender, err)
+	} else if builtinactors.IsEvmActor(actor.Code) {
+		evmState, err := builtinevm.Load(a.Chain.ActorStore(ctx), actor)
+		if err != nil {
+			return 0, xerrors.Errorf("failed to load evm state: %w", err)
+		}
+		if alive, err := evmState.IsAlive(); err != nil {
+			return 0, err
+		} else if !alive {
+			return 0, nil
+		}
+		nonce, err := evmState.Nonce()
+		return ethtypes.EthUint64(nonce), err
 	}
 
 	nonce, err := a.Mpool.GetNonce(ctx, addr, ts.Key())
@@ -370,6 +418,10 @@ func (a *EthModule) EthGetTransactionCount(ctx context.Context, sender ethtypes.
 }
 
 func (a *EthModule) EthGetTransactionReceipt(ctx context.Context, txHash ethtypes.EthHash) (*api.EthTxReceipt, error) {
+	return a.EthGetTransactionReceiptLimited(ctx, txHash, api.LookbackNoLimit)
+}
+
+func (a *EthModule) EthGetTransactionReceiptLimited(ctx context.Context, txHash ethtypes.EthHash, limit abi.ChainEpoch) (*api.EthTxReceipt, error) {
 	c, err := a.EthTxHashManager.TransactionHashLookup.GetCidFromHash(txHash)
 	if err != nil {
 		log.Debug("could not find transaction hash %s in lookup table", txHash.String())
@@ -380,7 +432,7 @@ func (a *EthModule) EthGetTransactionReceipt(ctx context.Context, txHash ethtype
 		c = txHash.ToCid()
 	}
 
-	msgLookup, err := a.StateAPI.StateSearchMsg(ctx, types.EmptyTSK, c, api.LookbackNoLimit, true)
+	msgLookup, err := a.StateAPI.StateSearchMsg(ctx, types.EmptyTSK, c, limit, true)
 	if err != nil || msgLookup == nil {
 		return nil, nil
 	}
@@ -390,20 +442,15 @@ func (a *EthModule) EthGetTransactionReceipt(ctx context.Context, txHash ethtype
 		return nil, nil
 	}
 
-	replay, err := a.StateAPI.StateReplay(ctx, types.EmptyTSK, c)
-	if err != nil {
-		return nil, nil
-	}
-
 	var events []types.Event
-	if rct := replay.MsgRct; rct != nil && rct.EventsRoot != nil {
+	if rct := msgLookup.Receipt; rct.EventsRoot != nil {
 		events, err = a.ChainAPI.ChainGetEvents(ctx, *rct.EventsRoot)
 		if err != nil {
 			return nil, nil
 		}
 	}
 
-	receipt, err := newEthTxReceipt(ctx, tx, msgLookup, replay, events, a.StateAPI)
+	receipt, err := newEthTxReceipt(ctx, tx, msgLookup, events, a.Chain, a.StateAPI)
 	if err != nil {
 		return nil, nil
 	}
@@ -411,12 +458,12 @@ func (a *EthModule) EthGetTransactionReceipt(ctx context.Context, txHash ethtype
 	return &receipt, nil
 }
 
-func (a *EthModule) EthGetTransactionByBlockHashAndIndex(ctx context.Context, blkHash ethtypes.EthHash, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error) {
-	return ethtypes.EthTx{}, nil
+func (a *EthAPI) EthGetTransactionByBlockHashAndIndex(context.Context, ethtypes.EthHash, ethtypes.EthUint64) (ethtypes.EthTx, error) {
+	return ethtypes.EthTx{}, ErrUnsupported
 }
 
-func (a *EthModule) EthGetTransactionByBlockNumberAndIndex(ctx context.Context, blkNum ethtypes.EthUint64, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error) {
-	return ethtypes.EthTx{}, nil
+func (a *EthAPI) EthGetTransactionByBlockNumberAndIndex(context.Context, ethtypes.EthUint64, ethtypes.EthUint64) (ethtypes.EthTx, error) {
+	return ethtypes.EthTx{}, ErrUnsupported
 }
 
 // EthGetCode returns string value of the compiled bytecode
@@ -426,23 +473,7 @@ func (a *EthModule) EthGetCode(ctx context.Context, ethAddr ethtypes.EthAddress,
 		return nil, xerrors.Errorf("cannot get Filecoin address: %w", err)
 	}
 
-	// use the system actor as the caller
-	from, err := address.NewIDAddress(0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct system sender address: %w", err)
-	}
-	msg := &types.Message{
-		From:       from,
-		To:         to,
-		Value:      big.Zero(),
-		Method:     builtintypes.MethodsEVM.GetBytecode,
-		Params:     nil,
-		GasLimit:   build.BlockGasLimit,
-		GasFeeCap:  big.Zero(),
-		GasPremium: big.Zero(),
-	}
-
-	ts, err := a.parseBlkParam(ctx, blkParam)
+	ts, err := a.parseBlkParam(ctx, blkParam, false)
 	if err != nil {
 		return nil, xerrors.Errorf("cannot parse block param: %s", blkParam)
 	}
@@ -450,6 +481,31 @@ func (a *EthModule) EthGetCode(ctx context.Context, ethAddr ethtypes.EthAddress,
 	// StateManager.Call will panic if there is no parent
 	if ts.Height() == 0 {
 		return nil, xerrors.Errorf("block param must not specify genesis block")
+	}
+
+	actor, err := a.StateManager.LoadActor(ctx, to, ts)
+	if err != nil {
+		if xerrors.Is(err, types.ErrActorNotFound) {
+			return nil, nil
+		}
+		return nil, xerrors.Errorf("failed to lookup contract %s: %w", ethAddr, err)
+	}
+
+	// Not a contract. We could try to distinguish between accounts and "native" contracts here,
+	// but it's not worth it.
+	if !builtinactors.IsEvmActor(actor.Code) {
+		return nil, nil
+	}
+
+	msg := &types.Message{
+		From:       builtinactors.SystemActorAddr,
+		To:         to,
+		Value:      big.Zero(),
+		Method:     builtintypes.MethodsEVM.GetBytecode,
+		Params:     nil,
+		GasLimit:   build.BlockGasLimit,
+		GasFeeCap:  big.Zero(),
+		GasPremium: big.Zero(),
 	}
 
 	// Try calling until we find a height with no migration.
@@ -466,9 +522,7 @@ func (a *EthModule) EthGetCode(ctx context.Context, ethAddr ethtypes.EthAddress,
 	}
 
 	if err != nil {
-		// if the call resulted in error, this is not an EVM smart contract;
-		// return no bytecode.
-		return nil, nil
+		return nil, xerrors.Errorf("failed to call GetBytecode: %w", err)
 	}
 
 	if res.MsgRct == nil {
@@ -476,15 +530,20 @@ func (a *EthModule) EthGetCode(ctx context.Context, ethAddr ethtypes.EthAddress,
 	}
 
 	if res.MsgRct.ExitCode.IsError() {
-		return nil, xerrors.Errorf("message execution failed: exit %s, reason: %s", res.MsgRct.ExitCode, res.Error)
+		return nil, xerrors.Errorf("GetBytecode failed: %s", res.Error)
 	}
 
-	var bytecodeCid cbg.CborCid
-	if err := bytecodeCid.UnmarshalCBOR(bytes.NewReader(res.MsgRct.Return)); err != nil {
+	var getBytecodeReturn evm.GetBytecodeReturn
+	if err := getBytecodeReturn.UnmarshalCBOR(bytes.NewReader(res.MsgRct.Return)); err != nil {
 		return nil, fmt.Errorf("failed to decode EVM bytecode CID: %w", err)
 	}
 
-	blk, err := a.Chain.StateBlockstore().Get(ctx, cid.Cid(bytecodeCid))
+	// The contract has selfdestructed, so the code is "empty".
+	if getBytecodeReturn.Cid == nil {
+		return nil, nil
+	}
+
+	blk, err := a.Chain.StateBlockstore().Get(ctx, *getBytecodeReturn.Cid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get EVM bytecode: %w", err)
 	}
@@ -493,13 +552,18 @@ func (a *EthModule) EthGetCode(ctx context.Context, ethAddr ethtypes.EthAddress,
 }
 
 func (a *EthModule) EthGetStorageAt(ctx context.Context, ethAddr ethtypes.EthAddress, position ethtypes.EthBytes, blkParam string) (ethtypes.EthBytes, error) {
+	ts, err := a.parseBlkParam(ctx, blkParam, false)
+	if err != nil {
+		return nil, xerrors.Errorf("cannot parse block param: %s", blkParam)
+	}
+
 	l := len(position)
 	if l > 32 {
 		return nil, fmt.Errorf("supplied storage key is too long")
 	}
 
 	// pad with zero bytes if smaller than 32 bytes
-	position = append(make([]byte, 32-l, 32-l), position...)
+	position = append(make([]byte, 32-l, 32), position...)
 
 	to, err := ethAddr.ToFilecoinAddress()
 	if err != nil {
@@ -512,8 +576,20 @@ func (a *EthModule) EthGetStorageAt(ctx context.Context, ethAddr ethtypes.EthAdd
 		return nil, fmt.Errorf("failed to construct system sender address: %w", err)
 	}
 
+	actor, err := a.StateManager.LoadActor(ctx, to, ts)
+	if err != nil {
+		if xerrors.Is(err, types.ErrActorNotFound) {
+			return ethtypes.EthBytes(make([]byte, 32)), nil
+		}
+		return nil, xerrors.Errorf("failed to lookup contract %s: %w", ethAddr, err)
+	}
+
+	if !builtinactors.IsEvmActor(actor.Code) {
+		return ethtypes.EthBytes(make([]byte, 32)), nil
+	}
+
 	params, err := actors.SerializeParams(&evm.GetStorageAtParams{
-		StorageKey: position,
+		StorageKey: *(*[32]byte)(position),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize parameters: %w", err)
@@ -529,8 +605,6 @@ func (a *EthModule) EthGetStorageAt(ctx context.Context, ethAddr ethtypes.EthAdd
 		GasFeeCap:  big.Zero(),
 		GasPremium: big.Zero(),
 	}
-
-	ts := a.Chain.GetHeaviestTipSet()
 
 	// Try calling until we find a height with no migration.
 	var res *api.InvocResult
@@ -550,10 +624,22 @@ func (a *EthModule) EthGetStorageAt(ctx context.Context, ethAddr ethtypes.EthAdd
 	}
 
 	if res.MsgRct == nil {
-		return nil, fmt.Errorf("no message receipt")
+		return nil, xerrors.Errorf("no message receipt")
 	}
 
-	return res.MsgRct.Return, nil
+	if res.MsgRct.ExitCode.IsError() {
+		return nil, xerrors.Errorf("failed to lookup storage slot: %s", res.Error)
+	}
+
+	var ret abi.CborBytes
+	if err := ret.UnmarshalCBOR(bytes.NewReader(res.MsgRct.Return)); err != nil {
+		return nil, xerrors.Errorf("failed to unmarshal storage slot: %w", err)
+	}
+
+	// pad with zero bytes if smaller than 32 bytes
+	ret = append(make([]byte, 32-len(ret), 32), ret...)
+
+	return ethtypes.EthBytes(ret), nil
 }
 
 func (a *EthModule) EthGetBalance(ctx context.Context, address ethtypes.EthAddress, blkParam string) (ethtypes.EthBigInt, error) {
@@ -562,12 +648,17 @@ func (a *EthModule) EthGetBalance(ctx context.Context, address ethtypes.EthAddre
 		return ethtypes.EthBigInt{}, err
 	}
 
-	ts, err := a.parseBlkParam(ctx, blkParam)
+	ts, err := a.parseBlkParam(ctx, blkParam, false)
 	if err != nil {
 		return ethtypes.EthBigInt{}, xerrors.Errorf("cannot parse block param: %s", blkParam)
 	}
 
-	actor, err := a.StateGetActor(ctx, filAddr, ts.Key())
+	st, _, err := a.StateManager.TipSetState(ctx, ts)
+	if err != nil {
+		return ethtypes.EthBigInt{}, xerrors.Errorf("failed to compute tipset state: %w", err)
+	}
+
+	actor, err := a.StateManager.LoadActorRaw(ctx, filAddr, st)
 	if xerrors.Is(err, types.ErrActorNotFound) {
 		return ethtypes.EthBigIntZero, nil
 	} else if err != nil {
@@ -589,36 +680,61 @@ func (a *EthModule) EthFeeHistory(ctx context.Context, p jsonrpc.RawParams) (eth
 	if params.BlkCount > 1024 {
 		return ethtypes.EthFeeHistory{}, fmt.Errorf("block count should be smaller than 1024")
 	}
+	rewardPercentiles := make([]float64, 0)
+	if params.RewardPercentiles != nil {
+		rewardPercentiles = append(rewardPercentiles, *params.RewardPercentiles...)
+	}
+	for i, rp := range rewardPercentiles {
+		if rp < 0 || rp > 100 {
+			return ethtypes.EthFeeHistory{}, fmt.Errorf("invalid reward percentile: %f should be between 0 and 100", rp)
+		}
+		if i > 0 && rp < rewardPercentiles[i-1] {
+			return ethtypes.EthFeeHistory{}, fmt.Errorf("invalid reward percentile: %f should be larger than %f", rp, rewardPercentiles[i-1])
+		}
+	}
 
-	ts, err := a.parseBlkParam(ctx, params.NewestBlkNum)
+	ts, err := a.parseBlkParam(ctx, params.NewestBlkNum, false)
 	if err != nil {
 		return ethtypes.EthFeeHistory{}, fmt.Errorf("bad block parameter %s: %s", params.NewestBlkNum, err)
 	}
 
-	// Deal with the case that the chain is shorter than the number of requested blocks.
-	oldestBlkHeight := uint64(1)
-	if abi.ChainEpoch(params.BlkCount) <= ts.Height() {
-		oldestBlkHeight = uint64(ts.Height()) - uint64(params.BlkCount) + 1
-	}
+	var (
+		basefee         = ts.Blocks()[0].ParentBaseFee
+		oldestBlkHeight = uint64(1)
 
-	// NOTE: baseFeePerGas should include the next block after the newest of the returned range,
-	//  because the next base fee can be inferred from the messages in the newest block.
-	//  However, this is NOT the case in Filecoin due to deferred execution, so the best
-	//  we can do is duplicate the last value.
-	baseFeeArray := []ethtypes.EthBigInt{ethtypes.EthBigInt(ts.Blocks()[0].ParentBaseFee)}
-	gasUsedRatioArray := []float64{}
+		// NOTE: baseFeePerGas should include the next block after the newest of the returned range,
+		//  because the next base fee can be inferred from the messages in the newest block.
+		//  However, this is NOT the case in Filecoin due to deferred execution, so the best
+		//  we can do is duplicate the last value.
+		baseFeeArray      = []ethtypes.EthBigInt{ethtypes.EthBigInt(basefee)}
+		rewardsArray      = make([][]ethtypes.EthBigInt, 0)
+		gasUsedRatioArray = []float64{}
+		blocksIncluded    int
+	)
 
-	for ts.Height() >= abi.ChainEpoch(oldestBlkHeight) {
-		// Unfortunately we need to rebuild the full message view so we can
-		// totalize gas used in the tipset.
-		block, err := newEthBlockFromFilecoinTipSet(ctx, ts, false, a.Chain, a.StateAPI)
+	for blocksIncluded < int(params.BlkCount) && ts.Height() > 0 {
+		msgs, rcpts, err := messagesAndReceipts(ctx, ts, a.Chain, a.StateAPI)
 		if err != nil {
-			return ethtypes.EthFeeHistory{}, fmt.Errorf("cannot create eth block: %v", err)
+			return ethtypes.EthFeeHistory{}, xerrors.Errorf("failed to retrieve messages and receipts for height %d: %w", ts.Height(), err)
 		}
 
-		// both arrays should be reversed at the end
-		baseFeeArray = append(baseFeeArray, ethtypes.EthBigInt(ts.Blocks()[0].ParentBaseFee))
-		gasUsedRatioArray = append(gasUsedRatioArray, float64(block.GasUsed)/float64(build.BlockGasLimit))
+		txGasRewards := gasRewardSorter{}
+		for i, msg := range msgs {
+			effectivePremium := msg.VMMessage().EffectiveGasPremium(basefee)
+			txGasRewards = append(txGasRewards, gasRewardTuple{
+				premium: effectivePremium,
+				gasUsed: rcpts[i].GasUsed,
+			})
+		}
+
+		rewards, totalGasUsed := calculateRewardsAndGasUsed(rewardPercentiles, txGasRewards)
+
+		// arrays should be reversed at the end
+		baseFeeArray = append(baseFeeArray, ethtypes.EthBigInt(basefee))
+		gasUsedRatioArray = append(gasUsedRatioArray, float64(totalGasUsed)/float64(build.BlockGasLimit))
+		rewardsArray = append(rewardsArray, rewards)
+		oldestBlkHeight = uint64(ts.Height())
+		blocksIncluded++
 
 		parentTsKey := ts.Parents()
 		ts, err = a.Chain.LoadTipSet(ctx, parentTsKey)
@@ -634,6 +750,9 @@ func (a *EthModule) EthFeeHistory(ctx context.Context, p jsonrpc.RawParams) (eth
 	for i, j := 0, len(gasUsedRatioArray)-1; i < j; i, j = i+1, j-1 {
 		gasUsedRatioArray[i], gasUsedRatioArray[j] = gasUsedRatioArray[j], gasUsedRatioArray[i]
 	}
+	for i, j := 0, len(rewardsArray)-1; i < j; i, j = i+1, j-1 {
+		rewardsArray[i], rewardsArray[j] = rewardsArray[j], rewardsArray[i]
+	}
 
 	ret := ethtypes.EthFeeHistory{
 		OldestBlock:   ethtypes.EthUint64(oldestBlkHeight),
@@ -641,24 +760,13 @@ func (a *EthModule) EthFeeHistory(ctx context.Context, p jsonrpc.RawParams) (eth
 		GasUsedRatio:  gasUsedRatioArray,
 	}
 	if params.RewardPercentiles != nil {
-		// TODO: Populate reward percentiles
-		//  https://github.com/filecoin-project/lotus/issues/10236
-		//  We need to calculate the requested percentiles of effective gas premium
-		//  based on the newest block (I presume it's the newest, we need to dig in
-		//  as it's underspecified). Effective means we're clamped at the gas_fee_cap - base_fee.
-		reward := make([][]ethtypes.EthBigInt, 0)
-		ret.Reward = &reward
+		ret.Reward = &rewardsArray
 	}
 	return ret, nil
 }
 
-func (a *EthModule) NetVersion(ctx context.Context) (string, error) {
-	// Note that networkId is not encoded in hex
-	nv, err := a.StateNetworkVersion(ctx, types.EmptyTSK)
-	if err != nil {
-		return "", err
-	}
-	return strconv.FormatUint(uint64(nv), 10), nil
+func (a *EthModule) NetVersion(_ context.Context) (string, error) {
+	return strconv.FormatInt(build.Eip155ChainId, 10), nil
 }
 
 func (a *EthModule) NetListening(ctx context.Context) (bool, error) {
@@ -739,18 +847,20 @@ func (a *EthModule) ethCallToFilecoinMessage(ctx context.Context, tx ethtypes.Et
 	}
 
 	var params []byte
+	if len(tx.Data) > 0 {
+		initcode := abi.CborBytes(tx.Data)
+		params2, err := actors.SerializeParams(&initcode)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize params: %w", err)
+		}
+		params = params2
+	}
+
 	var to address.Address
 	var method abi.MethodNum
 	if tx.To == nil {
 		// this is a contract creation
 		to = builtintypes.EthereumAddressManagerActorAddr
-
-		initcode := abi.CborBytes(tx.Data)
-		params2, err := actors.SerializeParams(&initcode)
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize Create params: %w", err)
-		}
-		params = params2
 		method = builtintypes.MethodsEAM.CreateExternal
 	} else {
 		addr, err := tx.To.ToFilecoinAddress()
@@ -758,15 +868,6 @@ func (a *EthModule) ethCallToFilecoinMessage(ctx context.Context, tx ethtypes.Et
 			return nil, xerrors.Errorf("cannot get Filecoin address: %w", err)
 		}
 		to = addr
-
-		if len(tx.Data) > 0 {
-			var buf bytes.Buffer
-			if err := cbg.WriteByteArray(&buf, tx.Data); err != nil {
-				return nil, fmt.Errorf("failed to encode tx input into a cbor byte-string")
-			}
-			params = buf.Bytes()
-		}
-
 		method = builtintypes.MethodsEVM.InvokeContract
 	}
 
@@ -788,9 +889,14 @@ func (a *EthModule) applyMessage(ctx context.Context, msg *types.Message, tsk ty
 		return nil, xerrors.Errorf("cannot get tipset: %w", err)
 	}
 
+	applyTsMessages := true
+	if os.Getenv("LOTUS_SKIP_APPLY_TS_MESSAGE_CALL_WITH_GAS") == "1" {
+		applyTsMessages = false
+	}
+
 	// Try calling until we find a height with no migration.
 	for {
-		res, err = a.StateManager.CallWithGas(ctx, msg, []types.ChainMsg{}, ts)
+		res, err = a.StateManager.CallWithGas(ctx, msg, []types.ChainMsg{}, ts, applyTsMessages)
 		if err != stmgr.ErrExpensiveFork {
 			break
 		}
@@ -803,7 +909,8 @@ func (a *EthModule) applyMessage(ctx context.Context, msg *types.Message, tsk ty
 		return nil, xerrors.Errorf("CallWithGas failed: %w", err)
 	}
 	if res.MsgRct.ExitCode.IsError() {
-		return nil, xerrors.Errorf("message execution failed: exit %s, msg receipt: %s, reason: %s", res.MsgRct.ExitCode, res.MsgRct.Return, res.Error)
+		reason := parseEthRevert(res.MsgRct.Return)
+		return nil, xerrors.Errorf("message execution failed: exit %s, revert reason: %s, vm error: %s", res.MsgRct.ExitCode, reason, res.Error)
 	}
 	return res, nil
 }
@@ -819,14 +926,24 @@ func (a *EthModule) EthEstimateGas(ctx context.Context, tx ethtypes.EthCall) (et
 	msg.GasLimit = 0
 
 	ts := a.Chain.GetHeaviestTipSet()
-	msg, err = a.GasAPI.GasEstimateMessageGas(ctx, msg, nil, ts.Key())
+	gassedMsg, err := a.GasAPI.GasEstimateMessageGas(ctx, msg, nil, ts.Key())
 	if err != nil {
+		// On failure, GasEstimateMessageGas doesn't actually return the invocation result,
+		// it just returns an error. That means we can't get the revert reason.
+		//
+		// So we re-execute the message with EthCall (well, applyMessage which contains the
+		// guts of EthCall). This will give us an ethereum specific error with revert
+		// information.
+		msg.GasLimit = build.BlockGasLimit
+		if _, err2 := a.applyMessage(ctx, msg, ts.Key()); err2 != nil {
+			err = err2
+		}
 		return ethtypes.EthUint64(0), xerrors.Errorf("failed to estimate gas: %w", err)
 	}
 
-	expectedGas, err := ethGasSearch(ctx, a.Chain, a.Stmgr, a.Mpool, msg, ts)
+	expectedGas, err := ethGasSearch(ctx, a.Chain, a.Stmgr, a.Mpool, gassedMsg, ts)
 	if err != nil {
-		log.Errorw("expected gas", "err", err)
+		return 0, xerrors.Errorf("gas search failed: %w", err)
 	}
 
 	return ethtypes.EthUint64(expectedGas), nil
@@ -848,10 +965,15 @@ func gasSearch(
 	high := msg.GasLimit
 	low := msg.GasLimit
 
+	applyTsMessages := true
+	if os.Getenv("LOTUS_SKIP_APPLY_TS_MESSAGE_CALL_WITH_GAS") == "1" {
+		applyTsMessages = false
+	}
+
 	canSucceed := func(limit int64) (bool, error) {
 		msg.GasLimit = limit
 
-		res, err := smgr.CallWithGas(ctx, &msg, priorMsgs, ts)
+		res, err := smgr.CallWithGas(ctx, &msg, priorMsgs, ts, applyTsMessages)
 		if err != nil {
 			return false, xerrors.Errorf("CallWithGas failed: %w", err)
 		}
@@ -957,14 +1079,14 @@ func (a *EthModule) EthCall(ctx context.Context, tx ethtypes.EthCall, blkParam s
 		return nil, xerrors.Errorf("failed to convert ethcall to filecoin message: %w", err)
 	}
 
-	ts, err := a.parseBlkParam(ctx, blkParam)
+	ts, err := a.parseBlkParam(ctx, blkParam, false)
 	if err != nil {
 		return nil, xerrors.Errorf("cannot parse block param: %s", blkParam)
 	}
 
 	invokeResult, err := a.applyMessage(ctx, msg, ts.Key())
 	if err != nil {
-		return nil, xerrors.Errorf("failed to apply message: %w", err)
+		return nil, err
 	}
 
 	if msg.To == builtintypes.EthereumAddressManagerActorAddr {
@@ -1234,8 +1356,9 @@ func (e *EthEvent) uninstallFilter(ctx context.Context, f filter.Filter) error {
 }
 
 const (
-	EthSubscribeEventTypeHeads = "newHeads"
-	EthSubscribeEventTypeLogs  = "logs"
+	EthSubscribeEventTypeHeads               = "newHeads"
+	EthSubscribeEventTypeLogs                = "logs"
+	EthSubscribeEventTypePendingTransactions = "newPendingTransactions"
 )
 
 func (e *EthEvent) EthSubscribe(ctx context.Context, p jsonrpc.RawParams) (ethtypes.EthSubscriptionID, error) {
@@ -1253,7 +1376,7 @@ func (e *EthEvent) EthSubscribe(ctx context.Context, p jsonrpc.RawParams) (ethty
 		return ethtypes.EthSubscriptionID{}, xerrors.Errorf("connection doesn't support callbacks")
 	}
 
-	sub, err := e.SubManager.StartSubscription(e.SubscribtionCtx, ethCb.EthSubscription)
+	sub, err := e.SubManager.StartSubscription(e.SubscribtionCtx, ethCb.EthSubscription, e.uninstallFilter)
 	if err != nil {
 		return ethtypes.EthSubscriptionID{}, err
 	}
@@ -1298,6 +1421,15 @@ func (e *EthEvent) EthSubscribe(ctx context.Context, p jsonrpc.RawParams) (ethty
 			return ethtypes.EthSubscriptionID{}, err
 		}
 		sub.addFilter(ctx, f)
+	case EthSubscribeEventTypePendingTransactions:
+		f, err := e.MemPoolFilterManager.Install(ctx)
+		if err != nil {
+			// clean up any previous filters added and stop the sub
+			_, _ = e.EthUnsubscribe(ctx, sub.id)
+			return ethtypes.EthSubscriptionID{}, err
+		}
+
+		sub.addFilter(ctx, f)
 	default:
 		return ethtypes.EthSubscriptionID{}, xerrors.Errorf("unsupported event type: %s", params.EventType)
 	}
@@ -1310,16 +1442,9 @@ func (e *EthEvent) EthUnsubscribe(ctx context.Context, id ethtypes.EthSubscripti
 		return false, api.ErrNotSupported
 	}
 
-	filters, err := e.SubManager.StopSubscription(ctx, id)
+	err := e.SubManager.StopSubscription(ctx, id)
 	if err != nil {
 		return false, nil
-	}
-
-	for _, f := range filters {
-		if err := e.uninstallFilter(ctx, f); err != nil {
-			// this will leave the filter a zombie, collecting events up to the maximum allowed
-			log.Warnf("failed to remove filter when unsubscribing: %v", err)
-		}
 	}
 
 	return true, nil
@@ -1507,7 +1632,7 @@ type EthSubscriptionManager struct {
 	subs     map[ethtypes.EthSubscriptionID]*ethSubscription
 }
 
-func (e *EthSubscriptionManager) StartSubscription(ctx context.Context, out ethSubscriptionCallback) (*ethSubscription, error) { // nolint
+func (e *EthSubscriptionManager) StartSubscription(ctx context.Context, out ethSubscriptionCallback, dropFilter func(context.Context, filter.Filter) error) (*ethSubscription, error) { // nolint
 	rawid, err := uuid.NewRandom()
 	if err != nil {
 		return nil, xerrors.Errorf("new uuid: %w", err)
@@ -1518,13 +1643,17 @@ func (e *EthSubscriptionManager) StartSubscription(ctx context.Context, out ethS
 	ctx, quit := context.WithCancel(ctx)
 
 	sub := &ethSubscription{
-		Chain:    e.Chain,
-		StateAPI: e.StateAPI,
-		ChainAPI: e.ChainAPI,
-		id:       id,
-		in:       make(chan interface{}, 200),
-		out:      out,
-		quit:     quit,
+		Chain:           e.Chain,
+		StateAPI:        e.StateAPI,
+		ChainAPI:        e.ChainAPI,
+		uninstallFilter: dropFilter,
+		id:              id,
+		in:              make(chan interface{}, 200),
+		out:             out,
+		quit:            quit,
+
+		toSend:   queue.New[[]byte](),
+		sendCond: make(chan struct{}, 1),
 	}
 
 	e.mu.Lock()
@@ -1535,37 +1664,46 @@ func (e *EthSubscriptionManager) StartSubscription(ctx context.Context, out ethS
 	e.mu.Unlock()
 
 	go sub.start(ctx)
+	go sub.startOut(ctx)
 
 	return sub, nil
 }
 
-func (e *EthSubscriptionManager) StopSubscription(ctx context.Context, id ethtypes.EthSubscriptionID) ([]filter.Filter, error) {
+func (e *EthSubscriptionManager) StopSubscription(ctx context.Context, id ethtypes.EthSubscriptionID) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	sub, ok := e.subs[id]
 	if !ok {
-		return nil, xerrors.Errorf("subscription not found")
+		return xerrors.Errorf("subscription not found")
 	}
 	sub.stop()
 	delete(e.subs, id)
 
-	return sub.filters, nil
+	return nil
 }
 
 type ethSubscriptionCallback func(context.Context, jsonrpc.RawParams) error
 
+const maxSendQueue = 20000
+
 type ethSubscription struct {
-	Chain    *store.ChainStore
-	StateAPI StateAPI
-	ChainAPI ChainAPI
-	id       ethtypes.EthSubscriptionID
-	in       chan interface{}
-	out      ethSubscriptionCallback
+	Chain           *store.ChainStore
+	StateAPI        StateAPI
+	ChainAPI        ChainAPI
+	uninstallFilter func(context.Context, filter.Filter) error
+	id              ethtypes.EthSubscriptionID
+	in              chan interface{}
+	out             ethSubscriptionCallback
 
 	mu      sync.Mutex
 	filters []filter.Filter
 	quit    func()
+
+	sendLk       sync.Mutex
+	sendQueueLen int
+	toSend       *queue.Queue[[]byte]
+	sendCond     chan struct{}
 }
 
 func (e *ethSubscription) addFilter(ctx context.Context, f filter.Filter) {
@@ -1574,6 +1712,36 @@ func (e *ethSubscription) addFilter(ctx context.Context, f filter.Filter) {
 
 	f.SetSubChannel(e.in)
 	e.filters = append(e.filters, f)
+}
+
+// sendOut processes the final subscription queue. It's here in case the subscriber
+// is slow, and we need to buffer the messages.
+func (e *ethSubscription) startOut(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-e.sendCond:
+			e.sendLk.Lock()
+
+			for !e.toSend.Empty() {
+				front := e.toSend.Dequeue()
+				e.sendQueueLen--
+
+				e.sendLk.Unlock()
+
+				if err := e.out(ctx, front); err != nil {
+					log.Warnw("error sending subscription response, killing subscription", "sub", e.id, "error", err)
+					e.stop()
+					return
+				}
+
+				e.sendLk.Lock()
+			}
+
+			e.sendLk.Unlock()
+		}
+	}
 }
 
 func (e *ethSubscription) send(ctx context.Context, v interface{}) {
@@ -1588,9 +1756,21 @@ func (e *ethSubscription) send(ctx context.Context, v interface{}) {
 		return
 	}
 
-	if err := e.out(ctx, outParam); err != nil {
-		log.Warnw("sending subscription response", "sub", e.id, "error", err)
+	e.sendLk.Lock()
+	defer e.sendLk.Unlock()
+
+	e.toSend.Enqueue(outParam)
+
+	e.sendQueueLen++
+	if e.sendQueueLen > maxSendQueue {
+		log.Warnw("subscription send queue full, killing subscription", "sub", e.id)
+		e.stop()
 		return
+	}
+
+	select {
+	case e.sendCond <- struct{}{}:
+	default: // already signalled, and we're holding the lock so we know that the event will be processed
 	}
 }
 
@@ -1617,6 +1797,15 @@ func (e *ethSubscription) start(ctx context.Context) {
 				}
 
 				e.send(ctx, ev)
+			case *types.SignedMessage: // mpool txid
+				evs, err := ethFilterResultFromMessages([]*types.SignedMessage{vt}, e.StateAPI)
+				if err != nil {
+					continue
+				}
+
+				for _, r := range evs.Results {
+					e.send(ctx, r)
+				}
 			default:
 				log.Warnf("unexpected subscription value type: %T", vt)
 			}
@@ -1626,20 +1815,28 @@ func (e *ethSubscription) start(ctx context.Context) {
 
 func (e *ethSubscription) stop() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	if e.quit == nil {
+		e.mu.Unlock()
+		return
+	}
 
 	if e.quit != nil {
 		e.quit()
 		e.quit = nil
+		e.mu.Unlock()
+
+		for _, f := range e.filters {
+			// note: the context in actually unused in uninstallFilter
+			if err := e.uninstallFilter(context.TODO(), f); err != nil {
+				// this will leave the filter a zombie, collecting events up to the maximum allowed
+				log.Warnf("failed to remove filter when unsubscribing: %v", err)
+			}
+		}
 	}
 }
 
 func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTxInfo bool, cs *store.ChainStore, sa StateAPI) (ethtypes.EthBlock, error) {
-	parent, err := cs.LoadTipSet(ctx, ts.Parents())
-	if err != nil {
-		return ethtypes.EthBlock{}, err
-	}
-	parentKeyCid, err := parent.Key().Cid()
+	parentKeyCid, err := ts.Parents().Cid()
 	if err != nil {
 		return ethtypes.EthBlock{}, err
 	}
@@ -1647,6 +1844,8 @@ func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTx
 	if err != nil {
 		return ethtypes.EthBlock{}, err
 	}
+
+	bn := ethtypes.EthUint64(ts.Height())
 
 	blkCid, err := ts.Key().Cid()
 	if err != nil {
@@ -1657,26 +1856,41 @@ func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTx
 		return ethtypes.EthBlock{}, err
 	}
 
-	msgs, err := cs.MessagesForTipset(ctx, ts)
+	msgs, rcpts, err := messagesAndReceipts(ctx, ts, cs, sa)
 	if err != nil {
-		return ethtypes.EthBlock{}, xerrors.Errorf("error loading messages for tipset: %v: %w", ts, err)
+		return ethtypes.EthBlock{}, xerrors.Errorf("failed to retrieve messages and receipts: %w", err)
 	}
 
 	block := ethtypes.NewEthBlock(len(msgs) > 0)
 
-	// this seems to be a very expensive way to get gasUsed of the block. may need to find an efficient way to do it
 	gasUsed := int64(0)
-	for txIdx, msg := range msgs {
-		msgLookup, err := sa.StateSearchMsg(ctx, types.EmptyTSK, msg.Cid(), api.LookbackNoLimit, false)
-		if err != nil || msgLookup == nil {
-			return ethtypes.EthBlock{}, nil
+	for i, msg := range msgs {
+		rcpt := rcpts[i]
+		ti := ethtypes.EthUint64(i)
+		gasUsed += rcpt.GasUsed
+		var smsg *types.SignedMessage
+		switch msg := msg.(type) {
+		case *types.SignedMessage:
+			smsg = msg
+		case *types.Message:
+			smsg = &types.SignedMessage{
+				Message: *msg,
+				Signature: crypto.Signature{
+					Type: crypto.SigTypeBLS,
+				},
+			}
+		default:
+			return ethtypes.EthBlock{}, xerrors.Errorf("failed to get signed msg %s: %w", msg.Cid(), err)
 		}
-		gasUsed += msgLookup.Receipt.GasUsed
-
-		tx, err := newEthTxFromMessageLookup(ctx, msgLookup, txIdx, cs, sa)
+		tx, err := newEthTxFromSignedMessage(ctx, smsg, sa)
 		if err != nil {
-			return ethtypes.EthBlock{}, nil
+			return ethtypes.EthBlock{}, xerrors.Errorf("failed to convert msg to ethTx: %w", err)
 		}
+
+		tx.ChainID = ethtypes.EthUint64(build.Eip155ChainId)
+		tx.BlockHash = &blkHash
+		tx.BlockNumber = &bn
+		tx.TransactionIndex = &ti
 
 		if fullTxInfo {
 			block.Transactions = append(block.Transactions, tx)
@@ -1686,12 +1900,35 @@ func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTx
 	}
 
 	block.Hash = blkHash
-	block.Number = ethtypes.EthUint64(ts.Height())
+	block.Number = bn
 	block.ParentHash = parentBlkHash
 	block.Timestamp = ethtypes.EthUint64(ts.Blocks()[0].Timestamp)
 	block.BaseFeePerGas = ethtypes.EthBigInt{Int: ts.Blocks()[0].ParentBaseFee.Int}
 	block.GasUsed = ethtypes.EthUint64(gasUsed)
 	return block, nil
+}
+
+func messagesAndReceipts(ctx context.Context, ts *types.TipSet, cs *store.ChainStore, sa StateAPI) ([]types.ChainMsg, []types.MessageReceipt, error) {
+	msgs, err := cs.MessagesForTipset(ctx, ts)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("error loading messages for tipset: %v: %w", ts, err)
+	}
+
+	_, rcptRoot, err := sa.StateManager.TipSetState(ctx, ts)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to compute state: %w", err)
+	}
+
+	rcpts, err := cs.ReadReceipts(ctx, rcptRoot)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("error loading receipts for tipset: %v: %w", ts, err)
+	}
+
+	if len(msgs) != len(rcpts) {
+		return nil, nil, xerrors.Errorf("receipts and message array lengths didn't match for tipset: %v: %w", ts, err)
+	}
+
+	return msgs, rcpts, nil
 }
 
 // lookupEthAddress makes its best effort at finding the Ethereum address for a
@@ -1867,20 +2104,9 @@ func newEthTxFromMessageLookup(ctx context.Context, msgLookup *api.MsgLookup, tx
 		return ethtypes.EthTx{}, err
 	}
 
-	smsg, err := cs.GetSignedMessage(ctx, msgLookup.Message)
+	smsg, err := getSignedMessage(ctx, cs, msgLookup.Message)
 	if err != nil {
-		// We couldn't find the signed message, it might be a BLS message, so search for a regular message.
-		msg, err := cs.GetMessage(ctx, msgLookup.Message)
-		if err != nil {
-			return ethtypes.EthTx{}, err
-		}
-		smsg = &types.SignedMessage{
-			Message: *msg,
-			Signature: crypto.Signature{
-				Type: crypto.SigTypeBLS,
-				Data: nil,
-			},
-		}
+		return ethtypes.EthTx{}, xerrors.Errorf("failed to get signed msg: %w", err)
 	}
 
 	tx, err := newEthTxFromSignedMessage(ctx, smsg, sa)
@@ -1900,7 +2126,7 @@ func newEthTxFromMessageLookup(ctx context.Context, msgLookup *api.MsgLookup, tx
 	return tx, nil
 }
 
-func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLookup, replay *api.InvocResult, events []types.Event, sa StateAPI) (api.EthTxReceipt, error) {
+func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLookup, events []types.Event, cs *store.ChainStore, sa StateAPI) (api.EthTxReceipt, error) {
 	var (
 		transactionIndex ethtypes.EthUint64
 		blockHash        ethtypes.EthHash
@@ -1931,8 +2157,7 @@ func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLook
 
 	if lookup.Receipt.ExitCode.IsSuccess() {
 		receipt.Status = 1
-	}
-	if lookup.Receipt.ExitCode.IsError() {
+	} else {
 		receipt.Status = 0
 	}
 
@@ -1941,7 +2166,20 @@ func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLook
 	// TODO: handle CumulativeGasUsed
 	receipt.CumulativeGasUsed = ethtypes.EmptyEthInt
 
-	effectiveGasPrice := big.Div(replay.GasCost.TotalCost, big.NewInt(lookup.Receipt.GasUsed))
+	// TODO: avoid loading the tipset twice (once here, once when we convert the message to a txn)
+	ts, err := cs.GetTipSetFromKey(ctx, lookup.TipSet)
+	if err != nil {
+		return api.EthTxReceipt{}, xerrors.Errorf("failed to lookup tipset %s when constructing the eth txn receipt: %w", lookup.TipSet, err)
+	}
+
+	baseFee := ts.Blocks()[0].ParentBaseFee
+	gasOutputs := vm.ComputeGasOutputs(lookup.Receipt.GasUsed, int64(tx.Gas), baseFee, big.Int(tx.MaxFeePerGas), big.Int(tx.MaxPriorityFeePerGas), true)
+	totalSpent := big.Sum(gasOutputs.BaseFeeBurn, gasOutputs.MinerTip, gasOutputs.OverEstimationBurn)
+
+	effectiveGasPrice := big.Zero()
+	if lookup.Receipt.GasUsed > 0 {
+		effectiveGasPrice = big.Div(totalSpent, big.NewInt(lookup.Receipt.GasUsed))
+	}
 	receipt.EffectiveGasPrice = ethtypes.EthBigInt(effectiveGasPrice)
 
 	if receipt.To == nil && lookup.Receipt.ExitCode.IsSuccess() {
@@ -2069,11 +2307,13 @@ func (m *EthTxHashManager) ProcessSignedMessage(ctx context.Context, msg *types.
 	ethTx, err := newEthTxFromSignedMessage(ctx, msg, m.StateAPI)
 	if err != nil {
 		log.Errorf("error converting filecoin message to eth tx: %s", err)
+		return
 	}
 
 	err = m.TransactionHashLookup.UpsertHash(ethTx.Hash, msg.Cid())
 	if err != nil {
 		log.Errorf("error inserting tx mapping to db: %s", err)
+		return
 	}
 }
 
@@ -2122,4 +2362,149 @@ func parseEthTopics(topics ethtypes.EthTopicSpec) (map[string][][]byte, error) {
 		}
 	}
 	return keys, nil
+}
+
+const errorFunctionSelector = "\x08\xc3\x79\xa0" // Error(string)
+const panicFunctionSelector = "\x4e\x48\x7b\x71" // Panic(uint256)
+// Eth ABI (solidity) panic codes.
+var panicErrorCodes map[uint64]string = map[uint64]string{
+	0x00: "Panic()",
+	0x01: "Assert()",
+	0x11: "ArithmeticOverflow()",
+	0x12: "DivideByZero()",
+	0x21: "InvalidEnumVariant()",
+	0x22: "InvalidStorageArray()",
+	0x31: "PopEmptyArray()",
+	0x32: "ArrayIndexOutOfBounds()",
+	0x41: "OutOfMemory()",
+	0x51: "CalledUninitializedFunction()",
+}
+
+// Parse an ABI encoded revert reason. This reason should be encoded as if it were the parameters to
+// an `Error(string)` function call.
+//
+// See https://docs.soliditylang.org/en/latest/control-structures.html#panic-via-assert-and-error-via-require
+func parseEthRevert(ret []byte) string {
+	if len(ret) == 0 {
+		return "none"
+	}
+	var cbytes abi.CborBytes
+	if err := cbytes.UnmarshalCBOR(bytes.NewReader(ret)); err != nil {
+		return "ERROR: revert reason is not cbor encoded bytes"
+	}
+	if len(cbytes) == 0 {
+		return "none"
+	}
+	// If it's not long enough to contain an ABI encoded response, return immediately.
+	if len(cbytes) < 4+32 {
+		return ethtypes.EthBytes(cbytes).String()
+	}
+	switch string(cbytes[:4]) {
+	case panicFunctionSelector:
+		cbytes := cbytes[4 : 4+32]
+		// Read the and check the code.
+		code, err := ethtypes.EthUint64FromBytes(cbytes)
+		if err != nil {
+			// If it's too big, just return the raw value.
+			codeInt := big.PositiveFromUnsignedBytes(cbytes)
+			return fmt.Sprintf("Panic(%s)", ethtypes.EthBigInt(codeInt).String())
+		}
+		if s, ok := panicErrorCodes[uint64(code)]; ok {
+			return s
+		}
+		return fmt.Sprintf("Panic(0x%x)", code)
+	case errorFunctionSelector:
+		cbytes := cbytes[4:]
+		cbytesLen := ethtypes.EthUint64(len(cbytes))
+		// Read the and check the offset.
+		offset, err := ethtypes.EthUint64FromBytes(cbytes[:32])
+		if err != nil {
+			break
+		}
+		if cbytesLen < offset {
+			break
+		}
+
+		// Read and check the length.
+		if cbytesLen-offset < 32 {
+			break
+		}
+		start := offset + 32
+		length, err := ethtypes.EthUint64FromBytes(cbytes[offset : offset+32])
+		if err != nil {
+			break
+		}
+		if cbytesLen-start < length {
+			break
+		}
+		// Slice the error message.
+		return fmt.Sprintf("Error(%s)", cbytes[start:start+length])
+	}
+	return ethtypes.EthBytes(cbytes).String()
+}
+
+func calculateRewardsAndGasUsed(rewardPercentiles []float64, txGasRewards gasRewardSorter) ([]ethtypes.EthBigInt, int64) {
+	var gasUsedTotal int64
+	for _, tx := range txGasRewards {
+		gasUsedTotal += tx.gasUsed
+	}
+
+	rewards := make([]ethtypes.EthBigInt, len(rewardPercentiles))
+	for i := range rewards {
+		rewards[i] = ethtypes.EthBigInt(types.NewInt(MinGasPremium))
+	}
+
+	if len(txGasRewards) == 0 {
+		return rewards, gasUsedTotal
+	}
+
+	sort.Stable(txGasRewards)
+
+	var idx int
+	var sum int64
+	for i, percentile := range rewardPercentiles {
+		threshold := int64(float64(gasUsedTotal) * percentile / 100)
+		for sum < threshold && idx < len(txGasRewards)-1 {
+			sum += txGasRewards[idx].gasUsed
+			idx++
+		}
+		rewards[i] = ethtypes.EthBigInt(txGasRewards[idx].premium)
+	}
+
+	return rewards, gasUsedTotal
+}
+
+func getSignedMessage(ctx context.Context, cs *store.ChainStore, msgCid cid.Cid) (*types.SignedMessage, error) {
+	smsg, err := cs.GetSignedMessage(ctx, msgCid)
+	if err != nil {
+		// We couldn't find the signed message, it might be a BLS message, so search for a regular message.
+		msg, err := cs.GetMessage(ctx, msgCid)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to find msg %s: %w", msgCid, err)
+		}
+		smsg = &types.SignedMessage{
+			Message: *msg,
+			Signature: crypto.Signature{
+				Type: crypto.SigTypeBLS,
+			},
+		}
+	}
+
+	return smsg, nil
+}
+
+type gasRewardTuple struct {
+	gasUsed int64
+	premium abi.TokenAmount
+}
+
+// sorted in ascending order
+type gasRewardSorter []gasRewardTuple
+
+func (g gasRewardSorter) Len() int { return len(g) }
+func (g gasRewardSorter) Swap(i, j int) {
+	g[i], g[j] = g[j], g[i]
+}
+func (g gasRewardSorter) Less(i, j int) bool {
+	return g[i].premium.Int.Cmp(g[j].premium.Int) == -1
 }

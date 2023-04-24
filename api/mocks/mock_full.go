@@ -24,7 +24,7 @@ import (
 
 	address "github.com/filecoin-project/go-address"
 	bitfield "github.com/filecoin-project/go-bitfield"
-	datatransfer "github.com/filecoin-project/go-data-transfer"
+	datatransfer "github.com/filecoin-project/go-data-transfer/v2"
 	retrievalmarket "github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	jsonrpc "github.com/filecoin-project/go-jsonrpc"
 	auth "github.com/filecoin-project/go-jsonrpc/auth"
@@ -156,6 +156,20 @@ func (m *MockFullNode) ChainExport(arg0 context.Context, arg1 abi.ChainEpoch, ar
 func (mr *MockFullNodeMockRecorder) ChainExport(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChainExport", reflect.TypeOf((*MockFullNode)(nil).ChainExport), arg0, arg1, arg2, arg3)
+}
+
+// ChainExportRangeInternal mocks base method.
+func (m *MockFullNode) ChainExportRangeInternal(arg0 context.Context, arg1, arg2 types.TipSetKey, arg3 api.ChainExportConfig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChainExportRangeInternal", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ChainExportRangeInternal indicates an expected call of ChainExportRangeInternal.
+func (mr *MockFullNodeMockRecorder) ChainExportRangeInternal(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChainExportRangeInternal", reflect.TypeOf((*MockFullNode)(nil).ChainExportRangeInternal), arg0, arg1, arg2, arg3)
 }
 
 // ChainGetBlock mocks base method.
@@ -381,6 +395,20 @@ func (m *MockFullNode) ChainHead(arg0 context.Context) (*types.TipSet, error) {
 func (mr *MockFullNodeMockRecorder) ChainHead(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChainHead", reflect.TypeOf((*MockFullNode)(nil).ChainHead), arg0)
+}
+
+// ChainHotGC mocks base method.
+func (m *MockFullNode) ChainHotGC(arg0 context.Context, arg1 api.HotGCOpts) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChainHotGC", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ChainHotGC indicates an expected call of ChainHotGC.
+func (mr *MockFullNodeMockRecorder) ChainHotGC(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChainHotGC", reflect.TypeOf((*MockFullNode)(nil).ChainHotGC), arg0, arg1)
 }
 
 // ChainNotify mocks base method.
@@ -956,6 +984,21 @@ func (mr *MockFullNodeMockRecorder) EthAccounts(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthAccounts", reflect.TypeOf((*MockFullNode)(nil).EthAccounts), arg0)
 }
 
+// EthAddressToFilecoinAddress mocks base method.
+func (m *MockFullNode) EthAddressToFilecoinAddress(arg0 context.Context, arg1 ethtypes.EthAddress) (address.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EthAddressToFilecoinAddress", arg0, arg1)
+	ret0, _ := ret[0].(address.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EthAddressToFilecoinAddress indicates an expected call of EthAddressToFilecoinAddress.
+func (mr *MockFullNodeMockRecorder) EthAddressToFilecoinAddress(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthAddressToFilecoinAddress", reflect.TypeOf((*MockFullNode)(nil).EthAddressToFilecoinAddress), arg0, arg1)
+}
+
 // EthBlockNumber mocks base method.
 func (m *MockFullNode) EthBlockNumber(arg0 context.Context) (ethtypes.EthUint64, error) {
 	m.ctrl.T.Helper()
@@ -1256,6 +1299,21 @@ func (mr *MockFullNodeMockRecorder) EthGetTransactionByHash(arg0, arg1 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthGetTransactionByHash", reflect.TypeOf((*MockFullNode)(nil).EthGetTransactionByHash), arg0, arg1)
 }
 
+// EthGetTransactionByHashLimited mocks base method.
+func (m *MockFullNode) EthGetTransactionByHashLimited(arg0 context.Context, arg1 *ethtypes.EthHash, arg2 abi.ChainEpoch) (*ethtypes.EthTx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EthGetTransactionByHashLimited", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*ethtypes.EthTx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EthGetTransactionByHashLimited indicates an expected call of EthGetTransactionByHashLimited.
+func (mr *MockFullNodeMockRecorder) EthGetTransactionByHashLimited(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthGetTransactionByHashLimited", reflect.TypeOf((*MockFullNode)(nil).EthGetTransactionByHashLimited), arg0, arg1, arg2)
+}
+
 // EthGetTransactionCount mocks base method.
 func (m *MockFullNode) EthGetTransactionCount(arg0 context.Context, arg1 ethtypes.EthAddress, arg2 string) (ethtypes.EthUint64, error) {
 	m.ctrl.T.Helper()
@@ -1299,6 +1357,21 @@ func (m *MockFullNode) EthGetTransactionReceipt(arg0 context.Context, arg1 ethty
 func (mr *MockFullNodeMockRecorder) EthGetTransactionReceipt(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthGetTransactionReceipt", reflect.TypeOf((*MockFullNode)(nil).EthGetTransactionReceipt), arg0, arg1)
+}
+
+// EthGetTransactionReceiptLimited mocks base method.
+func (m *MockFullNode) EthGetTransactionReceiptLimited(arg0 context.Context, arg1 ethtypes.EthHash, arg2 abi.ChainEpoch) (*api.EthTxReceipt, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EthGetTransactionReceiptLimited", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*api.EthTxReceipt)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EthGetTransactionReceiptLimited indicates an expected call of EthGetTransactionReceiptLimited.
+func (mr *MockFullNodeMockRecorder) EthGetTransactionReceiptLimited(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthGetTransactionReceiptLimited", reflect.TypeOf((*MockFullNode)(nil).EthGetTransactionReceiptLimited), arg0, arg1, arg2)
 }
 
 // EthMaxPriorityFeePerGas mocks base method.
@@ -1436,6 +1509,21 @@ func (mr *MockFullNodeMockRecorder) EthUnsubscribe(arg0, arg1 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthUnsubscribe", reflect.TypeOf((*MockFullNode)(nil).EthUnsubscribe), arg0, arg1)
 }
 
+// FilecoinAddressToEthAddress mocks base method.
+func (m *MockFullNode) FilecoinAddressToEthAddress(arg0 context.Context, arg1 address.Address) (ethtypes.EthAddress, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FilecoinAddressToEthAddress", arg0, arg1)
+	ret0, _ := ret[0].(ethtypes.EthAddress)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FilecoinAddressToEthAddress indicates an expected call of FilecoinAddressToEthAddress.
+func (mr *MockFullNodeMockRecorder) FilecoinAddressToEthAddress(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FilecoinAddressToEthAddress", reflect.TypeOf((*MockFullNode)(nil).FilecoinAddressToEthAddress), arg0, arg1)
+}
+
 // GasEstimateFeeCap mocks base method.
 func (m *MockFullNode) GasEstimateFeeCap(arg0 context.Context, arg1 *types.Message, arg2 int64, arg3 types.TipSetKey) (big.Int, error) {
 	m.ctrl.T.Helper()
@@ -1527,10 +1615,10 @@ func (mr *MockFullNodeMockRecorder) IPCAddSubnetActor(arg0, arg1, arg2 interface
 }
 
 // IPCGetCheckpoint mocks base method.
-func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (m *MockFullNode) IPCGetCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCGetCheckpoint", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret0, _ := ret[0].(*gateway.BottomUpCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1541,11 +1629,26 @@ func (mr *MockFullNodeMockRecorder) IPCGetCheckpoint(arg0, arg1, arg2 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpoint), arg0, arg1, arg2)
 }
 
+// IPCGetCheckpointSerialized mocks base method.
+func (m *MockFullNode) IPCGetCheckpointSerialized(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetCheckpointSerialized", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetCheckpointSerialized indicates an expected call of IPCGetCheckpointSerialized.
+func (mr *MockFullNodeMockRecorder) IPCGetCheckpointSerialized(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpointSerialized", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpointSerialized), arg0, arg1, arg2)
+}
+
 // IPCGetCheckpointTemplate mocks base method.
-func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.Checkpoint, error) {
+func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IPCGetCheckpointTemplate", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*gateway.Checkpoint)
+	ret0, _ := ret[0].(*gateway.BottomUpCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1554,6 +1657,36 @@ func (m *MockFullNode) IPCGetCheckpointTemplate(arg0 context.Context, arg1 addre
 func (mr *MockFullNodeMockRecorder) IPCGetCheckpointTemplate(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpointTemplate", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpointTemplate), arg0, arg1, arg2)
+}
+
+// IPCGetCheckpointTemplateSerialized mocks base method.
+func (m *MockFullNode) IPCGetCheckpointTemplateSerialized(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetCheckpointTemplateSerialized", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetCheckpointTemplateSerialized indicates an expected call of IPCGetCheckpointTemplateSerialized.
+func (mr *MockFullNodeMockRecorder) IPCGetCheckpointTemplateSerialized(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetCheckpointTemplateSerialized", reflect.TypeOf((*MockFullNode)(nil).IPCGetCheckpointTemplateSerialized), arg0, arg1, arg2)
+}
+
+// IPCGetGenesisEpochForSubnet mocks base method.
+func (m *MockFullNode) IPCGetGenesisEpochForSubnet(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID) (abi.ChainEpoch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetGenesisEpochForSubnet", arg0, arg1, arg2)
+	ret0, _ := ret[0].(abi.ChainEpoch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetGenesisEpochForSubnet indicates an expected call of IPCGetGenesisEpochForSubnet.
+func (mr *MockFullNodeMockRecorder) IPCGetGenesisEpochForSubnet(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetGenesisEpochForSubnet", reflect.TypeOf((*MockFullNode)(nil).IPCGetGenesisEpochForSubnet), arg0, arg1, arg2)
 }
 
 // IPCGetPrevCheckpointForChild mocks base method.
@@ -1571,19 +1704,94 @@ func (mr *MockFullNodeMockRecorder) IPCGetPrevCheckpointForChild(arg0, arg1, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetPrevCheckpointForChild", reflect.TypeOf((*MockFullNode)(nil).IPCGetPrevCheckpointForChild), arg0, arg1, arg2)
 }
 
-// IPCGetVotesForCheckpoint mocks base method.
-func (m *MockFullNode) IPCGetVotesForCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 cid.Cid) (*subnetactor.Votes, error) {
+// IPCGetTopDownMsgs mocks base method.
+func (m *MockFullNode) IPCGetTopDownMsgs(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID, arg3 types.TipSetKey, arg4 uint64) ([]*gateway.CrossMsg, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IPCGetVotesForCheckpoint", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*subnetactor.Votes)
+	ret := m.ctrl.Call(m, "IPCGetTopDownMsgs", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].([]*gateway.CrossMsg)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// IPCGetVotesForCheckpoint indicates an expected call of IPCGetVotesForCheckpoint.
-func (mr *MockFullNodeMockRecorder) IPCGetVotesForCheckpoint(arg0, arg1, arg2 interface{}) *gomock.Call {
+// IPCGetTopDownMsgs indicates an expected call of IPCGetTopDownMsgs.
+func (mr *MockFullNodeMockRecorder) IPCGetTopDownMsgs(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetVotesForCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCGetVotesForCheckpoint), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetTopDownMsgs", reflect.TypeOf((*MockFullNode)(nil).IPCGetTopDownMsgs), arg0, arg1, arg2, arg3, arg4)
+}
+
+// IPCGetTopDownMsgsSerialized mocks base method.
+func (m *MockFullNode) IPCGetTopDownMsgsSerialized(arg0 context.Context, arg1 address.Address, arg2 sdk.SubnetID, arg3 types.TipSetKey, arg4 uint64) ([][]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCGetTopDownMsgsSerialized", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].([][]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCGetTopDownMsgsSerialized indicates an expected call of IPCGetTopDownMsgsSerialized.
+func (mr *MockFullNodeMockRecorder) IPCGetTopDownMsgsSerialized(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCGetTopDownMsgsSerialized", reflect.TypeOf((*MockFullNode)(nil).IPCGetTopDownMsgsSerialized), arg0, arg1, arg2, arg3, arg4)
+}
+
+// IPCHasVotedBottomUpCheckpoint mocks base method.
+func (m *MockFullNode) IPCHasVotedBottomUpCheckpoint(arg0 context.Context, arg1 sdk.SubnetID, arg2 abi.ChainEpoch, arg3 address.Address) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCHasVotedBottomUpCheckpoint", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCHasVotedBottomUpCheckpoint indicates an expected call of IPCHasVotedBottomUpCheckpoint.
+func (mr *MockFullNodeMockRecorder) IPCHasVotedBottomUpCheckpoint(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCHasVotedBottomUpCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCHasVotedBottomUpCheckpoint), arg0, arg1, arg2, arg3)
+}
+
+// IPCHasVotedTopDownCheckpoint mocks base method.
+func (m *MockFullNode) IPCHasVotedTopDownCheckpoint(arg0 context.Context, arg1 address.Address, arg2 abi.ChainEpoch, arg3 address.Address) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCHasVotedTopDownCheckpoint", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCHasVotedTopDownCheckpoint indicates an expected call of IPCHasVotedTopDownCheckpoint.
+func (mr *MockFullNodeMockRecorder) IPCHasVotedTopDownCheckpoint(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCHasVotedTopDownCheckpoint", reflect.TypeOf((*MockFullNode)(nil).IPCHasVotedTopDownCheckpoint), arg0, arg1, arg2, arg3)
+}
+
+// IPCListCheckpoints mocks base method.
+func (m *MockFullNode) IPCListCheckpoints(arg0 context.Context, arg1 sdk.SubnetID, arg2, arg3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCListCheckpoints", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].([]*gateway.BottomUpCheckpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCListCheckpoints indicates an expected call of IPCListCheckpoints.
+func (mr *MockFullNodeMockRecorder) IPCListCheckpoints(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCListCheckpoints", reflect.TypeOf((*MockFullNode)(nil).IPCListCheckpoints), arg0, arg1, arg2, arg3)
+}
+
+// IPCListCheckpointsSerialized mocks base method.
+func (m *MockFullNode) IPCListCheckpointsSerialized(arg0 context.Context, arg1 sdk.SubnetID, arg2, arg3 abi.ChainEpoch) ([][]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IPCListCheckpointsSerialized", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].([][]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IPCListCheckpointsSerialized indicates an expected call of IPCListCheckpointsSerialized.
+func (mr *MockFullNodeMockRecorder) IPCListCheckpointsSerialized(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPCListCheckpointsSerialized", reflect.TypeOf((*MockFullNode)(nil).IPCListCheckpointsSerialized), arg0, arg1, arg2, arg3)
 }
 
 // IPCListChildSubnets mocks base method.

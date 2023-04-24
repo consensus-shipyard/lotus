@@ -13,6 +13,7 @@
   * [ChainCheckBlockstore](#ChainCheckBlockstore)
   * [ChainDeleteObj](#ChainDeleteObj)
   * [ChainExport](#ChainExport)
+  * [ChainExportRangeInternal](#ChainExportRangeInternal)
   * [ChainGetBlock](#ChainGetBlock)
   * [ChainGetBlockMessages](#ChainGetBlockMessages)
   * [ChainGetEvents](#ChainGetEvents)
@@ -28,6 +29,7 @@
   * [ChainGetTipSetByHeight](#ChainGetTipSetByHeight)
   * [ChainHasObj](#ChainHasObj)
   * [ChainHead](#ChainHead)
+  * [ChainHotGC](#ChainHotGC)
   * [ChainNotify](#ChainNotify)
   * [ChainPrune](#ChainPrune)
   * [ChainPutObj](#ChainPutObj)
@@ -68,6 +70,7 @@
   * [CreateBackup](#CreateBackup)
 * [Eth](#Eth)
   * [EthAccounts](#EthAccounts)
+  * [EthAddressToFilecoinAddress](#EthAddressToFilecoinAddress)
   * [EthBlockNumber](#EthBlockNumber)
   * [EthCall](#EthCall)
   * [EthChainId](#EthChainId)
@@ -88,9 +91,11 @@
   * [EthGetTransactionByBlockHashAndIndex](#EthGetTransactionByBlockHashAndIndex)
   * [EthGetTransactionByBlockNumberAndIndex](#EthGetTransactionByBlockNumberAndIndex)
   * [EthGetTransactionByHash](#EthGetTransactionByHash)
+  * [EthGetTransactionByHashLimited](#EthGetTransactionByHashLimited)
   * [EthGetTransactionCount](#EthGetTransactionCount)
   * [EthGetTransactionHashByCid](#EthGetTransactionHashByCid)
   * [EthGetTransactionReceipt](#EthGetTransactionReceipt)
+  * [EthGetTransactionReceiptLimited](#EthGetTransactionReceiptLimited)
   * [EthMaxPriorityFeePerGas](#EthMaxPriorityFeePerGas)
   * [EthNewBlockFilter](#EthNewBlockFilter)
   * [EthNewFilter](#EthNewFilter)
@@ -100,6 +105,8 @@
   * [EthSubscribe](#EthSubscribe)
   * [EthUninstallFilter](#EthUninstallFilter)
   * [EthUnsubscribe](#EthUnsubscribe)
+* [Filecoin](#Filecoin)
+  * [FilecoinAddressToEthAddress](#FilecoinAddressToEthAddress)
 * [Gas](#Gas)
   * [GasEstimateFeeCap](#GasEstimateFeeCap)
   * [GasEstimateGasLimit](#GasEstimateGasLimit)
@@ -109,9 +116,17 @@
   * [ID](#ID)
   * [IPCAddSubnetActor](#IPCAddSubnetActor)
   * [IPCGetCheckpoint](#IPCGetCheckpoint)
+  * [IPCGetCheckpointSerialized](#IPCGetCheckpointSerialized)
   * [IPCGetCheckpointTemplate](#IPCGetCheckpointTemplate)
+  * [IPCGetCheckpointTemplateSerialized](#IPCGetCheckpointTemplateSerialized)
+  * [IPCGetGenesisEpochForSubnet](#IPCGetGenesisEpochForSubnet)
   * [IPCGetPrevCheckpointForChild](#IPCGetPrevCheckpointForChild)
-  * [IPCGetVotesForCheckpoint](#IPCGetVotesForCheckpoint)
+  * [IPCGetTopDownMsgs](#IPCGetTopDownMsgs)
+  * [IPCGetTopDownMsgsSerialized](#IPCGetTopDownMsgsSerialized)
+  * [IPCHasVotedBottomUpCheckpoint](#IPCHasVotedBottomUpCheckpoint)
+  * [IPCHasVotedTopDownCheckpoint](#IPCHasVotedTopDownCheckpoint)
+  * [IPCListCheckpoints](#IPCListCheckpoints)
+  * [IPCListCheckpointsSerialized](#IPCListCheckpointsSerialized)
   * [IPCListChildSubnets](#IPCListChildSubnets)
   * [IPCReadGatewayState](#IPCReadGatewayState)
   * [IPCReadSubnetActorState](#IPCReadSubnetActorState)
@@ -481,6 +496,50 @@ Inputs:
 ```
 
 Response: `"Ynl0ZSBhcnJheQ=="`
+
+### ChainExportRangeInternal
+ChainExportRangeInternal triggers the export of a chain
+CAR-snapshot directly to disk. It is similar to ChainExport,
+except, depending on options, the snapshot can include receipts,
+messages and stateroots for the length between the specified head
+and tail, thus producing "archival-grade" snapshots that include
+all the on-chain data.  The header chain is included back to
+genesis and these snapshots can be used to initialize Filecoin
+nodes.
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  {
+    "WriteBufferSize": 123,
+    "NumWorkers": 123,
+    "IncludeMessages": true,
+    "IncludeReceipts": true,
+    "IncludeStateRoots": true
+  }
+]
+```
+
+Response: `{}`
 
 ### ChainGetBlock
 ChainGetBlock returns the block specified by the given CID.
@@ -1036,6 +1095,26 @@ Response:
 }
 ```
 
+### ChainHotGC
+ChainHotGC does online (badger) GC on the hot store; only supported if you are using
+the splitstore
+
+
+Perms: admin
+
+Inputs:
+```json
+[
+  {
+    "Threshold": 12.3,
+    "Periodic": true,
+    "Moving": true
+  }
+]
+```
+
+Response: `{}`
+
 ### ChainNotify
 ChainNotify returns channel with chain head updates.
 First message is guaranteed to be of len == 1, and type == 'current'.
@@ -1060,7 +1139,7 @@ Response:
 ```
 
 ### ChainPrune
-ChainPrune prunes the stored chain state and garbage collects; only supported if you
+ChainPrune forces compaction on cold store and garbage collects; only supported if you
 are using the splitstore
 
 
@@ -2272,6 +2351,21 @@ Response:
 ]
 ```
 
+### EthAddressToFilecoinAddress
+EthAddressToFilecoinAddress converts an EthAddress into an f410 Filecoin Address
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031"
+]
+```
+
+Response: `"f01234"`
+
 ### EthBlockNumber
 EthBlockNumber returns the height of the latest (heaviest) TipSet
 
@@ -2653,7 +2747,7 @@ Response:
   "accessList": [
     "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
   ],
-  "yParity": "0x0",
+  "v": "0x0",
   "r": "0x0",
   "s": "0x0"
 }
@@ -2692,7 +2786,7 @@ Response:
   "accessList": [
     "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
   ],
-  "yParity": "0x0",
+  "v": "0x0",
   "r": "0x0",
   "s": "0x0"
 }
@@ -2730,7 +2824,46 @@ Response:
   "accessList": [
     "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
   ],
-  "yParity": "0x0",
+  "v": "0x0",
+  "r": "0x0",
+  "s": "0x0"
+}
+```
+
+### EthGetTransactionByHashLimited
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  10101
+]
+```
+
+Response:
+```json
+{
+  "chainId": "0x5",
+  "nonce": "0x5",
+  "hash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "blockHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "blockNumber": "0x5",
+  "transactionIndex": "0x5",
+  "from": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "to": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "value": "0x0",
+  "type": "0x5",
+  "input": "0x07",
+  "gas": "0x5",
+  "maxFeePerGas": "0x0",
+  "maxPriorityFeePerGas": "0x0",
+  "accessList": [
+    "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
+  ],
+  "v": "0x0",
   "r": "0x0",
   "s": "0x0"
 }
@@ -2776,6 +2909,54 @@ Inputs:
 ```json
 [
   "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
+]
+```
+
+Response:
+```json
+{
+  "transactionHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "transactionIndex": "0x5",
+  "blockHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "blockNumber": "0x5",
+  "from": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "to": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "root": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  "status": "0x5",
+  "contractAddress": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+  "cumulativeGasUsed": "0x5",
+  "gasUsed": "0x5",
+  "effectiveGasPrice": "0x0",
+  "logsBloom": "0x07",
+  "logs": [
+    {
+      "address": "0x5cbeecf99d3fdb3f25e309cc264f240bb0664031",
+      "data": "0x07",
+      "topics": [
+        "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e"
+      ],
+      "removed": true,
+      "logIndex": "0x5",
+      "transactionIndex": "0x5",
+      "transactionHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+      "blockHash": "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+      "blockNumber": "0x5"
+    }
+  ],
+  "type": "0x5"
+}
+```
+
+### EthGetTransactionReceiptLimited
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "0x37690cfec6c1bf4c3b9288c7a5d783e98731e90b0a4c177c2a374c7a9427355e",
+  10101
 ]
 ```
 
@@ -2937,6 +3118,24 @@ Inputs:
 ```
 
 Response: `true`
+
+## Filecoin
+
+
+### FilecoinAddressToEthAddress
+FilecoinAddressToEthAddress converts an f410 or f0 Filecoin Address to an EthAddress
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234"
+]
+```
+
+Response: `"0x5cbeecf99d3fdb3f25e309cc264f240bb0664031"`
 
 ## Gas
 
@@ -3133,8 +3332,8 @@ Inputs:
     "Consensus": 0,
     "MinValidatorStake": "0",
     "MinValidators": 42,
-    "FinalityThreshold": 10101,
-    "CheckPeriod": 10101,
+    "TopDownCheckPeriod": 10101,
+    "BottomUpCheckPeriod": 10101,
     "Genesis": "Ynl0ZSBhcnJheQ=="
   }
 ]
@@ -3177,32 +3376,67 @@ Response:
           "Parent": "string value",
           "Actor": "f01234"
         },
-        "Checks": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        }
+        "Checks": [
+          {
+            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+          }
+        ]
       }
     ],
-    "CrossMsgs": [
-      {
-        "From": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "To": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "MsgsCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "Nonce": 42,
-        "Value": "0"
-      }
-    ]
+    "CrossMsgs": {
+      "CrossMsgs": [
+        {
+          "Msg": {
+            "From": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "To": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "Method": 1,
+            "Params": "Ynl0ZSBhcnJheQ==",
+            "Value": "0",
+            "Nonce": 42
+          },
+          "Wrapped": true
+        }
+      ],
+      "Fee": "0"
+    }
   },
   "Sig": "Ynl0ZSBhcnJheQ=="
 }
 ```
+
+### IPCGetCheckpointSerialized
+Serialized representation of IPC calls.
+This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
+version of the output of the call. These are really convenient to use the same type of serialization used
+in actor's state, removing the need of then intermediate serialization introduced by the Lotus API.
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  10101
+]
+```
+
+Response: `"Ynl0ZSBhcnJheQ=="`
 
 ### IPCGetCheckpointTemplate
 
@@ -3236,32 +3470,78 @@ Response:
           "Parent": "string value",
           "Actor": "f01234"
         },
-        "Checks": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        }
+        "Checks": [
+          {
+            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+          }
+        ]
       }
     ],
-    "CrossMsgs": [
-      {
-        "From": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "To": {
-          "Parent": "string value",
-          "Actor": "f01234"
-        },
-        "MsgsCID": {
-          "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-        },
-        "Nonce": 42,
-        "Value": "0"
-      }
-    ]
+    "CrossMsgs": {
+      "CrossMsgs": [
+        {
+          "Msg": {
+            "From": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "To": {
+              "SubnetID": {
+                "Parent": "string value",
+                "Actor": "f01234"
+              },
+              "RawAddress": "f01234"
+            },
+            "Method": 1,
+            "Params": "Ynl0ZSBhcnJheQ==",
+            "Value": "0",
+            "Nonce": 42
+          },
+          "Wrapped": true
+        }
+      ],
+      "Fee": "0"
+    }
   },
   "Sig": "Ynl0ZSBhcnJheQ=="
 }
 ```
+
+### IPCGetCheckpointTemplateSerialized
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  10101
+]
+```
+
+Response: `"Ynl0ZSBhcnJheQ=="`
+
+### IPCGetGenesisEpochForSubnet
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  }
+]
+```
+
+Response: `10101`
 
 ### IPCGetPrevCheckpointForChild
 
@@ -3286,7 +3566,93 @@ Response:
 }
 ```
 
-### IPCGetVotesForCheckpoint
+### IPCGetTopDownMsgs
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  42
+]
+```
+
+Response:
+```json
+[
+  {
+    "Msg": {
+      "From": {
+        "SubnetID": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "RawAddress": "f01234"
+      },
+      "To": {
+        "SubnetID": {
+          "Parent": "string value",
+          "Actor": "f01234"
+        },
+        "RawAddress": "f01234"
+      },
+      "Method": 1,
+      "Params": "Ynl0ZSBhcnJheQ==",
+      "Value": "0",
+      "Nonce": 42
+    },
+    "Wrapped": true
+  }
+]
+```
+
+### IPCGetTopDownMsgsSerialized
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  [
+    {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    {
+      "/": "bafy2bzacebp3shtrn43k7g3unredz7fxn4gj533d3o43tqn2p2ipxxhrvchve"
+    }
+  ],
+  42
+]
+```
+
+Response:
+```json
+[
+  "Ynl0ZSBhcnJheQ=="
+]
+```
+
+### IPCHasVotedBottomUpCheckpoint
 
 
 Perms: read
@@ -3298,19 +3664,129 @@ Inputs:
     "Parent": "string value",
     "Actor": "f01234"
   },
+  10101,
+  "f01234"
+]
+```
+
+Response: `true`
+
+### IPCHasVotedTopDownCheckpoint
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  "f01234",
+  10101,
+  "f01234"
+]
+```
+
+Response: `true`
+
+### IPCListCheckpoints
+
+
+Perms: read
+
+Inputs:
+```json
+[
   {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  }
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  10101,
+  10101
 ]
 ```
 
 Response:
 ```json
-{
-  "Validators": [
-    "f01234"
-  ]
-}
+[
+  {
+    "Data": {
+      "Source": {
+        "Parent": "string value",
+        "Actor": "f01234"
+      },
+      "Proof": "Ynl0ZSBhcnJheQ==",
+      "Epoch": 10101,
+      "PrevCheck": {
+        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+      },
+      "Children": [
+        {
+          "Source": {
+            "Parent": "string value",
+            "Actor": "f01234"
+          },
+          "Checks": [
+            {
+              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+            }
+          ]
+        }
+      ],
+      "CrossMsgs": {
+        "CrossMsgs": [
+          {
+            "Msg": {
+              "From": {
+                "SubnetID": {
+                  "Parent": "string value",
+                  "Actor": "f01234"
+                },
+                "RawAddress": "f01234"
+              },
+              "To": {
+                "SubnetID": {
+                  "Parent": "string value",
+                  "Actor": "f01234"
+                },
+                "RawAddress": "f01234"
+              },
+              "Method": 1,
+              "Params": "Ynl0ZSBhcnJheQ==",
+              "Value": "0",
+              "Nonce": 42
+            },
+            "Wrapped": true
+          }
+        ],
+        "Fee": "0"
+      }
+    },
+    "Sig": "Ynl0ZSBhcnJheQ=="
+  }
+]
+```
+
+### IPCListCheckpointsSerialized
+
+
+Perms: read
+
+Inputs:
+```json
+[
+  {
+    "Parent": "string value",
+    "Actor": "f01234"
+  },
+  10101,
+  10101
+]
+```
+
+Response:
+```json
+[
+  "Ynl0ZSBhcnJheQ=="
+]
 ```
 
 ### IPCListChildSubnets
@@ -3357,31 +3833,46 @@ Response:
               "Parent": "string value",
               "Actor": "f01234"
             },
-            "Checks": {
-              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-            }
+            "Checks": [
+              {
+                "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+              }
+            ]
           }
         ],
-        "CrossMsgs": [
-          {
-            "From": {
-              "Parent": "string value",
-              "Actor": "f01234"
-            },
-            "To": {
-              "Parent": "string value",
-              "Actor": "f01234"
-            },
-            "MsgsCID": {
-              "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-            },
-            "Nonce": 42,
-            "Value": "0"
-          }
-        ]
+        "CrossMsgs": {
+          "CrossMsgs": [
+            {
+              "Msg": {
+                "From": {
+                  "SubnetID": {
+                    "Parent": "string value",
+                    "Actor": "f01234"
+                  },
+                  "RawAddress": "f01234"
+                },
+                "To": {
+                  "SubnetID": {
+                    "Parent": "string value",
+                    "Actor": "f01234"
+                  },
+                  "RawAddress": "f01234"
+                },
+                "Method": 1,
+                "Params": "Ynl0ZSBhcnJheQ==",
+                "Value": "0",
+                "Nonce": 42
+              },
+              "Wrapped": true
+            }
+          ],
+          "Fee": "0"
+        }
       },
       "Sig": "Ynl0ZSBhcnJheQ=="
-    }
+    },
+    "AppliedBottomupNonce": 42,
+    "GenesisEpoch": 10101
   }
 ]
 ```
@@ -3418,23 +3909,45 @@ Response:
   "Subnets": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
-  "CheckPeriod": 10101,
-  "Checkpoints": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "CheckMsgRegistry": {
+  "BottomUpCheckPeriod": 10101,
+  "TopDownCheckPeriod": 10101,
+  "BottomUpCheckpoints": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   "Postbox": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
-  "Nonce": 42,
   "BottomupNonce": 42,
-  "BottomupMsgMeta": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  "AppliedTopdownNonce": 42,
+  "TopDownCheckpointVoting": {
+    "GenesisEpoch": 10101,
+    "SubmissionPeriod": 10101,
+    "LastVotingExecuted": 10101,
+    "ExecutableEpochQueue": [
+      10101
+    ],
+    "EpochVoteSubmission": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Ratio": {
+      "Num": 42,
+      "Denom": 42
+    }
   },
-  "AppliedBottomupNonce": 42,
-  "AppliedTopdownNonce": 42
+  "Validators": {
+    "Validators": {
+      "validators": [
+        {
+          "addr": "f01234",
+          "net_addr": "string value",
+          "weight": "0"
+        }
+      ],
+      "configuration_number": 42
+    },
+    "TotalWeight": "0"
+  },
+  "Initialized": true
 }
 ```
 
@@ -3478,12 +3991,9 @@ Response:
   },
   "Status": 0,
   "Genesis": "Ynl0ZSBhcnJheQ==",
-  "FinalityThreshold": 10101,
-  "CheckPeriod": 10101,
-  "Checkpoints": {
-    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-  },
-  "WindowChecks": {
+  "BottomUpCheckPeriod": 10101,
+  "TopDownCheckPeriod": 10101,
+  "CommittedCheckpoints": {
     "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
   },
   "ValidatorSet": {
@@ -3496,7 +4006,25 @@ Response:
     ],
     "configuration_number": 42
   },
-  "MinValidators": 42
+  "MinValidators": 42,
+  "PreviousExecutedCheckpoint": {
+    "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+  },
+  "BottomUpCheckpointVoting": {
+    "GenesisEpoch": 10101,
+    "SubmissionPeriod": 10101,
+    "LastVotingExecuted": 10101,
+    "ExecutableEpochQueue": [
+      10101
+    ],
+    "EpochVoteSubmission": {
+      "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
+    },
+    "Ratio": {
+      "Num": 42,
+      "Denom": 42
+    }
+  }
 }
 ```
 
@@ -4177,7 +4705,7 @@ Response:
   ],
   "SizeLimitHigh": 123,
   "SizeLimitLow": 123,
-  "ReplaceByFeeRatio": 12.3,
+  "ReplaceByFeeRatio": 1.23,
   "PruneCooldown": 60000000000,
   "GasLimitOverestimation": 12.3
 }
@@ -4465,7 +4993,7 @@ Inputs:
     ],
     "SizeLimitHigh": 123,
     "SizeLimitLow": 123,
-    "ReplaceByFeeRatio": 12.3,
+    "ReplaceByFeeRatio": 1.23,
     "PruneCooldown": 60000000000,
     "GasLimitOverestimation": 12.3
   }
@@ -6497,95 +7025,49 @@ Response:
   },
   "ExecutionTrace": {
     "Msg": {
-      "Version": 42,
-      "To": "f01234",
       "From": "f01234",
-      "Nonce": 42,
+      "To": "f01234",
       "Value": "0",
-      "GasLimit": 9,
-      "GasFeeCap": "0",
-      "GasPremium": "0",
       "Method": 1,
       "Params": "Ynl0ZSBhcnJheQ==",
-      "CID": {
-        "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-      }
+      "ParamsCodec": 42
     },
     "MsgRct": {
       "ExitCode": 0,
       "Return": "Ynl0ZSBhcnJheQ==",
-      "GasUsed": 9,
-      "EventsRoot": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
+      "ReturnCodec": 42
     },
-    "Error": "string value",
-    "Duration": 60000000000,
     "GasCharges": [
       {
         "Name": "string value",
-        "loc": [
-          {
-            "File": "string value",
-            "Line": 123,
-            "Function": "string value"
-          }
-        ],
         "tg": 9,
         "cg": 9,
         "sg": 9,
-        "vtg": 9,
-        "vcg": 9,
-        "vsg": 9,
-        "tt": 60000000000,
-        "ex": {}
+        "tt": 60000000000
       }
     ],
     "Subcalls": [
       {
         "Msg": {
-          "Version": 42,
-          "To": "f01234",
           "From": "f01234",
-          "Nonce": 42,
+          "To": "f01234",
           "Value": "0",
-          "GasLimit": 9,
-          "GasFeeCap": "0",
-          "GasPremium": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "CID": {
-            "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-          }
+          "ParamsCodec": 42
         },
         "MsgRct": {
           "ExitCode": 0,
           "Return": "Ynl0ZSBhcnJheQ==",
-          "GasUsed": 9,
-          "EventsRoot": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "ReturnCodec": 42
         },
-        "Error": "string value",
-        "Duration": 60000000000,
         "GasCharges": [
           {
             "Name": "string value",
-            "loc": [
-              {
-                "File": "string value",
-                "Line": 123,
-                "Function": "string value"
-              }
-            ],
             "tg": 9,
             "cg": 9,
             "sg": 9,
-            "vtg": 9,
-            "vcg": 9,
-            "vsg": 9,
-            "tt": 60000000000,
-            "ex": {}
+            "tt": 60000000000
           }
         ],
         "Subcalls": null
@@ -6773,95 +7255,49 @@ Response:
       },
       "ExecutionTrace": {
         "Msg": {
-          "Version": 42,
-          "To": "f01234",
           "From": "f01234",
-          "Nonce": 42,
+          "To": "f01234",
           "Value": "0",
-          "GasLimit": 9,
-          "GasFeeCap": "0",
-          "GasPremium": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "CID": {
-            "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-          }
+          "ParamsCodec": 42
         },
         "MsgRct": {
           "ExitCode": 0,
           "Return": "Ynl0ZSBhcnJheQ==",
-          "GasUsed": 9,
-          "EventsRoot": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "ReturnCodec": 42
         },
-        "Error": "string value",
-        "Duration": 60000000000,
         "GasCharges": [
           {
             "Name": "string value",
-            "loc": [
-              {
-                "File": "string value",
-                "Line": 123,
-                "Function": "string value"
-              }
-            ],
             "tg": 9,
             "cg": 9,
             "sg": 9,
-            "vtg": 9,
-            "vcg": 9,
-            "vsg": 9,
-            "tt": 60000000000,
-            "ex": {}
+            "tt": 60000000000
           }
         ],
         "Subcalls": [
           {
             "Msg": {
-              "Version": 42,
-              "To": "f01234",
               "From": "f01234",
-              "Nonce": 42,
+              "To": "f01234",
               "Value": "0",
-              "GasLimit": 9,
-              "GasFeeCap": "0",
-              "GasPremium": "0",
               "Method": 1,
               "Params": "Ynl0ZSBhcnJheQ==",
-              "CID": {
-                "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-              }
+              "ParamsCodec": 42
             },
             "MsgRct": {
               "ExitCode": 0,
               "Return": "Ynl0ZSBhcnJheQ==",
-              "GasUsed": 9,
-              "EventsRoot": {
-                "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-              }
+              "ReturnCodec": 42
             },
-            "Error": "string value",
-            "Duration": 60000000000,
             "GasCharges": [
               {
                 "Name": "string value",
-                "loc": [
-                  {
-                    "File": "string value",
-                    "Line": 123,
-                    "Function": "string value"
-                  }
-                ],
                 "tg": 9,
                 "cg": 9,
                 "sg": 9,
-                "vtg": 9,
-                "vcg": 9,
-                "vsg": 9,
-                "tt": 60000000000,
-                "ex": {}
+                "tt": 60000000000
               }
             ],
             "Subcalls": null
@@ -8288,95 +8724,49 @@ Response:
   },
   "ExecutionTrace": {
     "Msg": {
-      "Version": 42,
-      "To": "f01234",
       "From": "f01234",
-      "Nonce": 42,
+      "To": "f01234",
       "Value": "0",
-      "GasLimit": 9,
-      "GasFeeCap": "0",
-      "GasPremium": "0",
       "Method": 1,
       "Params": "Ynl0ZSBhcnJheQ==",
-      "CID": {
-        "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-      }
+      "ParamsCodec": 42
     },
     "MsgRct": {
       "ExitCode": 0,
       "Return": "Ynl0ZSBhcnJheQ==",
-      "GasUsed": 9,
-      "EventsRoot": {
-        "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-      }
+      "ReturnCodec": 42
     },
-    "Error": "string value",
-    "Duration": 60000000000,
     "GasCharges": [
       {
         "Name": "string value",
-        "loc": [
-          {
-            "File": "string value",
-            "Line": 123,
-            "Function": "string value"
-          }
-        ],
         "tg": 9,
         "cg": 9,
         "sg": 9,
-        "vtg": 9,
-        "vcg": 9,
-        "vsg": 9,
-        "tt": 60000000000,
-        "ex": {}
+        "tt": 60000000000
       }
     ],
     "Subcalls": [
       {
         "Msg": {
-          "Version": 42,
-          "To": "f01234",
           "From": "f01234",
-          "Nonce": 42,
+          "To": "f01234",
           "Value": "0",
-          "GasLimit": 9,
-          "GasFeeCap": "0",
-          "GasPremium": "0",
           "Method": 1,
           "Params": "Ynl0ZSBhcnJheQ==",
-          "CID": {
-            "/": "bafy2bzacebbpdegvr3i4cosewthysg5xkxpqfn2wfcz6mv2hmoktwbdxkax4s"
-          }
+          "ParamsCodec": 42
         },
         "MsgRct": {
           "ExitCode": 0,
           "Return": "Ynl0ZSBhcnJheQ==",
-          "GasUsed": 9,
-          "EventsRoot": {
-            "/": "bafy2bzacea3wsdh6y3a36tb3skempjoxqpuyompjbmfeyf34fi3uy6uue42v4"
-          }
+          "ReturnCodec": 42
         },
-        "Error": "string value",
-        "Duration": 60000000000,
         "GasCharges": [
           {
             "Name": "string value",
-            "loc": [
-              {
-                "File": "string value",
-                "Line": 123,
-                "Function": "string value"
-              }
-            ],
             "tg": 9,
             "cg": 9,
             "sg": 9,
-            "vtg": 9,
-            "vcg": 9,
-            "vsg": 9,
-            "tt": 60000000000,
-            "ex": {}
+            "tt": 60000000000
           }
         ],
         "Subcalls": null
