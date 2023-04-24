@@ -9,28 +9,13 @@ orbs:
 executors:
   golang:
     docker:
-      - image: cimg/go:1.18.8
+      - image: cimg/go:1.19.7
     resource_class: 2xlarge
   ubuntu:
     docker:
       - image: ubuntu:20.04
-  packer:
-    description: |
-      The HashiCorp provided Packer container
-    parameters:
-      packer-version:
-        type: string
-        default: "1.8"
-    docker:
-      - image: hashicorp/packer:<< parameters.packer-version >>
-
 
 commands:
-  install-deps:
-    steps:
-      - run: |
-          sudo apt update
-          sudo apt install python-is-python3
   prepare:
     parameters:
       linux:
@@ -44,22 +29,18 @@ commands:
     steps:
       - checkout
       - git_fetch_all_tags
-      - checkout
+      - run: git submodule sync
+      - run: git submodule update --init
       - when:
           condition: << parameters.linux >>
           steps:
-            - run: sudo apt-get update
-            - run:
-                command: sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ocl-icd-opencl-dev libhwloc-dev
-                no_output_timeout: 30m
-      - run: git submodule sync
-      - run: git submodule update --init
+            - run: sudo DEBIAN_FRONTEND=noninteractive apt-get update
+            - run: sudo DEBIAN_FRONTEND=noninteractive apt-get install ocl-icd-opencl-dev libhwloc-dev
   download-params:
     steps:
       - restore_cache:
           name: Restore parameters cache
-          keys:
-            - 'v26-2k-lotus-params'
+          keys: 'v26-2k-lotus-params'
           paths:
             - /var/tmp/filecoin-proof-parameters/
       - run:  ./lotus fetch-params 2048
@@ -89,30 +70,11 @@ commands:
           name: fetch all tags
           command: |
             git fetch --all
-  packer_build:
-    description: "Run a packer build"
-    parameters:
-      template:
-        description: |
-          The name of the packer template file
-        type: string
-        default: packer.json
-      args:
-        description: |
-          Arguments to pass to the packer build command
-        type: string
-        default: ""
-    steps:
-      - run:
-          name: "Run a packer build"
-          command: packer build << parameters.args >> << parameters.template >>
-          no_output_timeout: 30m
 
 jobs:
   mod-tidy-check:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: go mod tidy -v
       - run:
@@ -123,7 +85,6 @@ jobs:
   build-all:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: sudo apt-get update
       - run: sudo apt-get install npm
@@ -146,10 +107,83 @@ jobs:
   build-spacenet:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run:
           command: make spacenet
+  build-linux-spacenet:
+    description: build spacenet on Linux VM
+    machine:
+      image: ubuntu-2204:2023.02.1
+    steps:
+      - prepare:
+          linux: true
+          darwin: false
+      - run: go version
+      - run:
+          name: Install Rust
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y
+      - restore_cache:
+          name: restore cache
+          keys:
+            - linux-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
+      - run:
+          command: make deps lotus
+          no_output_timeout: 30m
+      - run:
+          command: make spacenet
+          no_output_timeout: 10m
+      - save_cache:
+          name: save cache
+          key: linux-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
+          paths:
+            - "~/.rustup"
+            - "~/.cargo"
+            - ~/.go_workspace/pkg/mod
+            - ~/.cache/go-build
+  build-macos-spacenet:
+    description: build spacenet on macos
+    macos:
+      xcode: "14.2.0"
+    working_directory: ~/go/src/github.com/filecoin-project/lotus
+    steps:
+      - prepare:
+          linux: false
+          darwin: true
+      - run:
+          name: Install go
+          command: |
+            curl -O https://dl.google.com/go/go1.19.7.darwin-amd64.pkg && \
+            sudo installer -pkg go1.19.7.darwin-amd64.pkg -target /
+      - run:
+          name: Export Go
+          command: |
+            echo 'export PATH="$PATH:/usr/local/go/bin"' >> "$BASH_ENV"
+            echo 'export GOPATH="${HOME}/go"' >> $BASH_ENV
+            echo 'export PATH="$GOPATH"/bin:"$PATH"' >> "$BASH_ENV"
+      - run: go version
+      - run:
+          name: Install dependencies with Homebrew
+          command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config coreutils jq hwloc
+      - run:
+          name: Install Rust
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- -y
+      - restore_cache:
+          name: restore cache
+          keys:
+            - macos-v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
+      - run:
+          command: make spacenet
+          no_output_timeout: 10m
+      - save_cache:
+          name: save cache
+          key: macos-v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
+          paths:
+            - "~/.rustup"
+            - "~/.cargo"
+            - ~/go/pkg/mod
+            - ~/Library/Caches/go-build
 
   test: &basic_test
     description: |
@@ -179,28 +213,34 @@ jobs:
         description: gotestsum format. https://github.com/gotestyourself/gotestsum#format
       coverage:
         type: string
-        default: -coverprofile=coverage.txt -coverpkg=github.com/filecoin-project/lotus/...
+        default: "-coverprofile=/tmp/conformance.out -coverpkg ./chain/consensus/...,./chain/ipcagent/...,./chain/eudico-core/..."
         description: Coverage flag. Set to the empty string to disable.
-      codecov-upload:
-        type: boolean
-        default: true
-        description: |
-          Upload coverage report to https://codecov.io/. Requires the codecov API token to be
-          set as an environment variable for private projects.
     executor: << parameters.executor >>
     steps:
-      - install-deps
       - prepare
+      - restore_cache:
+          name: restore cache
+          keys:
+            - test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
+      - run:
+          command: make spacenet
+          no_output_timeout: 10m
+      - save_cache:
+          name: save cache
+          key: test-v3-go-deps-{{ arch }}-{{ checksum "go.sum" }}
+          paths:
+            - ~/go/pkg/mod
+            - ~/.cache/go-build
       - download-params
       - run:
           name: go test
           environment:
             TEST_RUSTPROOFS_LOGS: << parameters.proofs-log-test >>
-            SKIP_CONFORMANCE: "1"
             MIR_INTERCEPTOR_OUTPUT: "mir-interceptor"
+            GOLOG_LOG_LEVEL: "info,mir-consensus=info,mir-manager=info"
           command: |
             mkdir -p /tmp/test-reports/<< parameters.suite >>
             mkdir -p /tmp/test-artifacts
@@ -212,6 +252,7 @@ jobs:
               << parameters.coverage >> \
               << parameters.go-test-flags >> \
               << parameters.target >>
+            go tool cover -html=/tmp/conformance.out -o /tmp/test-artifacts/test-coverage.html
           no_output_timeout: 30m
       - run:
           command: |
@@ -225,13 +266,10 @@ jobs:
           path: /tmp/test-artifacts/<< parameters.suite >>.json
       - store_artifacts:
           path: /tmp/test-mir-interceptor
-      - when:
-          condition: << parameters.codecov-upload >>
-          steps:
-            - run:
-                shell: /bin/bash -eo pipefail
-                command: |
-                  bash <(curl -s https://codecov.io/bash)
+      - store_artifacts:
+          path: /tmp/test-artifacts/test-coverage.html
+      - store_artifacts:
+          path: /tmp/conformance.out
 
   test-mir-smoke:
     <<: *basic_test
@@ -305,247 +343,9 @@ jobs:
   nightly-e2e-test-mir-basic:
     <<: *e2e_test
 
-  e2e-test-mir-basic:
-    <<: *e2e_test
-
-  test-conformance:
-    description: |
-      Run tests using a corpus of interoperable test vectors for Filecoin 
-      implementations to test their correctness and compliance with the Filecoin
-      specifications.
-    parameters:
-      <<: *test-params
-      vectors-branch:
-        type: string
-        default: ""
-        description: |
-          Branch on github.com/filecoin-project/test-vectors to checkout and
-          test with. If empty (the default) the commit defined by the git
-          submodule is used.
-    executor: << parameters.executor >>
-    steps:
-      - install-deps
-      - prepare
-      - run:
-          command: make deps lotus
-          no_output_timeout: 30m
-      - download-params
-      - when:
-          condition:
-            not:
-              equal: [ "", << parameters.vectors-branch >> ]
-          steps:
-            - run:
-                name: checkout vectors branch
-                command: |
-                  cd extern/test-vectors
-                  git fetch
-                  git checkout origin/<< parameters.vectors-branch >>
-      - run:
-          name: install statediff globally
-          command: |
-            ## statediff is optional; we succeed even if compilation fails.
-            mkdir -p /tmp/statediff
-            git clone https://github.com/filecoin-project/statediff.git /tmp/statediff
-            cd /tmp/statediff
-            go install ./cmd/statediff || exit 0
-      - run:
-          name: go test
-          environment:
-            SKIP_CONFORMANCE: "0"
-          command: |
-            mkdir -p /tmp/test-reports
-            mkdir -p /tmp/test-artifacts
-            gotestsum \
-              --format pkgname-and-test-fails \
-              --junitfile /tmp/test-reports/junit.xml \
-              -- \
-              -v -coverpkg ./chain/vm/,github.com/filecoin-project/specs-actors/... -coverprofile=/tmp/conformance.out ./conformance/
-            go tool cover -html=/tmp/conformance.out -o /tmp/test-artifacts/conformance-coverage.html
-          no_output_timeout: 30m
-      - store_test_results:
-          path: /tmp/test-reports
-      - store_artifacts:
-          path: /tmp/test-artifacts/conformance-coverage.html
-  build-ntwk-calibration:
-    description: |
-      Compile lotus binaries for the calibration network
-    parameters:
-      <<: *test-params
-    executor: << parameters.executor >>
-    steps:
-      - install-deps
-      - prepare
-      - run: make calibnet
-      - run: mkdir linux-calibrationnet && mv lotus lotus-miner lotus-worker linux-calibrationnet
-      - persist_to_workspace:
-          root: "."
-          paths:
-            - linux-calibrationnet
-  build-ntwk-butterfly:
-    description: |
-      Compile lotus binaries for the butterfly network
-    parameters:
-      <<: *test-params
-    executor: << parameters.executor >>
-    steps:
-      - install-deps
-      - prepare
-      - run: make butterflynet
-      - run: mkdir linux-butterflynet && mv lotus lotus-miner lotus-worker linux-butterflynet
-      - persist_to_workspace:
-          root: "."
-          paths:
-            - linux-butterflynet
-  build-lotus-soup:
-    description: |
-      Compile `lotus-soup` Testground test plan
-    parameters:
-      <<: *test-params
-    executor: << parameters.executor >>
-    steps:
-      - install-deps
-      - prepare
-      - run: cd extern/filecoin-ffi && make
-      - run:
-          name: "go get lotus@master"
-          command: cd testplans/lotus-soup && go mod edit -replace=github.com/filecoin-project/lotus=../.. && go mod tidy
-      - run:
-          name: "build lotus-soup testplan"
-          command: pushd testplans/lotus-soup && go build -tags=testground .
-  trigger-testplans:
-    description: |
-      Trigger `lotus-soup` test cases on TaaS
-    parameters:
-      <<: *test-params
-    executor: << parameters.executor >>
-    steps:
-      - install-deps
-      - prepare
-      - run:
-          name: "download testground"
-          command: wget https://gist.github.com/nonsense/5fbf3167cac79945f658771aed32fc44/raw/2e17eb0debf7ec6bdf027c1bdafc2c92dd97273b/testground-d3e9603 -O ~/testground-cli && chmod +x ~/testground-cli
-      - run:
-          name: "prepare .env.toml"
-          command: pushd testplans/lotus-soup && mkdir -p $HOME/testground && cp env-ci.toml $HOME/testground/.env.toml && echo 'endpoint="https://ci.testground.ipfs.team"' >> $HOME/testground/.env.toml && echo 'user="circleci"' >> $HOME/testground/.env.toml
-      - run:
-          name: "prepare testground home dir and link test plans"
-          command: mkdir -p $HOME/testground/plans && ln -s $(pwd)/testplans/lotus-soup $HOME/testground/plans/lotus-soup
-      - run:
-          name: "go get lotus@master"
-          command: cd testplans/lotus-soup && go get github.com/filecoin-project/lotus@master
-      - run:
-          name: "trigger deals baseline testplan on taas"
-          command: ~/testground-cli run composition -f $HOME/testground/plans/lotus-soup/_compositions/baseline-k8s-3-1.toml --metadata-commit=$CIRCLE_SHA1 --metadata-repo=filecoin-project/lotus --metadata-branch=$CIRCLE_BRANCH
-      - run:
-          name: "trigger payment channel stress testplan on taas"
-          command: ~/testground-cli run composition -f $HOME/testground/plans/lotus-soup/_compositions/paych-stress-k8s.toml --metadata-commit=$CIRCLE_SHA1 --metadata-repo=filecoin-project/lotus --metadata-branch=$CIRCLE_BRANCH
-
-  build-macos:
-    description: build darwin lotus binary
-    macos:
-      xcode: "12.5.1"
-    working_directory: ~/go/src/github.com/filecoin-project/lotus
-    steps:
-      - prepare:
-          linux: false
-          darwin: true
-      - run:
-          name: Install go
-          command: |
-            curl -O https://dl.google.com/go/go1.18.8.darwin-amd64.pkg && \
-            sudo installer -pkg go1.18.8.darwin-amd64.pkg -target /
-      - run:
-          name: Install pkg-config
-          command: HOMEBREW_NO_AUTO_UPDATE=1 brew install pkg-config
-      - run: go version
-      - run:
-          name: Install Rust
-          command: |
-            curl https://sh.rustup.rs -sSf | sh -s -- -y
-      - run:
-          name: Install hwloc
-          command: |
-            mkdir ~/hwloc
-            curl --location https://download.open-mpi.org/release/hwloc/v2.4/hwloc-2.4.1.tar.gz --output ~/hwloc/hwloc-2.4.1.tar.gz
-            cd ~/hwloc
-            tar -xvzpf hwloc-2.4.1.tar.gz
-            cd hwloc-2.4.1
-            ./configure && make && sudo make install
-      - restore_cache:
-          name: restore cargo cache
-          key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
-      - run:
-          command: make build
-          no_output_timeout: 30m
-      - run:
-          name: check tag and version output match
-          command: ./scripts/version-check.sh ./lotus
-      - store_artifacts:
-          path: lotus
-      - store_artifacts:
-          path: lotus-miner
-      - store_artifacts:
-          path: lotus-worker
-      - run: mkdir darwin && mv lotus lotus-miner lotus-worker darwin/
-      - persist_to_workspace:
-          root: "."
-          paths:
-            - darwin
-      - save_cache:
-          name: save cargo cache
-          key: v3-go-deps-{{ arch }}-{{ checksum "~/go/src/github.com/filecoin-project/lotus/go.sum" }}
-          paths:
-            - "~/.rustup"
-            - "~/.cargo"
-
-  build-appimage:
-    machine:
-      image: ubuntu-2004:202111-02
-    steps:
-      - checkout
-      - attach_workspace:
-          at: "."
-      - run:
-          name: install appimage-builder
-          command: |
-            # appimage-builder requires /dev/snd to exist. It creates containers during the testing phase
-            # that pass sound devices from the host to the testing container. (hard coded!)
-            # https://github.com/AppImageCrafters/appimage-builder/blob/master/appimagebuilder/modules/test/execution_test.py#L54
-            # Circleci doesn't provide a working sound device; this is enough to fake it.
-            if [ ! -e /dev/snd ]
-            then
-              sudo mkdir /dev/snd
-              sudo mknod /dev/snd/ControlC0 c 1 2
-            fi
-            # docs: https://appimage-builder.readthedocs.io/en/latest/intro/install.html
-            sudo apt update
-            sudo apt install -y python3-pip python3-setuptools patchelf desktop-file-utils libgdk-pixbuf2.0-dev fakeroot strace
-            sudo curl -Lo /usr/local/bin/appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-            sudo chmod +x /usr/local/bin/appimagetool
-            sudo pip3 install appimage-builder
-      - run:
-          name: install lotus dependencies
-          command: sudo apt install ocl-icd-opencl-dev libhwloc-dev
-      - run:
-          name: build appimage
-          command: |
-            sed -i "s/version: latest/version: ${CIRCLE_TAG:-latest}/" AppImageBuilder.yml
-            make appimage
-      - run:
-          name: prepare workspace
-          command: |
-            mkdir appimage
-            mv Lotus-*.AppImage appimage
-      - persist_to_workspace:
-          root: "."
-          paths:
-            - appimage
-
   gofmt:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run:
           command: "! go fmt ./... 2>&1 | read"
@@ -554,7 +354,6 @@ jobs:
   gen-check:
     executor: golang
     steps:
-      - install-deps
       - prepare
       - run: make deps
       - run: go install golang.org/x/tools/cmd/goimports
@@ -581,7 +380,6 @@ jobs:
           Arguments to pass to golangci-lint
     executor: << parameters.executor >>
     steps:
-      - install-deps
       - prepare
       - run:
           command: make deps
@@ -594,32 +392,57 @@ jobs:
   lint-all:
     <<: *lint
 
-  publish:
-    description: publish binary artifacts
-    executor: ubuntu
-    steps:
-      - run:
-          name: Install git jq curl
-          command: apt update && apt install -y git jq curl
-      - checkout
-      - git_fetch_all_tags
-      - checkout
-      - install_ipfs
-      - attach_workspace:
-          at: "."
-      - run:
-          name: Create bundles
-          command: ./scripts/build-bundle.sh
-      - run:
-          name: Publish release
-          command: ./scripts/publish-release.sh
 
 workflows:
   version: 2.1
   ci:
     jobs:
-      - e2e-test-mir-basic:
+      - lint-all:
+          concurrency: "16"   # expend all docker 2xlarge CPUs.
+      - mod-tidy-check
+      - gofmt
+      - gen-check
+      - test-chain-unit:
+          name: chain-unit-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -race -shuffle=on -v -count=1"
+          target: "./chain/consensus/..."
+      - test-ipcagent-unit:
+          name: ipcagent-unit-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -race -shuffle=on -v -count=1"
+          target: "./chain/ipcagent/..."
+      - test-mir-smoke:
+          name: mir-smoke-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 10m -run TestMirSmoke"
+          target: "./itests/mir_test.go"
+      - test-ipc-basic:
+          name: ipc-basic-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 10m -run TestIPC"
+          target: "./itests/ipc_test.go"
+      - test-mir-basic:
+          name: mir-basic-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
+          target: "./itests/mir_test.go"
+      - test-mir-reconfiguration:
+          name: mir-reconfiguration-tests
+          suite: consensus
+          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
+          target: "./itests/mir_test.go"
+      - nightly-e2e-test-mir-basic:
           name: e2e-mir-basic-tests
+      - build-spacenet
+      - build-linux-spacenet
+      - build-macos-spacenet
+      - build-all:
+          filters:
+            tags:
+              only:
+                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+
   nightly:
     triggers:
       - schedule:
@@ -632,17 +455,17 @@ workflows:
       - nightly-test-mir-with-mangler:
           name: nightly-mir-mangler-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 120m -run TestMirWithMangler"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=120m -run TestMirWithMangler"
           target: "./itests/mir_test.go"
       - nightly-test-mir-basic:
           name: nightly-mir-basic-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirBasic"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirBasic"
           target: "./itests/mir_test.go"
       - nightly-test-mir-reconfiguration:
           name: nightly-mir-reconfiguration-tests
           suite: consensus
-          go-test-flags: "-tags=spacenet -count=1 -v -timeout 20m -run TestMirReconfiguration"
+          go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
       - nightly-e2e-test-mir-basic:
           name: nightly-mir-e2e-basic-tests
