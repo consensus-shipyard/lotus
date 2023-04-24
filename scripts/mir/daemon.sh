@@ -23,7 +23,7 @@ export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
 mkdir $LOTUS_PATH
-cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/
+cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/ | true
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json
