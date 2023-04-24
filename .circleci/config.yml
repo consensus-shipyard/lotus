@@ -307,7 +307,6 @@ jobs:
       image: ubuntu-2204:2022.10.2
       docker_layer_caching: true
     steps:
-      - install-deps
       - prepare
       - restore_cache:
           keys:
