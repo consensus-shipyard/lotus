@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -41,7 +40,7 @@ func init() {
 }
 
 func getAuthToken(id string) (string, error) {
-	b, err := ioutil.ReadFile(path.Join(DeploymentPath, id, "token"))
+	b, err := os.ReadFile(path.Join(DeploymentPath, id, "token"))
 	if err != nil {
 		return "", err
 	}
