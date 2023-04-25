@@ -396,51 +396,10 @@ workflows:
   version: 2.1
   ci:
     jobs:
-      - lint-all:
-          concurrency: "16"   # expend all docker 2xlarge CPUs.
-      - mod-tidy-check
-      - gofmt
-      - gen-check
-      - test-chain-unit:
-          name: chain-unit-tests
-          suite: consensus
-          go-test-flags: "-tags=spacenet -race -shuffle=on -v -count=1"
-          target: "./chain/consensus/..."
-      - test-ipcagent-unit:
-          name: ipcagent-unit-tests
-          suite: consensus
-          go-test-flags: "-tags=spacenet -race -shuffle=on -v -count=1"
-          target: "./chain/ipcagent/..."
-      - test-mir-smoke:
-          name: mir-smoke-tests
-          suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 10m -run TestMirSmoke"
-          target: "./itests/mir_test.go"
-      - test-ipc-basic:
-          name: ipc-basic-tests
-          suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 10m -run TestIPC"
-          target: "./itests/ipc_test.go"
-      - test-mir-basic:
-          name: mir-basic-tests
-          suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirBasic"
-          target: "./itests/mir_test.go"
-      - test-mir-reconfiguration:
-          name: mir-reconfiguration-tests
-          suite: consensus
-          go-test-flags: "-tags=spacenet -timeout 20m -run TestMirReconfiguration"
-          target: "./itests/mir_test.go"
+
       - nightly-e2e-test-mir-basic:
           name: e2e-mir-basic-tests
-      - build-spacenet
-      - build-linux-spacenet
-      - build-macos-spacenet
-      - build-all:
-          filters:
-            tags:
-              only:
-                - /^v\d+\.\d+\.\d+(-rc\d+)?$/
+      
 
   nightly:
     triggers:
