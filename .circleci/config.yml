@@ -310,12 +310,12 @@ jobs:
       - prepare
       - restore_cache:
           keys:
-            - golang-deps-{{ checksum "go.sum" }}
+            - test-e2e-go-deps-{{ checksum "go.sum" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
       - save_cache:
-          key: golang-deps-{{ checksum "go.sum" }}
+          key: test-e2e-go-deps-{{ checksum "go.sum" }}
           paths:
             - ~/.go_workspace/pkg/mod
             - ~/.cache/go-build
@@ -332,12 +332,13 @@ jobs:
           no_output_timeout: 30m
       - run:
           command: |
+            cd e2e
             dates="$(date +%s)"
             mkdir -p /tmp/e2e-artifacts/"$dates"
             [ -d "./testdata/_runtime/logs" ] && cp -R ./testdata/_runtime/logs/* /tmp/e2e-artifacts/"$dates" || echo "E2E logs directory not found"
           when: on_fail
       - store_artifacts:
-          path: /tmp/e2e-artifacts/
+          path: /tmp/e2e-artifacts
 
   nightly-e2e-test-mir-basic:
     <<: *e2e_test
@@ -399,7 +400,7 @@ workflows:
 
       - nightly-e2e-test-mir-basic:
           name: e2e-mir-basic-tests
-      
+
 
   nightly:
     triggers:
