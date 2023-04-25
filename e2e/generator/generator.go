@@ -28,6 +28,8 @@ type Validator struct {
 	Weight  *abi.TokenAmount
 
 	APIPort       string
+	P2PPort       string
+	IPAddr        string
 	LibP2PKey     crypto.PrivKey
 	WalletPrivKey *types.KeyInfo
 	LibP2PTCPAddr multiaddr.Multiaddr
@@ -52,6 +54,8 @@ func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
 	v := Validator{
 		N:       n,
 		APIPort: fmt.Sprintf("123%d", n),
+		P2PPort: fmt.Sprintf("400%d", n),
+		IPAddr:  fmt.Sprintf("192.168.10.%d", n+2),
 		Weight:  &w,
 	}
 	err := v.newWalletKey()
@@ -189,8 +193,6 @@ func (v *Validator) SaveToFile(outDir string) error {
 		return err
 	}
 
-	// ----
-
 	return nil
 }
 
@@ -299,6 +301,28 @@ func NewValidatorSet(startIP string, size int, nonce int, ports ...string) (*Val
 		v.Set = &set
 	}
 	return &set, nil
+}
+
+func (s *ValidatorSet) StoreNet(outDir string) error {
+	fi, err := os.Create(path.Join(outDir, "mir.net"))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err2 := fi.Close()
+		if err == nil {
+			err = err2
+		}
+	}()
+
+	for _, v := range s.Validators {
+		_, err := fi.Write([]byte(v.NetAddr + "\n"))
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
 
 func nextIP(ip string) string {

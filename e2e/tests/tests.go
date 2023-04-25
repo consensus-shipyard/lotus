@@ -26,6 +26,7 @@ import (
 var (
 	WaitTimeout    = 5 * time.Minute
 	DeploymentPath string
+	MirConfigPath  string
 )
 
 func init() {
@@ -34,6 +35,10 @@ func init() {
 		panic(err)
 	}
 	DeploymentPath, err = filepath.Abs(filepath.Join(r, "e2e", "testdata", "_runtime"))
+	if err != nil {
+		panic(err)
+	}
+	MirConfigPath, err = filepath.Abs(filepath.Join(r, "e2e", "testdata", "mir"))
 	if err != nil {
 		panic(err)
 	}

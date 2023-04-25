@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bufio"
 	"errors"
 	"os"
 	"path"
@@ -26,4 +27,25 @@ func FindRoot() (string, error) {
 	}
 
 	return dir, nil
+}
+
+func ReadFileLineByLine(filePath string) ([]string, error) {
+	var lines []string
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close() // nolint
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		l := scanner.Text()
+		lines = append(lines, l)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return lines, nil
 }

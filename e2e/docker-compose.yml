@@ -27,6 +27,7 @@ services:
       start_period: 30s
     ports:
       - "1230:1230"
+      - "4000:4000"
     networks:
       localnet:
         ipv4_address: 192.168.10.2
@@ -56,6 +57,7 @@ services:
         condition: service_healthy
     ports:
       - "1231:1231"
+      - "4001:4001"
     networks:
       localnet:
         ipv4_address: 192.168.10.3
@@ -85,6 +87,7 @@ services:
         condition: service_healthy
     ports:
       - "1232:1232"
+      - "4002:4002"
     networks:
       localnet:
         ipv4_address: 192.168.10.4
@@ -114,6 +117,7 @@ services:
         condition: service_healthy
     ports:
       - "1233:1233"
+      - "4003:4003"
     networks:
       localnet:
         ipv4_address: 192.168.10.5
