@@ -71,7 +71,7 @@ func TestIPCAccessors(t *testing.T) {
 	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
 	require.NoError(t, err)
 
-	JoinSubnet(t, ctx, api, src, actorAddr)
+	joinSubnet(t, ctx, api, actorAddr)
 
 	e, err := api.IPCGetGenesisEpochForSubnet(ctx, genesis.DefaultIPCGatewayAddr, sn)
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestIPCAccessors(t *testing.T) {
 	checkEpoch := abi.ChainEpoch(genesis.DefaultCheckpointPeriod)
 	c, err := abi.CidBuilder.Sum([]byte("genesis"))
 	require.NoError(t, err)
-	SubmitCheckpoint(t, ctx, api, sn, src, checkEpoch, c)
+	submitCheckpoint(t, ctx, api, sn, checkEpoch, c)
 
 	// get list of child subnets and see there are none
 	l, err := api.IPCListChildSubnets(ctx, genesis.DefaultIPCGatewayAddr)
@@ -132,7 +132,7 @@ func TestIPCAccessors(t *testing.T) {
 
 	// fund subnet with a number of top-down messages
 	for i := 0; i < 5; i++ {
-		FundSubnet(t, ctx, api, sn, src)
+		fundSubnet(t, ctx, api, sn)
 	}
 	// get the topdown messages
 	msgs, err := api.IPCGetTopDownMsgs(ctx, genesis.DefaultIPCGatewayAddr, sn, types.EmptyTSK, 0)
@@ -151,7 +151,71 @@ func TestIPCAccessors(t *testing.T) {
 	require.Equal(t, *msgs[0], serMsg)
 }
 
-func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from, snActor address.Address) {
+func TestIPCCheckpointSubmission(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, validators, ens := kit.EnsembleWithMirValidators(t, 3)
+	ens.BeginMirMining(ctx, g, validators...)
+
+	// check gateway state
+	api := nodes[0]
+	_, err := api.IPCReadGatewayState(ctx, genesis.DefaultIPCGatewayAddr, types.EmptyTSK)
+	require.NoError(t, err)
+
+	// add subnet actor
+	src, err := api.WalletDefaultAddress(ctx)
+	require.NoError(t, err)
+	networkName, err := api.StateNetworkName(ctx)
+	require.NoError(t, err)
+	parent, err := sdk.NewSubnetIDFromString(string(networkName))
+	require.NoError(t, err)
+
+	params := subnetactor.ConstructParams{
+		Parent:              parent,
+		Name:                "test",
+		IPCGatewayAddr:      genesis.DefaultIPCGatewayAddrID,
+		BottomUpCheckPeriod: genesis.DefaultCheckpointPeriod,
+		TopDownCheckPeriod:  genesis.DefaultCheckpointPeriod,
+		MinValidators:       1,
+		MinValidatorStake:   abi.TokenAmount(types.MustParseFIL("1FIL")),
+		Consensus:           subnetactor.Mir,
+	}
+	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
+	require.NoError(t, err)
+	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
+	require.NoError(t, err)
+
+	// join from three validators
+	joinSubnet(t, ctx, nodes[0], actorAddr)
+	joinSubnet(t, ctx, nodes[1], actorAddr)
+	joinSubnet(t, ctx, nodes[2], actorAddr)
+
+	// submit checkpoint from two validators
+	checkEpoch := abi.ChainEpoch(genesis.DefaultCheckpointPeriod)
+	c, err := abi.CidBuilder.Sum([]byte("genesis"))
+	require.NoError(t, err)
+	submitCheckpoint(t, ctx, nodes[0], sn, checkEpoch, c)
+	// see that it has voted
+	hasVoted, err := nodes[0].IPCHasVotedBottomUpCheckpoint(ctx, sn, genesis.DefaultCheckpointPeriod, src)
+	require.NoError(t, err)
+	require.True(t, hasVoted)
+
+	submitCheckpoint(t, ctx, nodes[1], sn, checkEpoch, c)
+
+}
+
+func joinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, snActor address.Address) {
+	from, err := node.WalletDefaultAddress(ctx)
+	require.NoError(t, err)
 	params, err := actors.SerializeParams(&subnetactor.JoinParams{ValidatorNetAddr: "test"})
 	require.NoError(t, err)
 	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
@@ -168,7 +232,9 @@ func JoinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, from,
 
 }
 
-func FundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID, from address.Address) {
+func fundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID) {
+	from, err := node.WalletDefaultAddress(ctx)
+	require.NoError(t, err)
 	params, err := actors.SerializeParams(&sn)
 	require.NoError(t, err)
 	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
@@ -185,7 +251,9 @@ func FundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sd
 
 }
 
-func SubmitCheckpoint(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID, from address.Address, epoch abi.ChainEpoch, prev cid.Cid) {
+func submitCheckpoint(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID, epoch abi.ChainEpoch, prev cid.Cid) {
+	from, err := node.WalletDefaultAddress(ctx)
+	require.NoError(t, err)
 	ch := gateway.NewBottomUpCheckpoint(sn, epoch)
 	ch.Data.PrevCheck = prev
 	params, err := actors.SerializeParams(ch)
