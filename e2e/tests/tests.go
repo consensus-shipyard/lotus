@@ -24,9 +24,12 @@ import (
 )
 
 var (
-	WaitTimeout    = 5 * time.Minute
-	DeploymentPath string
-	MirConfigPath  string
+	WaitTimeout = 5 * time.Minute
+
+	NetworkSize     int
+	DeploymentPath  string
+	MirConfigPath   string
+	ManifestDirPath string
 )
 
 func init() {
@@ -42,6 +45,11 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	ManifestDirPath, err = filepath.Abs(filepath.Join(r, "e2e", "networks"))
+	if err != nil {
+		panic(err)
+	}
+
 }
 
 func getAuthToken(id string) (string, error) {

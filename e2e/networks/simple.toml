@@ -1,0 +1,4 @@
+size = 4
+configNonce = 0
+startIP = "192.168.10.2"
+configDir = "./testdata/mir"

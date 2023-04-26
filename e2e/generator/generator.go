@@ -339,3 +339,20 @@ func nextIP(ip string) string {
 
 	return ipAddr.String()
 }
+
+func SaveNewNetworkConfig(size int, firstIP string, nonce int, outputDir string) error {
+	validatorSet, err := NewValidatorSet(firstIP, size, nonce)
+	if err != nil {
+		return err
+	}
+
+	for i, v := range validatorSet.Validators {
+		nodeConfigDir := path.Join(outputDir, fmt.Sprintf("node%d", i))
+
+		err = v.SaveToFile(nodeConfigDir)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

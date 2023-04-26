@@ -11,7 +11,7 @@ docker_on_mac:
 	docker build --tag eudico/e2e -f ./Dockerfile --build-arg FFI_BUILD_FROM_SOURCE=1 ..
 
 gen:
-	go run ./generator/cmd -ip=192.168.10.2 -n=4 -output="./testdata/mir/"
+	go run ./generator/cmd -manifest="./networks/simple.toml"
 
 run-tests-locally:
 	go test -v -count=1 -timeout=20m ./...
@@ -19,6 +19,7 @@ run-tests-locally:
 run-tests-on-ci:
 	go test -c -o tests.app ./tests
 	sudo ./tests.app -test.v
+
 up:
 	BUILDKIT_PROGRESS=plain docker compose up -d
 

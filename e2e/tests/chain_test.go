@@ -2,16 +2,25 @@ package tests
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/filecoin-project/lotus/e2e/internal/manifest"
 )
 
 func TestMain(m *testing.M) {
-	for _, id := range []string{"0", "1", "2", "3"} {
+	mf, err := manifest.LoadManifest(filepath.Join(ManifestDirPath, "simple.toml"))
+	if err != nil {
+		panic(err)
+	}
+	NetworkSize = mf.Size
+
+	for _, id := range NodeIDS(NetworkSize) {
 		err := waitForAuthToken(id)
 		if err != nil {
 			panic(err)
@@ -21,6 +30,7 @@ func TestMain(m *testing.M) {
 			panic(err)
 		}
 	}
+
 	m.Run()
 }
 
@@ -29,7 +39,7 @@ func TestMirSmoke_ConnectNodes(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	nodes := ClientsFor(ctx, t, "0", "1", "2", "3")
+	nodes := ClientsFor(ctx, t, NodeIDS(NetworkSize)...)
 	var peerInfo []peer.AddrInfo
 
 	for i, n := range nodes {
@@ -74,7 +84,7 @@ func TestMirSmoke_AllNodesMine(t *testing.T) {
 		t.Logf("[*] defer: system %s stopped", t.Name())
 	}()
 
-	nodes := ClientsFor(ctx, t, "0", "1", "2", "3")
+	nodes := ClientsFor(ctx, t, NodeIDS(NetworkSize)...)
 
 	err := waitForHeight(ctx, 20, nodes...)
 	require.NoError(t, err)

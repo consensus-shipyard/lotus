@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 )
 
 func FindRoot() (string, error) {
@@ -48,4 +49,12 @@ func ReadFileLineByLine(filePath string) ([]string, error) {
 		return nil, err
 	}
 	return lines, nil
+}
+
+func NodeIDS(n int) []string {
+	var ids []string
+	for i := 0; i < n; i++ {
+		ids = append(ids, strconv.Itoa(i))
+	}
+	return ids
 }
