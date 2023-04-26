@@ -398,7 +398,7 @@ workflows:
   ci:
     jobs:
       - lint-all:
-        concurrency: "16"   # expend all docker 2xlarge CPUs.
+          concurrency: "16"   # expend all docker 2xlarge CPUs.
       - mod-tidy-check
       - gofmt
       - gen-check
