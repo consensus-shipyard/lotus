@@ -6,6 +6,7 @@ import (
 
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 
+	lotusGenesis "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/eudico-core/genesis"
 )
 
@@ -49,7 +50,7 @@ var genesisNewCmd = &cli.Command{
 			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}
 
-		params := &genesis.SubnetParams{
+		params := &lotusGenesis.SubnetParams{
 			TemplatePath:   cctx.String("template"),
 			OutputFilePath: cctx.String("out"),
 			IPCAgentURL:    cctx.String("ipcagent-url"),

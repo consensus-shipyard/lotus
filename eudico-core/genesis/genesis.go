@@ -27,14 +27,7 @@ const (
 	defaultTemplateFilePath = "eudico-core/genesis/genesis.json"
 )
 
-type SubnetParams struct {
-	TemplatePath   string
-	OutputFilePath string
-	SubnetID       string
-	IPCAgentURL    string
-}
-
-func MakeGenesisCar(ctx context.Context, params *SubnetParams) error {
+func MakeGenesisCar(ctx context.Context, params *lotusGenesis.SubnetParams) error {
 	f, err := os.OpenFile(params.OutputFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -48,7 +41,7 @@ func MakeGenesisCar(ctx context.Context, params *SubnetParams) error {
 	return nil
 }
 
-func MakeGenesisTemplate(params *SubnetParams) (genesis.Template, error) {
+func MakeGenesisTemplate(params *lotusGenesis.SubnetParams) (genesis.Template, error) {
 	var tmplPath string
 	if params.TemplatePath == "" {
 		e, err := os.Executable()
@@ -71,7 +64,7 @@ func MakeGenesisTemplate(params *SubnetParams) (genesis.Template, error) {
 	return tmpl, nil
 }
 
-func makeGenesis(ctx context.Context, w io.Writer, params *SubnetParams) error {
+func makeGenesis(ctx context.Context, w io.Writer, params *lotusGenesis.SubnetParams) error {
 	tmpl, err := MakeGenesisTemplate(params)
 	if err != nil {
 		return err
@@ -80,7 +73,7 @@ func makeGenesis(ctx context.Context, w io.Writer, params *SubnetParams) error {
 	bs := blockstore.WrapIDStore(blockstore.NewMemorySync())
 	sbldr := vm.Syscalls(ffiwrapper.ProofVerifier)
 
-	b, err := lotusGenesis.MakeGenesisBlock(ctx, jrnl, bs, sbldr, tmpl, true)
+	b, err := lotusGenesis.MakeGenesisBlock(ctx, jrnl, bs, sbldr, tmpl, params, true)
 	if err != nil {
 		return xerrors.Errorf("failed to make genesis block: %w", err)
 	}

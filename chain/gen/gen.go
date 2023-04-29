@@ -229,7 +229,7 @@ func NewGeneratorWithSectorsAndUpgradeSchedule(numSectors int, us stmgr.UpgradeS
 		Timestamp:        uint64(build.Clock.Now().Add(-500 * time.Duration(build.BlockDelaySecs) * time.Second).Unix()),
 	}
 
-	genb, err := genesis2.MakeGenesisBlock(context.TODO(), j, bs, sys, tpl, false)
+	genb, err := genesis2.MakeGenesisBlock(context.TODO(), j, bs, sys, tpl, nil, false)
 	if err != nil {
 		return nil, xerrors.Errorf("make genesis block failed: %w", err)
 	}
@@ -251,10 +251,10 @@ func NewGeneratorWithSectorsAndUpgradeSchedule(numSectors int, us stmgr.UpgradeS
 	miners := []address.Address{maddr1, maddr2}
 
 	beac := beacon.Schedule{{Start: 0, Beacon: beacon.NewMockBeacon(time.Second)}}
-	//beac, err := drand.NewDrandBeacon(tpl.Timestamp, build.BlockDelaySecs)
-	//if err != nil {
-	//return nil, xerrors.Errorf("creating drand beacon: %w", err)
-	//}
+	// beac, err := drand.NewDrandBeacon(tpl.Timestamp, build.BlockDelaySecs)
+	// if err != nil {
+	// return nil, xerrors.Errorf("creating drand beacon: %w", err)
+	// }
 
 	sm, err := stmgr.NewStateManager(cs, consensus.NewTipSetExecutor(filcns.RewardFunc), sys, us, beac, ds)
 	if err != nil {

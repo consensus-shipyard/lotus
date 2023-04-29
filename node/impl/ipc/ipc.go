@@ -6,26 +6,27 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/consensus-shipyard/go-ipc-types/gateway"
-	"github.com/consensus-shipyard/go-ipc-types/sdk"
-	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
+
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	init_ "github.com/filecoin-project/go-state-types/builtin/v10/init"
-	"github.com/filecoin-project/specs-actors/v2/actors/util/adt"
-
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
+	lotusGenesis "github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/eudico-core/genesis"
 	"github.com/filecoin-project/lotus/node/impl/full"
+	"github.com/filecoin-project/specs-actors/v2/actors/util/adt"
 )
 
 type IPCAPI struct {
@@ -317,7 +318,11 @@ func (a *IPCAPI) IPCSubnetGenesisTemplate(_ context.Context, subnet sdk.SubnetID
 	// make genesis with default subnet template.
 	// TODO: This will fail if eudico not run in the default path,
 	// we should pass a path as an input or remove this endpoint.
-	tmpl, err := genesis.MakeGenesisTemplate(subnet.String(), "")
+	p := &lotusGenesis.SubnetParams{
+		TemplatePath: subnet.String(),
+		SubnetID:     "",
+	}
+	tmpl, err := genesis.MakeGenesisTemplate(p)
 	if err != nil {
 		return nil, err
 	}

@@ -59,6 +59,13 @@ type GenesisBootstrap struct {
 	Genesis *types.BlockHeader
 }
 
+type SubnetParams struct {
+	TemplatePath   string
+	OutputFilePath string
+	SubnetID       string
+	IPCAgentURL    string
+}
+
 /*
 From a list of parameters, create a genesis block / initial state
 
@@ -121,7 +128,15 @@ Genesis: {
 
 */
 
-func MakeInitialStateTree(ctx context.Context, bs bstore.Blockstore, template genesis.Template, deterministic bool) (*state.StateTree, map[address.Address]address.Address, error) {
+func MakeInitialStateTree(
+	ctx context.Context,
+	bs bstore.Blockstore,
+	template genesis.Template,
+	params *SubnetParams,
+	deterministic bool,
+) (
+	*state.StateTree, map[address.Address]address.Address, error,
+) {
 	// Create empty state tree
 	cst := cbor.NewCborStore(bs)
 
@@ -402,7 +417,14 @@ func MakeAccountActor(ctx context.Context, cst cbor.IpldStore, av actorstypes.Ve
 	return act, nil
 }
 
-func CreateAccountActor(ctx context.Context, cst cbor.IpldStore, state *state.StateTree, info genesis.Actor, keyIDs map[address.Address]address.Address, av actorstypes.Version) error {
+func CreateAccountActor(
+	ctx context.Context,
+	cst cbor.IpldStore,
+	state *state.StateTree,
+	info genesis.Actor,
+	keyIDs map[address.Address]address.Address,
+	av actorstypes.Version,
+) error {
 	var ainfo genesis.AccountMeta
 	if err := json.Unmarshal(info.Meta, &ainfo); err != nil {
 		return xerrors.Errorf("unmarshaling account meta: %w", err)
@@ -563,11 +585,21 @@ func VerifyPreSealedData(ctx context.Context, cs *store.ChainStore, sys vm.Sysca
 	return st, nil
 }
 
-func MakeGenesisBlock(ctx context.Context, j journal.Journal, bs bstore.Blockstore, sys vm.SyscallBuilder, template genesis.Template, deterministic bool) (*GenesisBootstrap, error) {
+func MakeGenesisBlock(
+	ctx context.Context,
+	j journal.Journal,
+	bs bstore.Blockstore,
+	sys vm.SyscallBuilder,
+	template genesis.Template,
+	params *SubnetParams,
+	deterministic bool,
+) (
+	*GenesisBootstrap, error,
+) {
 	if j == nil {
 		j = journal.NilJournal()
 	}
-	st, keyIDs, err := MakeInitialStateTree(ctx, bs, template, deterministic)
+	st, keyIDs, err := MakeInitialStateTree(ctx, bs, template, params, deterministic)
 	if err != nil {
 		return nil, xerrors.Errorf("make initial state tree failed: %w", err)
 	}
