@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
+
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 
 	"github.com/filecoin-project/lotus/eudico-core/genesis"
 )
@@ -36,6 +37,10 @@ var genesisNewCmd = &cli.Command{
 			Aliases: []string{"tmp"},
 			Usage:   "genesis template for the subnet",
 		},
+		&cli.StringFlag{
+			Name:  "ipcagent-url",
+			Usage: "The URL of IPC Agent interface",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		sid := cctx.String("subnet-id")
@@ -44,8 +49,13 @@ var genesisNewCmd = &cli.Command{
 			return xerrors.Errorf("incorrect subnet ID %s: %w", sid, err)
 		}
 
-		err = genesis.MakeGenesisCar(cctx.Context, cctx.String("template"), cctx.String("out"), subnetID.String())
-		if err != nil {
+		params := &genesis.SubnetParams{
+			TemplatePath:   cctx.String("template"),
+			OutputFilePath: cctx.String("out"),
+			IPCAgentURL:    cctx.String("ipcagent-url"),
+			SubnetID:       subnetID.String(),
+		}
+		if err = genesis.MakeGenesisCar(cctx.Context, params); err != nil {
 			return xerrors.Errorf("failed to make genesis: %w", err)
 		}
 
