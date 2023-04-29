@@ -301,6 +301,48 @@ jobs:
   nightly-test-mir-reconfiguration:
     <<: *basic_test
 
+  e2etest: &e2e_test
+    description: Run e2e tests.
+    machine:
+      image: ubuntu-2204:2023.02.1
+      docker_layer_caching: true
+    steps:
+      - prepare
+      - restore_cache:
+          keys:
+            - test-e2e-go-deps-{{ checksum "go.sum" }}
+      - run:
+          command: make deps lotus
+          no_output_timeout: 30m
+      - save_cache:
+          key: test-e2e-go-deps-{{ checksum "go.sum" }}
+          paths:
+            - ~/.go_workspace/pkg/mod
+            - ~/.cache/go-build
+      - run:
+          name: Install Docker Compose
+          command: |
+            sudo DEBIAN_FRONTEND=noninteractive apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose-plugin
+      - download-params
+      - run:
+          command: |
+            cd e2e
+            make test-ci
+          no_output_timeout: 30m
+      - run:
+          command: |
+            cd e2e
+            dates="$(date +%s)"
+            mkdir -p /tmp/e2e-artifacts/"$dates"
+            [ -d "./testdata/_runtime/logs" ] && cp -R ./testdata/_runtime/logs/*.log /tmp/e2e-artifacts/"$dates" || echo "E2E logs directory not found"
+          when: on_fail
+      - store_artifacts:
+          path: /tmp/e2e-artifacts
+
+  nightly-e2e-test-mir-basic:
+    <<: *e2e_test
+
   gofmt:
     executor: golang
     steps:
@@ -423,3 +465,5 @@ workflows:
           suite: consensus
           go-test-flags: "-tags=spacenet -count=1 -v -timeout=20m -run TestMirReconfiguration"
           target: "./itests/mir_test.go"
+      - nightly-e2e-test-mir-basic:
+          name: nightly-mir-e2e-basic-tests

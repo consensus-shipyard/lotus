@@ -12,17 +12,22 @@ import (
 	"context"
 	"encoding/binary"
 	"math/rand"
+	"net/http"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/client"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	mb "github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -786,6 +791,45 @@ func TestMirSmoke_TwoNodesMining(t *testing.T) {
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, n1, n2)
 	require.NoError(t, err)
+}
+
+// TestMirSmoke_AccessToNodesViaClient tests that nodes' API is visible for JSON RPC clients.
+func TestMirSmoke_AccessToNodesViaClient(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
+	ens.InterconnectFullNodes().BeginMirMining(ctx, g, validators...)
+
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
+
+	for _, node := range nodes {
+		token, err := node.AuthNew(ctx, api.AllPermissions)
+		require.NoError(t, err)
+
+		headers := http.Header{"Authorization": []string{"Bearer " + string(token)}}
+
+		c, closer, err := client.NewFullNodeRPCV1(ctx, "ws://"+nodes[0].ListenURL[len("http://"):]+"/rpc/v1", headers)
+		require.NoError(t, err)
+
+		head, err := c.ChainHead(ctx)
+		require.NoError(t, err)
+
+		require.Greater(t, head.Height(), abi.ChainEpoch(TestedBlockNumber))
+
+		closer()
+	}
 }
 
 // TestMirSmoke_AllNodesMine tests that n nodes can mine blocks normally.

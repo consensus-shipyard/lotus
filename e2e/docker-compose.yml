@@ -1,0 +1,131 @@
+services:
+  node0:
+    container_name: node0
+    image: "eudico/e2e"
+    build:
+      context: ../
+      dockerfile: e2e/Dockerfile
+    command: "/scripts/mir/node.sh 0 /logs"
+    environment:
+      EUDICO: /usr/local/bin/eudico
+      LOTUS_PATH: /var/lib/lotus
+      LOTUS_MINER_PATH: /var/lib/lotus-miner
+      CONFIG_DATA: /testdata/mir
+      BUILD_DATA: /build
+    volumes:
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/0:/var/lib/lotus
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ../build:/build
+      - ../scripts/mir:/scripts/mir
+      - ./testdata/mir:/testdata/mir
+    healthcheck:
+      test: [ "CMD-SHELL", "[ $(curl -w '%{http_code}' http://localhost:1230/rpc/v1) -eq 500 ]" ]
+      interval: 8s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    ports:
+      - "1230:1230"
+      - "4000:4000"
+    networks:
+      localnet:
+        ipv4_address: 192.168.10.2
+
+  node1:
+    container_name: node1
+    image: "eudico/e2e"
+    build:
+      context: ../
+      dockerfile: e2e/Dockerfile
+    command: "/scripts/mir/node.sh 1 /logs"
+    environment:
+      EUDICO: /usr/local/bin/eudico
+      LOTUS_PATH: /var/lib/lotus
+      LOTUS_MINER_PATH: /var/lib/lotus-miner
+      CONFIG_DATA: /testdata/mir
+      BUILD_DATA: /build
+    volumes:
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/1:/var/lib/lotus
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ../build:/build
+      - ../scripts/mir:/scripts/mir
+      - ./testdata/mir:/testdata/mir
+    depends_on:
+      node0:
+        condition: service_healthy
+    ports:
+      - "1231:1231"
+      - "4001:4001"
+    networks:
+      localnet:
+        ipv4_address: 192.168.10.3
+
+  node2:
+    container_name: node2
+    image: "eudico/e2e"
+    build:
+      context: ../
+      dockerfile: e2e/Dockerfile
+    command: "/scripts/mir/node.sh 2 /logs"
+    environment:
+      EUDICO: /usr/local/bin/eudico
+      LOTUS_PATH: /var/lib/lotus
+      LOTUS_MINER_PATH: /var/lib/lotus-miner
+      CONFIG_DATA: /testdata/mir
+      BUILD_DATA: /build
+    volumes:
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/2:/var/lib/lotus
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ../build:/build
+      - ../scripts/mir:/scripts/mir
+      - ./testdata/mir:/testdata/mir
+    depends_on:
+      node0:
+        condition: service_healthy
+    ports:
+      - "1232:1232"
+      - "4002:4002"
+    networks:
+      localnet:
+        ipv4_address: 192.168.10.4
+
+  node3:
+    container_name: node3
+    image: "eudico/e2e"
+    build:
+      context: ../
+      dockerfile: e2e/Dockerfile
+    command: "/scripts/mir/node.sh 3 /logs"
+    environment:
+      EUDICO: /usr/local/bin/eudico
+      LOTUS_PATH: /var/lib/lotus
+      LOTUS_MINER_PATH: /var/lib/lotus-miner
+      CONFIG_DATA: /testdata/mir
+      BUILD_DATA: /build
+    volumes:
+      - ./testdata/_runtime/logs:/logs
+      - ./testdata/_runtime/3:/var/lib/lotus
+      - /var/tmp/filecoin-proof-parameters:/var/tmp/filecoin-proof-parameters
+      - ../build:/build
+      - ../scripts/mir:/scripts/mir
+      - ./testdata/mir:/testdata/mir
+    depends_on:
+      node0:
+        condition: service_healthy
+    ports:
+      - "1233:1233"
+      - "4003:4003"
+    networks:
+      localnet:
+        ipv4_address: 192.168.10.5
+
+networks:
+  localnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.10.0/16
