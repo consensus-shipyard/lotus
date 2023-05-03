@@ -1,9 +1,10 @@
 #!/bin/bash
 # rm -rf ~/.genesis-sectors
 
-if [ $# -ne 1 ]
+if [ $# -ne 2 ]
 then
     echo "Provide the index of the validator to deploy as first argument. Starting from 0"
+    echo "The second argument expected is the port where the RPC API will be listening for the daemon"
     exit 1
 fi
 

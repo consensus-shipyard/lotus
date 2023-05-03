@@ -14,13 +14,13 @@ tmux new-session -d -s "mir" \; \
   split-window -t "mir:1.2" -h \; \
   \
   send-keys -t "mir:0.0" "
-        ./scripts/mir/daemon.sh 0" Enter \; \
+        ./scripts/mir/daemon.sh 0 1230" Enter \; \
   send-keys -t "mir:0.1" "
-        ./scripts/mir/daemon.sh 1" Enter \; \
+        ./scripts/mir/daemon.sh 1 1231" Enter \; \
   send-keys -t "mir:0.2" "
-        ./scripts/mir/daemon.sh 2" Enter \; \
+        ./scripts/mir/daemon.sh 2 1232" Enter \; \
   send-keys -t "mir:0.3" "
-        ./scripts/mir/daemon.sh 3" Enter \; \
+        ./scripts/mir/daemon.sh 3 1233" Enter \; \
   \
   send-keys -t "mir:1.0" "
         ./scripts/mir/validator.sh 0 2>&1 | tee validator_0.log" Enter \; \
