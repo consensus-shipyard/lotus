@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/e2e/internal/fs"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/client"
@@ -33,7 +34,7 @@ var (
 )
 
 func init() {
-	r, err := FindRoot()
+	r, err := fs.FindRoot()
 	if err != nil {
 		panic(err)
 	}
