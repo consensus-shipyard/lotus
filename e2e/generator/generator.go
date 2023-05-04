@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"text/template"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -16,6 +17,8 @@ import (
 
 	addr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/e2e/internal/fs"
+
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
 )
@@ -346,6 +349,8 @@ func SaveNewNetworkConfig(size int, firstIP string, nonce int, outputDir string)
 		return err
 	}
 
+	// --- save node configs
+
 	for i, v := range validatorSet.Validators {
 		nodeConfigDir := path.Join(outputDir, fmt.Sprintf("node%d", i))
 
@@ -354,5 +359,21 @@ func SaveNewNetworkConfig(size int, firstIP string, nonce int, outputDir string)
 			return err
 		}
 	}
+
+	// --- save genesis.car
+
+	r, err := fs.FindRoot()
+	if err != nil {
+		panic(err)
+	}
+	ScriptPath, err := filepath.Abs(filepath.Join(r, "scripts", "mir"))
+	if err != nil {
+		panic(err)
+	}
+	err = fs.CopyFile(path.Join(ScriptPath, "genesis.car"), path.Join(outputDir, "genesis.car"))
+	if err != nil {
+		panic(err)
+	}
+
 	return nil
 }

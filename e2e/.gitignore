@@ -1,4 +1,5 @@
 testdata/mir/node*
+testdata/mir/genesis.car
 docker.log
 testdata/_runtime
 tests.app
