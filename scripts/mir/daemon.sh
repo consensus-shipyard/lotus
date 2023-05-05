@@ -23,7 +23,6 @@ export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
 mkdir $LOTUS_PATH
-cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json
@@ -39,9 +38,11 @@ cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/
 # else
 
 API_PORT=""
-if [ ! -z "$PORT" ]
+if [ "$PORT" != 0 ]
 then
   API_PORT="--api=$PORT"
+else
+  cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/
 fi
 $EUDICO mir daemon --genesis=$CONFIG_DATA/genesis.car --bootstrap=false $API_PORT
 # fi

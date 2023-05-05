@@ -8,7 +8,13 @@ fi
 
 INDEX=$1
 EUDICO=${EUDICO:-./eudico}
-CONFIG_DATA=${CONFIG_DATA:-./scripts/mir/mir-config}
+CONFIG_DATA=${CONFIG_DATA/mir-config:-./scripts/mir/mir-config}
+
+if [[ -z "${CONFIG_DATA}" ]]; then
+  CONFIG_DATA=./scripts/mir/mir-config
+else
+  CONFIG_DATA="${CONFIG_DATA}/mir-config"
+fi
 
 LOG_LEVEL="info,mir-consensus=info,mir-manager=error"
 

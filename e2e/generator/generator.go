@@ -343,7 +343,7 @@ func nextIP(ip string) string {
 	return ipAddr.String()
 }
 
-func SaveNewNetworkConfig(size int, firstIP string, nonce int, outputDir string) error {
+func SaveNewNetworkConfig(size int, firstIP string, nonce int, outputDir, genesisDir string) error {
 	validatorSet, err := NewValidatorSet(firstIP, size, nonce)
 	if err != nil {
 		return err
@@ -370,7 +370,7 @@ func SaveNewNetworkConfig(size int, firstIP string, nonce int, outputDir string)
 	if err != nil {
 		panic(err)
 	}
-	err = fs.CopyFile(path.Join(ScriptPath, "genesis.car"), path.Join(outputDir, "genesis.car"))
+	err = fs.CopyFile(path.Join(ScriptPath, "genesis.car"), path.Join(genesisDir, "genesis.car"))
 	if err != nil {
 		panic(err)
 	}

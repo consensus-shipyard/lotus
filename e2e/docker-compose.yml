@@ -5,7 +5,7 @@ services:
     build:
       context: ../
       dockerfile: e2e/Dockerfile
-    command: "/scripts/mir/node.sh 0 1230 /logs"
+    command: "/scripts/mir/node.sh 0 0 /logs"
     environment:
       EUDICO: /usr/local/bin/eudico
       LOTUS_PATH: /var/lib/lotus
@@ -38,7 +38,7 @@ services:
     build:
       context: ../
       dockerfile: e2e/Dockerfile
-    command: "/scripts/mir/node.sh 1 1231 /logs"
+    command: "/scripts/mir/node.sh 1 0 /logs"
     environment:
       EUDICO: /usr/local/bin/eudico
       LOTUS_PATH: /var/lib/lotus
@@ -68,7 +68,7 @@ services:
     build:
       context: ../
       dockerfile: e2e/Dockerfile
-    command: "/scripts/mir/node.sh 2 1232 /logs"
+    command: "/scripts/mir/node.sh 2 0 /logs"
     environment:
       EUDICO: /usr/local/bin/eudico
       LOTUS_PATH: /var/lib/lotus
@@ -98,7 +98,7 @@ services:
     build:
       context: ../
       dockerfile: e2e/Dockerfile
-    command: "/scripts/mir/node.sh 3 1233 /logs"
+    command: "/scripts/mir/node.sh 3 0 /logs"
     environment:
       EUDICO: /usr/local/bin/eudico
       LOTUS_PATH: /var/lib/lotus

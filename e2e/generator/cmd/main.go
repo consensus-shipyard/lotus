@@ -12,7 +12,8 @@ func main() {
 	firstIP := flag.String("ip", "192.168.10.2", "IP address of the first validator node")
 	n := flag.Int("n", 4, "number of nodes")
 	nonce := flag.Int("nonce", 0, "configuration number")
-	outputDir := flag.String("output", "./testdata/mir/", "output directory")
+	nodesConfigDir := flag.String("nodes", "./testdata/mir/mir-config", "nodes config directory")
+	genesisDir := flag.String("genesis", "./testdata/mir", "genesis directory")
 	manifestFile := flag.String("manifest", "", "use manifest file")
 
 	flag.Parse()
@@ -26,10 +27,11 @@ func main() {
 		*firstIP = m.StartIP
 		*n = m.Size
 		*nonce = m.ConfigNonce
-		*outputDir = m.ConfigDir
+		*nodesConfigDir = m.NodesConfigDir
+		*genesisDir = m.GenesisDir
 	}
 
-	err := generator.SaveNewNetworkConfig(*n, *firstIP, *nonce, *outputDir)
+	err := generator.SaveNewNetworkConfig(*n, *firstIP, *nonce, *nodesConfigDir, *genesisDir)
 	if err != nil {
 		panic(err)
 	}

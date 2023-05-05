@@ -1,4 +1,6 @@
 testdata/mir/node*
+testdata/mir/mir-config/node*
+testdata/mir/mir-config/*.*
 testdata/mir/genesis.car
 docker.log
 testdata/_runtime
