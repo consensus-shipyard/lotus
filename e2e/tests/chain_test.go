@@ -53,15 +53,16 @@ func TestMirSmoke_ConnectNodes(t *testing.T) {
 
 	for i, n := range nodes {
 		for j, info := range peerInfo {
+			if i == j {
+				continue
+			}
 			p := peer.AddrInfo{
 				ID:    info.ID,
 				Addrs: []multiaddr.Multiaddr{info.Addrs[0]},
 			}
 
 			err := n.NetConnect(ctx, p)
-			if i != j {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 		}
 	}
 
