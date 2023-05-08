@@ -10,10 +10,12 @@ import (
 	"path"
 	"time"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"golang.org/x/xerrors"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/go-state-types/abi"
+
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"
@@ -42,7 +44,9 @@ const (
 
 	CheckpointDBKeyPrefix = "mir/checkpoints/"
 
-	ReconfigurationInterval = 2000 * time.Millisecond
+	ReconfigurationInterval   = 2000 * time.Millisecond
+	WaitForMembershipTimeout  = 60 * time.Second
+	ReadingMembershipInterval = 3 * time.Second
 )
 
 type Manager struct {
@@ -83,45 +87,27 @@ func NewManager(ctx context.Context,
 	membership mirmembership.Reader,
 	cfg *Config,
 ) (*Manager, error) {
-	netName, err := node.StateNetworkName(ctx)
-	if err != nil {
-		return nil, err
-	}
 	if cfg == nil {
 		return nil, fmt.Errorf("nil config")
 	}
 	id := cfg.Addr.String()
 
+	netName, err := node.StateNetworkName(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("validator %v failed to resolve network name: %w", id, err)
+	}
+
 	if cfg.Consensus.SegmentLength < 0 {
-		return nil, fmt.Errorf("validator %v segment length must not be negative", id)
+		return nil, fmt.Errorf("validator %v segment length is negative", id)
 	}
 
-	membershipInfo, err := membership.GetMembershipInfo()
+	membershipInfo, nodes, err := waitForMembershipInfo(ctx, id, membership, WaitForMembershipTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("validator %v failed to get membership info: %w", id, err)
+		return nil, fmt.Errorf("validator %v failed to configure membership: %w", id, err)
 	}
 
+	e := membershipInfo.GenesisEpoch
 	initialValidatorSet := membershipInfo.ValidatorSet
-	genesisEpoch := membershipInfo.GenesisEpoch
-	valSize := initialValidatorSet.Size()
-	// There needs to be at least one validator in the membership
-	if valSize == 0 {
-		return nil, fmt.Errorf("validator %v: empty validator set", id)
-	}
-	// Check the minimum number of validators.
-	if membershipInfo.MinValidators > uint64(valSize) {
-		return nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
-	}
-
-	_, initialMembership, err := mirmembership.Membership(initialValidatorSet.Validators)
-	if err != nil {
-		return nil, fmt.Errorf("validator %v failed to build node membership: %w", id, err)
-	}
-
-	_, ok := initialMembership[t.NodeID(id)]
-	if !ok {
-		return nil, fmt.Errorf("validator %v failed to find its identity in membership", id)
-	}
 
 	logger := NewLogger(id)
 
@@ -129,7 +115,7 @@ func NewManager(ctx context.Context,
 	if err := net.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
-	net.Connect(initialMembership)
+	net.Connect(nodes)
 
 	cryptoManager, err := NewCryptoManager(cfg.Addr, node)
 	if err != nil {
@@ -158,12 +144,12 @@ func NewManager(ctx context.Context,
 	m.mirErrChan = make(chan error, 1)
 	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
-	m.stateManager, err = NewStateManager(ctx, m.netName, initialMembership, abi.ChainEpoch(genesisEpoch), m.confManager, node, ds, m.requestPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.requestPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
 
-	params := trantor.DefaultParams(initialMembership)
+	params := trantor.DefaultParams(nodes)
 	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
 	params.Iss.ConfigOffset = cfg.Consensus.ConfigOffset
 	params.Iss.AdjustSpeed(cfg.Consensus.MaxProposeDelay)
@@ -422,4 +408,88 @@ func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirpro
 	}
 
 	return r
+}
+
+var ErrMissingOwnIdentityInMembership = errors.New("validator failed to find its identity in membership")
+var ErrWaitForMembershipTimeout = errors.New("getting membership timeout expired")
+
+// waitForMembershipInfo waits for membership information by reading the membership source and checking that
+// the validator address is in the membership.
+//
+// We should sleep and periodically poll membership source until is up
+// (as long as no SIGTERM is turned and the user proactively kills the process),
+// which is when the validator address is not still in the membership fetched from the IPC agent
+// when the validator belongs to a child subnet using on-
+// The reason for not killing the process is that some users may deploy their infrastructure before joining the subnet,
+// and instead of killing their validator, and requiring them to start it again when they have joined the subnet.
+// It is better for the validator to just periodically poll to see
+// if it has joined, and if so, continue initializing the manager.
+func waitForMembershipInfo(
+	ctx context.Context,
+	id string,
+	r mirmembership.Reader,
+	timeout time.Duration,
+) (
+	*mirmembership.Info,
+	map[t.NodeID]t.NodeAddress,
+	error,
+) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	next := time.NewTicker(ReadingMembershipInterval)
+	defer next.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, nil, ErrWaitForMembershipTimeout
+		case <-next.C:
+			info, m, err := getMembershipInfo(id, r)
+			if errors.Is(err, ErrMissingOwnIdentityInMembership) {
+				continue
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			return info, m, nil
+		}
+	}
+}
+
+func getMembershipInfo(
+	id string,
+	r mirmembership.Reader,
+) (
+	*mirmembership.Info,
+	map[t.NodeID]t.NodeAddress,
+	error,
+) {
+	membershipInfo, err := r.GetMembershipInfo()
+	if err != nil {
+		return nil, nil, fmt.Errorf("validator %v failed to get membership info: %w", id, err)
+	}
+
+	initialValidatorSet := membershipInfo.ValidatorSet
+
+	valSize := initialValidatorSet.Size()
+	// There needs to be at least one validator in the membership
+	if valSize == 0 {
+		return nil, nil, fmt.Errorf("validator %v: empty validator set", id)
+	}
+	// Check the minimum number of validators.
+	if membershipInfo.MinValidators > uint64(valSize) {
+		return nil, nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
+	}
+
+	_, initialMembership, err := mirmembership.Membership(initialValidatorSet.Validators)
+	if err != nil {
+		return nil, nil, fmt.Errorf("validator %v failed to build node membership: %w", id, err)
+	}
+
+	_, ok := initialMembership[t.NodeID(id)]
+	if !ok {
+		return nil, nil, ErrMissingOwnIdentityInMembership
+	}
+	return membershipInfo, initialMembership, nil
 }
