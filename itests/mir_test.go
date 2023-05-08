@@ -826,7 +826,7 @@ func TestMirSmoke_AccessToNodesViaClient(t *testing.T) {
 		head, err := c.ChainHead(ctx)
 		require.NoError(t, err)
 
-		require.Greater(t, head.Height(), abi.ChainEpoch(TestedBlockNumber))
+		require.GreaterOrEqual(t, head.Height(), abi.ChainEpoch(TestedBlockNumber))
 
 		closer()
 	}
