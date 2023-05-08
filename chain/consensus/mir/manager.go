@@ -10,6 +10,7 @@ import (
 	"path"
 	"time"
 
+	golog "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
 	"github.com/consensus-shipyard/go-ipc-types/validator"
@@ -45,7 +46,7 @@ const (
 	CheckpointDBKeyPrefix = "mir/checkpoints/"
 
 	ReconfigurationInterval   = 2000 * time.Millisecond
-	WaitForMembershipTimeout  = 60 * time.Second
+	WaitForMembershipTimeout  = 600 * time.Second
 	ReadingMembershipInterval = 3 * time.Second
 )
 
@@ -101,7 +102,7 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v segment length is negative", id)
 	}
 
-	membershipInfo, nodes, err := waitForMembershipInfo(ctx, id, membership, WaitForMembershipTimeout)
+	membershipInfo, nodes, err := waitForMembershipInfo(ctx, id, membership, log, WaitForMembershipTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to configure membership: %w", id, err)
 	}
@@ -110,7 +111,6 @@ func NewManager(ctx context.Context,
 	initialValidatorSet := membershipInfo.ValidatorSet
 
 	logger := NewLogger(id)
-
 	// Create Mir modules.
 	if err := net.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
@@ -428,6 +428,7 @@ func waitForMembershipInfo(
 	ctx context.Context,
 	id string,
 	r mirmembership.Reader,
+	logger *golog.ZapEventLogger,
 	timeout time.Duration,
 ) (
 	*mirmembership.Info,
@@ -445,6 +446,7 @@ func waitForMembershipInfo(
 		case <-ctx.Done():
 			return nil, nil, ErrWaitForMembershipTimeout
 		case <-next.C:
+			log.With("validator", id).Info("Attempt to retrieve membership information")
 			info, m, err := getMembershipInfo(id, r)
 			if errors.Is(err, ErrMissingOwnIdentityInMembership) {
 				continue
