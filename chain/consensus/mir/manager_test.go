@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
@@ -17,12 +18,14 @@ func TestWaitForMembership(t *testing.T) {
 
 	mb := membership.StringMembership("0;" + s1 + "," + s2)
 
-	info, nodes, err := waitForMembershipInfo(ctx, "testID", mb, 3*time.Second)
+	logger := golog.Logger("test-logger")
+
+	info, nodes, err := waitForMembershipInfo(ctx, "testID", mb, logger, 3*time.Second)
 	require.Nil(t, info)
 	require.Nil(t, nodes)
 	require.ErrorIs(t, err, ErrWaitForMembershipTimeout)
 
-	info, nodes, err = waitForMembershipInfo(ctx, "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy", mb, 3*time.Second)
+	info, nodes, err = waitForMembershipInfo(ctx, "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy", mb, logger, 3*time.Second)
 	require.NotNil(t, info)
 	require.NotNil(t, nodes)
 	require.NoError(t, err)
