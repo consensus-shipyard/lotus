@@ -20,13 +20,13 @@ func TestWaitForMembership(t *testing.T) {
 
 	logger := golog.Logger("test-logger")
 
-	info, nodes, err := waitForMembershipInfo(ctx, "testID", mb, logger, 3*time.Second)
+	info, nodes, err := waitForMembershipInfo(ctx, "not-existing-ID", mb, logger, 6*time.Second)
+	require.ErrorIs(t, err, ErrWaitForMembershipTimeout)
 	require.Nil(t, info)
 	require.Nil(t, nodes)
-	require.ErrorIs(t, err, ErrWaitForMembershipTimeout)
 
-	info, nodes, err = waitForMembershipInfo(ctx, "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy", mb, logger, 3*time.Second)
+	info, nodes, err = waitForMembershipInfo(ctx, "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy", mb, logger, 6*time.Second)
+	require.NoError(t, err)
 	require.NotNil(t, info)
 	require.NotNil(t, nodes)
-	require.NoError(t, err)
 }

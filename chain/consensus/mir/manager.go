@@ -446,7 +446,7 @@ func waitForMembershipInfo(
 		case <-ctx.Done():
 			return nil, nil, ErrWaitForMembershipTimeout
 		case <-next.C:
-			log.With("validator", id).Info("Attempt to retrieve membership information")
+			logger.With("validator", id).Info("Attempt to retrieve membership information")
 			info, m, err := getMembershipInfo(id, r)
 			if errors.Is(err, ErrMissingOwnIdentityInMembership) {
 				continue
