@@ -8,10 +8,11 @@ import (
 )
 
 type Manifest struct {
-	Size        int    `toml:"size"`
-	ConfigNonce int    `toml:"configNonce"`
-	StartIP     string `toml:"startIP"`
-	ConfigDir   string `toml:"configDir"`
+	Size           int    `toml:"size"`
+	ConfigNonce    int    `toml:"configNonce"`
+	StartIP        string `toml:"startIP"`
+	NodesConfigDir string `toml:"nodesConfigDir"`
+	GenesisDir     string `toml:"genesisDir"`
 }
 
 func (m Manifest) Save(file string) error {

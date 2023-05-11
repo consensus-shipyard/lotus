@@ -1,6 +1,6 @@
 all: docker gen up tests clean
 
-test: gen up run-tests-locally clean
+test: gen up run-tests-locally down clean
 
 test-ci: gen up run-tests-on-ci down
 
@@ -27,6 +27,6 @@ down:
 	docker compose down
 
 clean:
-	rm -rf ./testdata/mir/node*
+	rm -rf ./testdata/mir
 
 .PHONY: all docker gen up down tests clean

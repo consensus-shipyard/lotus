@@ -310,12 +310,12 @@ jobs:
       - prepare
       - restore_cache:
           keys:
-            - test-e2e-go-deps-{{ checksum "go.sum" }}
+            - test-e2e-deps-{{ checksum "go.sum" }}-{{ checksum "build/actors/ipc-actors.car" }}
       - run:
           command: make deps lotus
           no_output_timeout: 30m
       - save_cache:
-          key: test-e2e-go-deps-{{ checksum "go.sum" }}
+          key: test-e2e-deps-{{ checksum "go.sum" }}-{{ checksum "build/actors/ipc-actors.car" }}
           paths:
             - ~/.go_workspace/pkg/mod
             - ~/.cache/go-build
