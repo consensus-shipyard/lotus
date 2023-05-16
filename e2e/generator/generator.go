@@ -77,13 +77,15 @@ func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
 
 	info := peer.AddrInfo{
 		ID:    peerID,
-		Addrs: []multiaddr.Multiaddr{v.LibP2PTCPAddr},
+		Addrs: []multiaddr.Multiaddr{v.LibP2PTCPAddr, v.LibP2PUDPAddr},
 	}
 	ddd, err := peer.AddrInfoToP2pAddrs(&info)
 	if err != nil {
 		return nil, err
 	}
-	v.NetAddr = ddd[0].String()
+
+	// v.NetAddr = ddd[0].String() // use TCP-based addr
+	v.NetAddr = ddd[1].String() // use UDP-based/QUIC addr
 
 	return &v, nil
 }
