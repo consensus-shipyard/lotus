@@ -40,7 +40,7 @@
   #
   # type: []string
   # env var: LOTUS_LIBP2P_LISTENADDRESSES
-  ListenAddresses = ["/ip4/{{.IPAddr}}/tcp/{{.P2PPort}}"]
+  ListenAddresses = ["/ip4/{{.IPAddr}}/udp/{{.P2PPort}}/quic"]
 
   # Addresses to explicitally announce to other peers. If not specified,
   # all interface addresses are announced
@@ -48,7 +48,7 @@
   #
   # type: []string
   # env var: LOTUS_LIBP2P_ANNOUNCEADDRESSES
-  AnnounceAddresses = ["/ip4/{{.IPAddr}}/tcp/{{.P2PPort}}"]
+  AnnounceAddresses = ["/ip4/{{.IPAddr}}/udp/{{.P2PPort}}/quic"]
 
   # Addresses to not announce
   # Format: multiaddress
