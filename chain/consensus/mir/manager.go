@@ -411,6 +411,7 @@ func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirpro
 }
 
 var ErrMissingOwnIdentityInMembership = errors.New("validator failed to find its identity in membership")
+var ErrMinNumValidatorNotReached = errors.New("minimum number of validators for subnet not reached")
 var ErrWaitForMembershipTimeout = errors.New("getting membership timeout expired")
 
 // waitForMembershipInfo waits for membership information by reading the membership source and checking that
@@ -448,7 +449,7 @@ func waitForMembershipInfo(
 		case <-next.C:
 			logger.With("validator", id).Info("Attempt to retrieve membership information")
 			info, m, err := getMembershipInfo(id, r)
-			if errors.Is(err, ErrMissingOwnIdentityInMembership) {
+			if errors.Is(err, ErrMissingOwnIdentityInMembership) || errors.Is(err, ErrMinNumValidatorNotReached) {
 				continue
 			}
 			if err != nil {
@@ -481,7 +482,7 @@ func getMembershipInfo(
 	}
 	// Check the minimum number of validators.
 	if membershipInfo.MinValidators > uint64(valSize) {
-		return nil, nil, fmt.Errorf("validator %v: minimum number of validators not reached", id)
+		return nil, nil, ErrMinNumValidatorNotReached
 	}
 
 	_, initialMembership, err := mirmembership.Membership(initialValidatorSet.Validators)
