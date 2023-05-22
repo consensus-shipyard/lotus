@@ -167,7 +167,7 @@ var disputerStartCmd = &cli.Command{
 
 		disputeLog.Info("checking sync status")
 
-		if err := SyncWait(ctx, api, false); err != nil {
+		if err := SyncWait(ctx, api, false, false); err != nil {
 			return xerrors.Errorf("sync wait: %w", err)
 		}
 
