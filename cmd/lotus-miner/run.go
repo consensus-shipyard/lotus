@@ -98,7 +98,7 @@ var runCmd = &cli.Command{
 		log.Info("Checking full node sync status")
 
 		if !cctx.Bool("nosync") {
-			if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: nodeApi}, false); err != nil {
+			if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: nodeApi}, false, true); err != nil {
 				return xerrors.Errorf("sync wait: %w", err)
 			}
 		}
