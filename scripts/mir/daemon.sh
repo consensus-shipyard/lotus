@@ -1,22 +1,28 @@
 #!/bin/bash
 # rm -rf ~/.genesis-sectors
 
-if [ $# -ne 1 ]
+if [ $# -ne 2 ]
 then
     echo "Provide the index of the validator to deploy as first argument. Starting from 0"
+    echo "The second argument expected is the port where the RPC API will be listening for the daemon"
     exit 1
 fi
 
 INDEX=$1
+PORT=$2
+EUDICO=${EUDICO:-./eudico}
+CONFIG_DATA=${CONFIG_DATA:-./scripts/mir}
+
 
 # Config envs
-export LOTUS_PATH=~/.lotus-local-net$INDEX
-export LOTUS_MINER_PATH=~/.lotus-miner-local-net$INDEX
+export LOTUS_PATH=${LOTUS_PATH:-~/.lotus-local-net$INDEX}
+export LOTUS_MINER_PATH=${LOTUS_MINER_PATH:-~/.lotus-miner-local-net$INDEX}
 export LOTUS_SKIP_GENESIS_CHECK=_yes_
 export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 
 rm -rf $LOTUS_PATH
+mkdir $LOTUS_PATH
 
 # Uncomment to create a genesis template
 # ./lotus-seed genesis new localnet.json
@@ -30,5 +36,13 @@ rm -rf $LOTUS_PATH
 #    rm ./scripts/mir/devgen.car
 #    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
-./eudico mir daemon --genesis=./scripts/mir/genesis.car --bootstrap=false --api=123$INDEX
+
+API_PORT=""
+if [ "$PORT" != 0 ]
+then
+  API_PORT="--api=$PORT"
+else
+  cp -r $CONFIG_DATA/mir-config/node$INDEX/config.toml $LOTUS_PATH/
+fi
+$EUDICO mir daemon --genesis=$CONFIG_DATA/genesis.car --bootstrap=false $API_PORT
 # fi

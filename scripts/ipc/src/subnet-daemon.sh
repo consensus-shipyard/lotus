@@ -16,6 +16,8 @@ echo '
   EnableSplitstore = true
 [API]
   ListenAddress = "/ip4/0.0.0.0/tcp/1234/http"
+[Fevm]
+  EnableEthRPC = true
 ' > $LOTUS_PATH/config.toml
 
 echo "[*] Generate genesis for subnet deterministically"

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/ipfs/go-cid"
 	ds "github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -17,13 +16,16 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/consensus"
+	"github.com/filecoin-project/lotus/chain/gen/genesis"
 
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
-	"github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -80,7 +82,7 @@ func AdvanceChain(ctx context.Context, blocks int, nodes ...*TestFullNode) error
 // (because the consensus goes so fast) so it doesn't have the message yet in its local ChainStore and
 // `StateWaitMsg` fails. This wrapper in `strict=false` disregards errors from `StateWaitMsg` for a
 // specific timeout.
-func WaitForMessageWithAvailable(ctx context.Context, n *TestFullNode, c cid.Cid, strict bool) error {
+func WaitForMessageWithAvailable(ctx context.Context, n api.FullNode, c cid.Cid, strict bool) error {
 	after := time.After(MessageWaitTimeout)
 	for {
 		select {

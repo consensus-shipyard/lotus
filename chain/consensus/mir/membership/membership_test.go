@@ -35,11 +35,19 @@ func TestMembership(t *testing.T) {
 
 func TestStringMembershipInfo(t *testing.T) {
 	s1 := "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ"
+
+	vs := StringMembership("0;" + s1)
+	info, err := vs.GetMembershipInfo()
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), info.MinValidators)
+	require.Equal(t, uint64(0), info.ValidatorSet.ConfigurationNumber)
+	require.Equal(t, 1, len(info.ValidatorSet.Validators))
+
 	s2 := "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10001/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ"
 	s3 := "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy@/ip4/127.0.0.1/tcp/10002/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ"
 
-	vs := StringMembership("3;" + s1 + "," + s2 + "," + s3)
-	info, err := vs.GetMembershipInfo()
+	vs = StringMembership("3;" + s1 + "," + s2 + "," + s3)
+	info, err = vs.GetMembershipInfo()
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), info.MinValidators)
 	require.Equal(t, uint64(3), info.ValidatorSet.ConfigurationNumber)

@@ -1,17 +1,11 @@
 package kit
 
 import (
-	"context"
-	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/stretchr/testify/require"
-
-	"github.com/filecoin-project/lotus/chain/types"
 )
 
 // EnsembleMinimal creates and starts an Ensemble with a single full node and a single miner.
@@ -30,26 +24,6 @@ func EnsembleMinimal(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMin
 	)
 	ens := NewEnsemble(t, eopts...).FullNode(&full, nopts...).Miner(&miner, &full, nopts...).Start()
 	return &full, &miner, ens
-}
-
-func adaptForMir(t *testing.T, full *TestFullNode, miner *TestValidator) {
-	addr, err := full.WalletNew(context.Background(), types.KTSecp256k1)
-	require.NoError(t, err)
-
-	priv, _, err := crypto.GenerateEd25519Key(rand.Reader)
-	require.NoError(t, err)
-
-	h, err := libp2p.New(
-		libp2p.Identity(priv),
-		libp2p.DefaultTransports,
-		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
-	)
-	require.NoError(t, err)
-
-	miner.mirPrivKey = priv
-	miner.mirHost = h
-	miner.mirAddr = addr
-	miner.mirMultiAddr = h.Addrs()
 }
 
 func EnsembleWithMirValidators(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestValidator, *Ensemble) {
