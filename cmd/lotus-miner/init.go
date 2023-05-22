@@ -174,7 +174,7 @@ var initCmd = &cli.Command{
 		log.Info("Checking full node sync status")
 
 		if !cctx.Bool("genesis-miner") && !cctx.Bool("nosync") {
-			if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false, true); err != nil {
+			if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false, false); err != nil {
 				return xerrors.Errorf("sync wait: %w", err)
 			}
 		}
