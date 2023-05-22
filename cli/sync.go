@@ -16,6 +16,10 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
+// We set this to 3, because of Trantor's current configuration
+// but we could make this configurable if needed.
+const MAX_HEIGHT_DRIFT = 3
+
 var SyncCmd = &cli.Command{
 	Name:  "sync",
 	Usage: "Inspect or interact with the chain syncer",
@@ -92,6 +96,10 @@ var SyncWaitCmd = &cli.Command{
 			Name:  "watch",
 			Usage: "don't exit after node is synced",
 		},
+		&cli.BoolFlag{
+			Name:  "mir",
+			Usage: "sync wait for mir consensus",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		napi, closer, err := GetFullNodeAPI(cctx)
@@ -101,7 +109,7 @@ var SyncWaitCmd = &cli.Command{
 		defer closer()
 		ctx := ReqContext(cctx)
 
-		return SyncWait(ctx, napi, cctx.Bool("watch"))
+		return SyncWait(ctx, napi, cctx.Bool("watch"), cctx.Bool("mir"))
 	},
 }
 
@@ -245,7 +253,7 @@ var SyncCheckpointCmd = &cli.Command{
 	},
 }
 
-func SyncWait(ctx context.Context, napi v0api.FullNode, watch bool) error {
+func SyncWait(ctx context.Context, napi v0api.FullNode, watch, mir bool) error {
 	tick := time.Second / 4
 
 	lastLines := 0
@@ -332,9 +340,17 @@ func SyncWait(ctx context.Context, napi v0api.FullNode, watch bool) error {
 
 		_ = target // todo: maybe print? (creates a bunch of line wrapping issues with most tipsets)
 
-		if !watch && time.Now().Unix()-int64(head.MinTimestamp()) < int64(build.BlockDelaySecs) {
-			fmt.Println("\nDone!")
-			return nil
+		// In Mir we don't do a time-check for sync.
+		if mir {
+			if !watch && heightDiff <= MAX_HEIGHT_DRIFT {
+				fmt.Println("\nDone!")
+				return nil
+			}
+		} else {
+			if !watch && time.Now().Unix()-int64(head.MinTimestamp()) < int64(build.BlockDelaySecs) {
+				fmt.Println("\nDone!")
+				return nil
+			}
 		}
 
 		select {

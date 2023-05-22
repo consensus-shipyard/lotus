@@ -119,7 +119,7 @@ func restore(ctx context.Context, cctx *cli.Context, targetPath string, strConfi
 	}
 
 	if !cctx.Bool("nosync") {
-		if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false); err != nil {
+		if err := lcli.SyncWait(ctx, &v0api.WrapperV1Full{FullNode: api}, false, false); err != nil {
 			return xerrors.Errorf("sync wait: %w", err)
 		}
 	}
