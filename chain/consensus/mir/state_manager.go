@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"sort"
 	"time"
 
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
@@ -695,6 +696,11 @@ func (sm *StateManager) getSignedMessages(mirMsgs []Message) (msgs []*types.Sign
 			log.With("validator", sm.id).Error("unknown message type in a block")
 		}
 	}
+
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs[i].Message.Nonce < msgs[j].Message.Nonce
+	})
+
 	return
 }
 
