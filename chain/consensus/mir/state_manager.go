@@ -680,7 +680,7 @@ func (sm *StateManager) getSignedMessages(mirMsgs []Message) (msgs []*types.Sign
 		switch msg := input.(type) {
 		case *types.SignedMessage:
 			// batch being processed, remove from mpool
-			found := sm.requestPool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
+			found := sm.requestPool.RequestDelivered(msg.Cid(), msg.Message.Nonce)
 			if !found {
 				log.With("validator", sm.id).
 					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())
