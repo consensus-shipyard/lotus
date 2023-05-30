@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -1206,7 +1207,7 @@ func TestMirBasic_BlocksContainSortedMessages(t *testing.T) {
 	require.NoError(t, err)
 	_, err = nodes[0].IsSyncedWith(ctx, from, nodes[1:]...)
 	require.NoError(t, err)
-// wait for messages to be included in a block
+	// wait for messages to be included in a block
 	for _, id := range cids {
 		err = kit.MirNodesWaitForMsg(ctx, id, nodes[0])
 		require.NoError(t, err)
@@ -1228,36 +1229,45 @@ func TestMirBasic_BlocksContainSortedMessages(t *testing.T) {
 
 	t.Logf(">>> checking nonces")
 
+	lastBLSNonce, lastSecpkNonce := uint64(math.MaxUint64), uint64(math.MaxUint64)
+
 	for i := 0; i <= int(maxHeight); i++ {
 		ts, err := nodes[0].ChainGetTipSetByHeight(ctx, abi.ChainEpoch(i), types.TipSetKey{})
 		require.NoError(t, err)
 
-		for _, b := range ts.Blocks() {
+		b := ts.Blocks()[0]
 
-			bh, err := nodes[0].ChainGetBlock(ctx, b.Cid())
-			require.NoError(t, err)
+		bh, err := nodes[0].ChainGetBlock(ctx, b.Cid())
+		require.NoError(t, err)
 
-			msgs, err := nodes[0].ChainGetBlockMessages(ctx, bh.Cid())
-			require.NoError(t, err)
+		msgs, err := nodes[0].ChainGetBlockMessages(ctx, bh.Cid())
+		require.NoError(t, err)
 
-			t.Logf(">>> there are %d Secpk messages in the block %v", len(msgs.SecpkMessages), i)
-			t.Logf(">>> there are %d BLS messages in the block %v", len(msgs.BlsMessages), i)
+		t.Logf(">>> there are %d Secpk messages in the block %v", len(msgs.SecpkMessages), i)
+		t.Logf(">>> there are %d BLS messages in the block %v", len(msgs.BlsMessages), i)
 
-			var lastNonce uint64
-
-			for _, msg := range msgs.BlsMessages {
-				t.Logf(">>> BLS message nonce is %d", msg.Nonce)
-				require.GreaterOrEqual(t, msg.Nonce, lastNonce)
-				lastNonce = msg.Nonce
+		for _, msg := range msgs.BlsMessages {
+			// Check whether it is a target message
+			if msg.From != src || msg.To != dst {
+				continue
 			}
-
-			lastNonce = 0
-
-			for _, msg := range msgs.SecpkMessages {
-				t.Logf(">>> Secpk message nonce is %d", msg.Message.Nonce)
-				require.GreaterOrEqual(t, msg.Message.Nonce, lastNonce)
-				lastNonce = msg.Message.Nonce
+			t.Logf(">>> block %d, target BLS message nonce is %d, last nonce is %d", i, msg.Nonce, lastBLSNonce)
+			if msg.Nonce != lastBLSNonce+1 {
+				t.Fatalf("nonces are not sequential: wanted %d, got %d ", lastBLSNonce+1, msg.Nonce)
 			}
+			lastBLSNonce = msg.Nonce
+		}
+
+		for _, msg := range msgs.SecpkMessages {
+			// Check whether it is a target message
+			if msg.Message.From != src || msg.Message.To != dst {
+				continue
+			}
+			t.Logf(">>> block %d, target Secpk message nonce is %d, last nonce is %d", i, msg.Message.Nonce, lastSecpkNonce)
+			if msg.Message.Nonce != lastSecpkNonce+1 {
+				t.Fatalf("nonces are not sequential: wanted %d, got %d ", lastSecpkNonce+1, msg.Message.Nonce)
+			}
+			lastSecpkNonce = msg.Message.Nonce
 		}
 	}
 }
