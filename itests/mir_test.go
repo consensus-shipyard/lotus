@@ -3,14 +3,15 @@ package itests
 // These tests check that Eudico/Mir bundle operates normally.
 //
 // Notes:
-//   - It is assumed that the first F of N nodes can be byzantine;
-//   - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
-//     and nodes[MirFaultyValidatorNumber:] are honest nodes.
+// - It is assumed that the first F of N nodes can be byzantine;
+// - In terms of Go, that means that nodes[:MirFaultyValidatorNumber] can be byzantine,
+// and nodes[MirFaultyValidatorNumber:] are honest nodes.
 
 import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
@@ -88,7 +89,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	initialMembership := membership
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -108,7 +109,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -178,7 +179,7 @@ func TestMirReconfigurationOnChain_RunSubnetWithStubJSONRPC(t *testing.T) {
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+1)
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType: mb.OnChainSource,
 		})
 
@@ -217,7 +218,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -237,7 +238,7 @@ func TestMirReconfiguration_AddOneValidatorAtHeight(t *testing.T) {
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -278,7 +279,7 @@ func TestMirReconfiguration_MembershipMessagesSent(t *testing.T) {
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -298,7 +299,7 @@ func TestMirReconfiguration_MembershipMessagesSent(t *testing.T) {
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -381,7 +382,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
 	ens.InterconnectFullNodes()
-	ens.BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber], &kit.MirConfig{
+	ens.BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber], &kit.MirTestConfig{
 		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFileName,
 		Databases:          dbs,
@@ -432,7 +433,7 @@ func TestMirReconfiguration_AddOneValidatorWithConfigurationRecovery(t *testing.
 	// Start new validators.
 	ens.InterconnectFullNodes()
 
-	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirConfig{
+	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirTestConfig{
 		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFileName,
 		Databases:          dbs,
@@ -508,7 +509,7 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 	// Run validators, including the added validator.
 	ens.InterconnectFullNodes()
 	for i := 0; i < MirTotalValidatorNumber; i++ {
-		ens.BeginMirMiningWithConfig(ctx, g, []*kit.TestValidator{validators[i]}, &kit.MirConfig{
+		ens.BeginMirMiningWithConfig(ctx, g, []*kit.TestValidator{validators[i]}, &kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFiles[i],
 		})
@@ -516,7 +517,7 @@ func TestMirReconfiguration_AddOneValidatorToMembershipWithDelay(t *testing.T) {
 
 	t.Log(">>> start a joined node")
 
-	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirConfig{
+	ens.BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:], &kit.MirTestConfig{
 		MembershipType:     mb.FileSource,
 		MembershipFileName: membershipFiles[MirTotalValidatorNumber],
 	})
@@ -578,7 +579,7 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 	require.Equal(t, initialValidatorNumber, membership.Size())
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:initialValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -597,7 +598,7 @@ func TestMirReconfiguration_AddValidatorsOnce(t *testing.T) {
 	require.Equal(t, initialValidatorNumber+addedValidatorNumber, membership.Size())
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[initialValidatorNumber:],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -640,7 +641,7 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -664,7 +665,7 @@ func TestMirReconfiguration_AddValidatorsOneByOne(t *testing.T) {
 
 		// Start new validators.
 		ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, []*kit.TestValidator{validators[MirTotalValidatorNumber+i-1]},
-			&kit.MirConfig{
+			&kit.MirTestConfig{
 				MembershipType:     mb.FileSource,
 				MembershipFileName: membershipFileName,
 			})
@@ -706,7 +707,7 @@ func TestMirReconfiguration_NewNodeFailsToJoin(t *testing.T) {
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+MirFaultyValidatorNumber)
 	ens.SaveValidatorSetToFile(0, membershipFileName, validators[:MirTotalValidatorNumber]...)
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:     mb.FileSource,
 			MembershipFileName: membershipFileName,
 		})
@@ -1151,6 +1152,126 @@ func TestMirBasic_AllNodesMiningWithMessaging(t *testing.T) {
 	}
 }
 
+// TestMirBasic_BlocksContainSortedMessages tests that the messages nonces in the ordered blocks increase.
+func TestMirBasic_BlocksContainSortedMessages(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
+	ens.InterconnectFullNodes().BeginMirMiningWithTestAndConsensusConfigs(ctx, g, validators,
+		kit.DefaultMirTestConfig(),
+		&mir.ConsensusConfig{
+			SegmentLength:                1,
+			ConfigOffset:                 2,
+			MaxProposeDelay:              5 * time.Second,
+			MaxTransactionsInBatch:       1024,
+			PBFTViewChangeSegmentTimeout: 6 * time.Second,
+			PBFTViewChangeSNTimeout:      6 * time.Second,
+		},
+	)
+
+	err := kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	from, err := nodes[0].IsSyncedWith(ctx, 0, nodes[1:]...)
+	require.NoError(t, err)
+
+	src, err := nodes[0].WalletDefaultAddress(ctx)
+	require.NoError(t, err)
+
+	dst, err := nodes[1].WalletDefaultAddress(ctx)
+	require.NoError(t, err)
+
+	// Send N messages from node 0 to node 1.
+	n := 30
+	var cids []cid.Cid
+	for i := 0; i < n; i++ {
+		msg, err := nodes[0].MpoolPushMessage(ctx, &types.Message{
+			From:  src,
+			To:    dst,
+			Value: big.Zero(),
+		}, nil)
+		require.NoError(t, err)
+		cids = append(cids, msg.Cid())
+	}
+	require.Equal(t, n, len(cids))
+
+	err = kit.AdvanceChain(ctx, TestedBlockNumber, nodes...)
+	require.NoError(t, err)
+	_, err = nodes[0].IsSyncedWith(ctx, from, nodes[1:]...)
+	require.NoError(t, err)
+	// wait for messages to be included in a block
+	for _, id := range cids {
+		err = kit.MirNodesWaitForMsg(ctx, id, nodes[0])
+		require.NoError(t, err)
+	}
+
+	var maxHeight abi.ChainEpoch
+	for i, msgCID := range cids {
+		searchRes, err := nodes[0].StateSearchMsg(ctx, types.EmptyTSK, msgCID, api.LookbackNoLimit, true)
+		require.NoError(t, err)
+
+		if searchRes != nil &&
+			searchRes.Height > maxHeight {
+			maxHeight = searchRes.Height
+		}
+
+		t.Logf(">>> message number %d with CID %v is in the block %d", i, msgCID, searchRes.Height)
+	}
+	t.Logf(">>> target epoch is %d", maxHeight)
+
+	t.Logf(">>> checking nonces")
+
+	lastBLSNonce, lastSecpkNonce := uint64(math.MaxUint64), uint64(math.MaxUint64)
+
+	for i := 0; i <= int(maxHeight); i++ {
+		ts, err := nodes[0].ChainGetTipSetByHeight(ctx, abi.ChainEpoch(i), types.TipSetKey{})
+		require.NoError(t, err)
+
+		b := ts.Blocks()[0]
+
+		bh, err := nodes[0].ChainGetBlock(ctx, b.Cid())
+		require.NoError(t, err)
+
+		msgs, err := nodes[0].ChainGetBlockMessages(ctx, bh.Cid())
+		require.NoError(t, err)
+
+		t.Logf(">>> there are %d Secpk messages in the block %v", len(msgs.SecpkMessages), i)
+		t.Logf(">>> there are %d BLS messages in the block %v", len(msgs.BlsMessages), i)
+
+		for _, msg := range msgs.BlsMessages {
+			// Check whether it is a target message
+			if msg.From != src || msg.To != dst {
+				continue
+			}
+			t.Logf(">>> block %d, target BLS message nonce is %d, last nonce is %d", i, msg.Nonce, lastBLSNonce)
+			if msg.Nonce != lastBLSNonce+1 {
+				t.Fatalf("nonces are not sequential: wanted %d, got %d ", lastBLSNonce+1, msg.Nonce)
+			}
+			lastBLSNonce = msg.Nonce
+		}
+
+		for _, msg := range msgs.SecpkMessages {
+			// Check whether it is a target message
+			if msg.Message.From != src || msg.Message.To != dst {
+				continue
+			}
+			t.Logf(">>> block %d, target Secpk message nonce is %d, last nonce is %d", i, msg.Message.Nonce, lastSecpkNonce)
+			if msg.Message.Nonce != lastSecpkNonce+1 {
+				t.Fatalf("nonces are not sequential: wanted %d, got %d ", lastSecpkNonce+1, msg.Message.Nonce)
+			}
+			lastSecpkNonce = msg.Message.Nonce
+		}
+	}
+}
+
 // TestMirBasic_MiningWithOneByzantineNode tests that sending messages mechanism operates normally
 // in a presence of one byzantine node.
 func TestMirBasic_MiningWithOneByzantineNode(t *testing.T) {
@@ -1201,7 +1322,7 @@ func TestMirBasic_WithFOmissionNodes(t *testing.T) {
 	}()
 
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
-	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirConfig{
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirTestConfig{
 		MembershipType:  mb.StringSource,
 		MockedTransport: true,
 	})
@@ -1396,7 +1517,7 @@ func TestMirSmoke_StopWithError(t *testing.T) {
 	}()
 
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
-	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirConfig{
+	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators, &kit.MirTestConfig{
 		MembershipType: mb.FakeSource,
 	})
 
@@ -1495,7 +1616,7 @@ func TestMirBasic_FNodesHaveLongPeriodNoNetworkAccessButDoNotCrash(t *testing.T)
 
 	nodes, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators,
-		&kit.MirConfig{
+		&kit.MirTestConfig{
 			MembershipType:  mb.StringSource,
 			MockedTransport: true,
 		},
