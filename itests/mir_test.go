@@ -1206,7 +1206,7 @@ func TestMirBasic_BlocksContainSortedMessages(t *testing.T) {
 	require.NoError(t, err)
 	_, err = nodes[0].IsSyncedWith(ctx, from, nodes[1:]...)
 	require.NoError(t, err)
-
+// wait for messages to be included in a block
 	for _, id := range cids {
 		err = kit.MirNodesWaitForMsg(ctx, id, nodes[0])
 		require.NoError(t, err)
