@@ -16,17 +16,17 @@ import (
 // SignedMessage was signed by the indicated Address, computing the correct
 // signature payload depending on the signature type. The supplied Address type
 // must be recognized by the registered verifier for the signature type.
-func AuthenticateMessage(msg *types.SignedMessage, signer address.Address) error {
+func AuthenticateMessage(msg *types.SignedMessage, signer address.Address, chainID int) error {
 	var digest []byte
 
 	typ := msg.Signature.Type
 	switch typ {
 	case crypto.SigTypeDelegated:
-		txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(&msg.Message)
+		txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(&msg.Message, chainID)
 		if err != nil {
 			return xerrors.Errorf("failed to reconstruct eth transaction: %w", err)
 		}
-		roundTripMsg, err := txArgs.ToUnsignedMessage(msg.Message.From)
+		roundTripMsg, err := txArgs.ToUnsignedMessage(msg.Message.From, chainID)
 		if err != nil {
 			return xerrors.Errorf("failed to reconstruct filecoin msg: %w", err)
 		}

@@ -71,6 +71,7 @@ type StateModuleAPI interface {
 	StateVerifiedClientStatus(ctx context.Context, addr address.Address, tsk types.TipSetKey) (*abi.StoragePower, error)
 	StateSearchMsg(ctx context.Context, from types.TipSetKey, msg cid.Cid, limit abi.ChainEpoch, allowReplaced bool) (*api.MsgLookup, error)
 	StateWaitMsg(ctx context.Context, cid cid.Cid, confidence uint64, limit abi.ChainEpoch, allowReplaced bool) (*api.MsgLookup, error)
+	StateNetworkName(ctx context.Context) (dtypes.NetworkName, error)
 }
 
 var _ StateModuleAPI = *new(api.FullNode)
@@ -83,6 +84,10 @@ type StateModule struct {
 
 	StateManager *stmgr.StateManager
 	Chain        *store.ChainStore
+}
+
+func (sm StateModule) StateNetworkName(ctx context.Context) (dtypes.NetworkName, error) {
+	return stmgr.GetNetworkName(ctx, sm.StateManager, sm.Chain.GetHeaviestTipSet().ParentState())
 }
 
 var _ StateModuleAPI = (*StateModule)(nil)

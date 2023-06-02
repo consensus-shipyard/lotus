@@ -33,12 +33,12 @@ type Interface interface {
 // Message failures, unexpected terminations,gas costs, etc. should all be ignored.
 var useFvmDebug = os.Getenv("LOTUS_FVM_DEVELOPER_DEBUG") == "1"
 
-func NewVM(ctx context.Context, opts *VMOpts) (Interface, error) {
+func NewVM(ctx context.Context, opts *VMOpts, chainID uint64) (Interface, error) {
 	if opts.NetworkVersion >= network.Version16 {
 		if useFvmDebug {
-			return NewDualExecutionFVM(ctx, opts)
+			return NewDualExecutionFVM(ctx, opts, chainID)
 		}
-		return NewFVM(ctx, opts)
+		return NewFVM(ctx, opts, chainID)
 	}
 
 	return NewLegacyVM(ctx, opts)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"golang.org/x/xerrors"
@@ -65,6 +66,18 @@ func GetNetworkName(ctx context.Context, sm *StateManager, st cid.Cid) (dtypes.N
 	return ias.NetworkName()
 }
 
+func GetChainID(ctx context.Context, sm *StateManager) (uint64, error) {
+	nn, err := GetNetworkName(ctx, sm, sm.parentState(sm.cs.GetHeaviestTipSet()))
+	if err != nil {
+		return 0, err
+	}
+	sn, err := sdk.NewSubnetIDFromString(string(nn))
+	if err != nil {
+		return 0, err
+	}
+	return sn.ChainID(), nil
+}
+
 func ComputeState(ctx context.Context, sm *StateManager, height abi.ChainEpoch, msgs []*types.Message, ts *types.TipSet) (cid.Cid, []*api.InvocResult, error) {
 	if ts == nil {
 		ts = sm.cs.GetHeaviestTipSet()
@@ -102,7 +115,12 @@ func ComputeState(ctx context.Context, sm *StateManager, height abi.ChainEpoch, 
 		TipSetGetter:   TipSetGetterForTipset(sm.cs, ts),
 		Tracing:        true,
 	}
-	vmi, err := sm.newVM(ctx, vmopt)
+
+	chainID, err := GetChainID(ctx, sm)
+	if err != nil {
+		return cid.Undef, nil, err
+	}
+	vmi, err := sm.newVM(ctx, vmopt, chainID)
 	if err != nil {
 		return cid.Undef, nil, err
 	}

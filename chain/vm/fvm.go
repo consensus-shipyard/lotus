@@ -241,7 +241,7 @@ type FVM struct {
 	returnEvents bool
 }
 
-func defaultFVMOpts(ctx context.Context, opts *VMOpts) (*ffi.FVMOpts, error) {
+func defaultFVMOpts(ctx context.Context, opts *VMOpts, chainID uint64) (*ffi.FVMOpts, error) {
 	state, err := state.LoadStateTree(cbor.NewCborStore(opts.Bstore), opts.StateBase)
 	if err != nil {
 		return nil, xerrors.Errorf("loading state tree: %w", err)
@@ -264,7 +264,7 @@ func defaultFVMOpts(ctx context.Context, opts *VMOpts) (*ffi.FVMOpts, error) {
 		},
 		Epoch:          opts.Epoch,
 		Timestamp:      opts.Timestamp,
-		ChainID:        build.Eip155ChainId,
+		ChainID:        chainID,
 		BaseFee:        opts.BaseFee,
 		BaseCircSupply: circToReport,
 		NetworkVersion: opts.NetworkVersion,
@@ -275,8 +275,8 @@ func defaultFVMOpts(ctx context.Context, opts *VMOpts) (*ffi.FVMOpts, error) {
 
 }
 
-func NewFVM(ctx context.Context, opts *VMOpts) (*FVM, error) {
-	fvmOpts, err := defaultFVMOpts(ctx, opts)
+func NewFVM(ctx context.Context, opts *VMOpts, chainID uint64) (*FVM, error) {
+	fvmOpts, err := defaultFVMOpts(ctx, opts, chainID)
 	if err != nil {
 		return nil, xerrors.Errorf("creating fvm opts: %w", err)
 	}
@@ -303,7 +303,7 @@ func NewDebugFVM(ctx context.Context, opts *VMOpts) (*FVM, error) {
 	vmBstore := blockstore.NewTieredBstore(overlayBstore, baseBstore)
 
 	opts.Bstore = vmBstore
-	fvmOpts, err := defaultFVMOpts(ctx, opts)
+	fvmOpts, err := defaultFVMOpts(ctx, opts, build.Eip155ChainId)
 	if err != nil {
 		return nil, xerrors.Errorf("creating fvm opts: %w", err)
 	}
@@ -538,8 +538,8 @@ type dualExecutionFVM struct {
 
 var _ Interface = (*dualExecutionFVM)(nil)
 
-func NewDualExecutionFVM(ctx context.Context, opts *VMOpts) (Interface, error) {
-	main, err := NewFVM(ctx, opts)
+func NewDualExecutionFVM(ctx context.Context, opts *VMOpts, chainID uint64) (Interface, error) {
+	main, err := NewFVM(ctx, opts, chainID)
 	if err != nil {
 		return nil, err
 	}

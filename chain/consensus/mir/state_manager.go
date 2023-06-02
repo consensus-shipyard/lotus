@@ -310,7 +310,11 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		}
 		valSetMsgs = append(valSetMsgs, initialConfigMsg)
 		// the rootnet doesn't need to be explicitly initialized.
-		if string(sm.netName) != sdk.RootStr {
+		sn, err := sdk.NewSubnetIDFromString(string(sm.netName))
+		if err != nil {
+			return xerrors.Errorf("error getting subnetID from network name: %w", err)
+		}
+		if !sn.IsRoot() {
 			initializeMsg, err := membership.NewInitGenesisEpochMsg(genesis.DefaultIPCGatewayAddr, sm.genesisEpoch)
 			if err != nil {
 				return xerrors.Errorf("error initializing subnet: %w", err)

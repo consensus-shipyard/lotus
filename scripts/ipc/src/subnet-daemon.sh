@@ -21,7 +21,7 @@ echo '
 ' > $LOTUS_PATH/config.toml
 
 echo "[*] Generate genesis for subnet deterministically"
-if [[ "$SUBNETID" == "/root" ]]; then
+if [[ "$SUBNETID" == "/r31415926" ]]; then
     eudico genesis new --subnet-id=$SUBNETID --template=/genesis-test.json --out=subnet.car
 else
     eudico genesis new --subnet-id=$SUBNETID --template=/genesis.json --out=subnet.car

@@ -10,13 +10,11 @@ import (
 	"path"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/validator"
 	golog "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
-	"github.com/consensus-shipyard/go-ipc-types/validator"
-
 	"github.com/filecoin-project/go-state-types/abi"
-
 	"github.com/filecoin-project/mir"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
 	mircrypto "github.com/filecoin-project/mir/pkg/crypto"

@@ -165,7 +165,12 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		TipSetGetter:   TipSetGetterForTipset(sm.cs, ts),
 		Tracing:        true,
 	}
-	vmi, err := sm.newVM(ctx, vmopt)
+
+	chainID, err := GetChainID(ctx, sm)
+	if err != nil {
+		return nil, err
+	}
+	vmi, err := sm.newVM(ctx, vmopt, chainID)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to set up vm: %w", err)
 	}
@@ -201,7 +206,11 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		vmopt.BaseFee = big.Zero()
 		vmopt.StateBase = stateCid
 
-		vmi, err = sm.newVM(ctx, vmopt)
+		chainID, err := GetChainID(ctx, sm)
+		if err != nil {
+			return nil, err
+		}
+		vmi, err = sm.newVM(ctx, vmopt, chainID)
 		if err != nil {
 			return nil, xerrors.Errorf("failed to set up estimation vm: %w", err)
 		}

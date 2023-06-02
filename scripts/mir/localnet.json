@@ -7,42 +7,42 @@
       "Meta": {
         "Owner": "t3tat272hqg2h6fuokkun4xx742flp72iwvnsao5z4ba7c5qwhjlumyuklcnudg74phfvxaqd52ncb5vhutu2a"
       }
-  },
-      {
+    },
+    {
       "Type": "account",
       "Balance": "50000000000000000000000000",
       "Meta": {
-          "Owner": "t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"
+        "Owner": "t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq"
       }
-  },
-      {
+    },
+    {
       "Type": "account",
       "Balance": "50000000000000000000000000",
       "Meta": {
-          "Owner": "t1akaouty2buxxwb46l27pzrhl3te2lw5jem67xuy"
+        "Owner": "t1akaouty2buxxwb46l27pzrhl3te2lw5jem67xuy"
       }
-  },
-      {
+    },
+    {
       "Type": "account",
       "Balance": "50000000000000000000000000",
       "Meta": {
-          "Owner": "t1vfp7yzvwy7ftktnex2cfoz2gpm2jyxlebqpam4q"
+        "Owner": "t1vfp7yzvwy7ftktnex2cfoz2gpm2jyxlebqpam4q"
       }
-  },
-      {
+    },
+    {
       "Type": "account",
       "Balance": "50000000000000000000000000",
       "Meta": {
-          "Owner": "t12zjpclnis2uytmcydrx7i5jcbvehs5ut3x6mvvq"
+        "Owner": "t12zjpclnis2uytmcydrx7i5jcbvehs5ut3x6mvvq"
       }
-  },
-      {
+    },
+    {
       "Type": "account",
       "Balance": "500000000000000000000000000",
       "Meta": {
-          "Owner": "f1jlm55oqkdalh2l3akqfsaqmpjxgjd36pob34dqy"
+        "Owner": "f1jlm55oqkdalh2l3akqfsaqmpjxgjd36pob34dqy"
       }
-  }
+    }
   ],
   "Miners": [
     {
@@ -119,7 +119,7 @@
       ]
     }
   ],
-    "NetworkName": "/root",
+  "NetworkName": "/r123",
   "VerifregRootKey": {
     "Type": "multisig",
     "Balance": "0",

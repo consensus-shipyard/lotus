@@ -114,7 +114,7 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 		return nil, err
 	}
 	st := subnetactor.State{}
-	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
+	if err := a.readActorState(ctx, sn.Actor(), tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
 
@@ -418,9 +418,9 @@ func (a *IPCAPI) checkParent(ctx context.Context, sn sdk.SubnetID) error {
 		return err
 	}
 
-	if string(netName) != sn.Parent {
+	if string(netName) != sn.Parent().String() {
 		return xerrors.Errorf("wrong subnet being called: the current network is not the parent of subnet provided: %s, %s",
-			netName, sn.Parent)
+			netName, sn.Parent().String())
 	}
 	return nil
 }

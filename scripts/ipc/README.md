@@ -30,7 +30,7 @@ Not online yet... (could not get API info for FullNode: could not get api endpoi
 === (this process may take several minutes until all the infrastructure is deployed)
 
 >>> Root daemon running in container: 4f8f0577143c1a5de4111b4053f8d485c8aaabbba462e7e5465f628f039ecba9 (friendly name: ipc_root_1235)
->>> Token to /root daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0._-2xzek2c3QzYqt5MWdQYrpRtK_Kqi8uEu3bvcm0i40
+>>> Token to /r31415926 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0._-2xzek2c3QzYqt5MWdQYrpRtK_Kqi8uEu3bvcm0i40
 >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
 ```
 The information about the token to the daemon and the default wallet will be used to configure the [IPC agent](https://github.com/consensus-shipyard/ipc-agent) to interact with the rootnet. The docker container will be named `ipc_root_<API_PORT>`. Refer to the agent's documentation for further information about how to run a subnet and interact with IPC.
@@ -46,15 +46,15 @@ This command runs a new node for a subnet `<SUBNET_ID>` listening at `<API_PORT>
 ```
 The result of deploying the subnet node should output something like this:
 ```
-$ ./scripts/ipc/run-subnet-docker.sh 1239 1349 /root/t01002 /home/workspace/pl/lotus/scripts/ipc/src/wallet.key
-[*] Running docker container for /root/t01002 in port 1239
+$ ./scripts/ipc/run-subnet-docker.sh 1239 1349 /r31415926/t01002 /home/workspace/pl/lotus/scripts/ipc/src/wallet.key
+[*] Running docker container for /r31415926/t01002 in port 1239
 [*] Waiting for the daemon to start
 Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
 Not online yet... (could not get API info for FullNode: could not get api endpoint: API not running (no endpoint))
 === (this process may take several minutes until all the infrastructure is deployed)
 
->>> Subnet /root/t01002 daemon running in container: 196f07aa68fedb48f6c14a0eb2aad3e139438cb515e0b238689b88c8bd440e8a (friendly name: ipc_root_t01002_1239)
->>> Token to /root/t01002 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.dR5L79UIi1ZoPlvaW1Taxyc4nujxRw2elCU85yvi7vc
+>>> Subnet /r31415926/t01002 daemon running in container: 196f07aa68fedb48f6c14a0eb2aad3e139438cb515e0b238689b88c8bd440e8a (friendly name: ipc_root_t01002_1239)
+>>> Token to /r31415926/t01002 daemon: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.dR5L79UIi1ZoPlvaW1Taxyc4nujxRw2elCU85yvi7vc
 >>> Default wallet: t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq
 >>> Subnet subnet validator info:
  t1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq@/ip4/127.0.0.1/tcp/1347/p2p/12D3KooWNWKXfw86CswD9yqZgPu5Dp2mhAcFRPXpXFe53aARYtTJJYtTJ

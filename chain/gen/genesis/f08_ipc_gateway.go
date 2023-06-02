@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
-	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/voting"
 	cbor "github.com/ipfs/go-ipld-cbor"
@@ -49,7 +48,7 @@ func constructState(store adt.Store, network ipctypes.SubnetID, buPeriod, tdPeri
 
 	// if it is the rootnet no need to explicitly initialize the gateway.
 	initialized := false
-	if network == sdk.RootSubnet {
+	if network.IsRoot() {
 		initialized = true
 	}
 
@@ -80,12 +79,12 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 	// TODO: Make this configurable
 	dst, err := constructState(adt.WrapStore(ctx, cbor.NewCborStore(bs)), network, checkPeriod, checkPeriod)
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("cannot construct state: %w", err)
 	}
 
 	statecid, err := cst.Put(ctx, dst)
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("cannot put state: %w", err)
 	}
 
 	actcid, ok := actors.GetActorCodeID(av, gateway.ManifestID)
@@ -97,7 +96,11 @@ func SetupIPCGateway(ctx context.Context, bs bstore.Blockstore, av actorstypes.V
 	// to mint new tokens in subnets when top-down messages are executed.
 	// This balance is zero in the root, as now top-down messages can be executed in the root.
 	balance := abi.NewTokenAmount(0)
-	if network != ipctypes.RootSubnet {
+	id, err := ipctypes.NewSubnetIDFromString(networkName)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to parse network name %s: %w", networkName, err)
+	}
+	if !id.IsRoot() {
 		balance = types.BigInt{Int: build.InitialRewardBalance}
 	}
 

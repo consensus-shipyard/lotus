@@ -7,7 +7,7 @@ tmux new-session -d -s "mir" \; \
     split-window -t "mir:0" -v \; \
     \
     send-keys -t "mir:0" "
-        /scripts/ipc/src/subnet-daemon.sh /root" Enter \; \
+        /scripts/ipc/src/subnet-daemon.sh /r31415926" Enter \; \
     send-keys -t "mir:0.0" "
         /scripts/ipc/src/root-single-validator.sh" Enter \; \
     \
