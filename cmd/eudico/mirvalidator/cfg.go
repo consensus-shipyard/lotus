@@ -23,6 +23,7 @@ const (
 	LevelDSPath           = "mir.db"
 	DefaultTCPLibP2PPort  = 1347
 	DefaultQuicLibP2PPort = 1348
+	DefaultEudicoPath     = ".lotus"
 )
 
 var configFiles = []string{PrivKeyPath, MaddrPath, MembershipCfgPath, LevelDSPath}
