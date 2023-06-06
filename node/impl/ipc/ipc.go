@@ -414,16 +414,19 @@ func (a *IPCAPI) checkParent(ctx context.Context, sn sdk.SubnetID) error {
 }
 
 // getSubnet is a wrapper over GetSubnet that translate the SubnetID into its f0-based form.
+//
+// We must note that the only actor in the route that we can translate to f0 is the last
+// one in the ID, as this is the one for which we have information within the subnet to
+// resolve the ID.
 func (a *IPCAPI) getSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (*gateway.Subnet, bool, error) {
-	newCh := make([]address.Address, len(sn.Children))
+	// translate the last actor in route if  any to f0 address
 	var err error
-	for i, c := range sn.Children {
-		newCh[i], err = a.Stmgr.LookupID(ctx, c, nil)
+	if len(sn.Children) > 0 {
+		sn.Children[len(sn.Children)-1], err = a.Stmgr.LookupID(ctx, sn.Children[len(sn.Children)-1], nil)
 		if err != nil {
-			return nil, false, xerrors.Errorf("error looking up child ID %s: %w", c, err)
+			return nil, false, xerrors.Errorf("error looking up child ID: %w", err)
 		}
 	}
-	sn = sdk.NewSubnetIDFromRoute(sn.Root, newCh)
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, false, err
