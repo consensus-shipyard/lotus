@@ -3,6 +3,7 @@ package rpcstmgr
 import (
 	"context"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	"golang.org/x/xerrors"
 
@@ -54,6 +55,18 @@ func (s *RPCStateManager) ResolveToDeterministicAddress(ctx context.Context, add
 
 func (s *RPCStateManager) Call(ctx context.Context, msg *types.Message, ts *types.TipSet) (*api.InvocResult, error) {
 	return nil, xerrors.Errorf("RPCStateManager does not implement StateManager.Call")
+}
+
+func (s *RPCStateManager) GetChainID(ctx context.Context) (uint64, error) {
+	nn, err := s.gapi.StateNetworkName(ctx)
+	if err != nil {
+		return 0, err
+	}
+	sn, err := sdk.NewSubnetIDFromString(string(nn))
+	if err != nil {
+		return 0, err
+	}
+	return sn.ChainID(), nil
 }
 
 var _ stmgr.StateManagerAPI = (*RPCStateManager)(nil)

@@ -73,7 +73,7 @@ func TestEthAccountAbstraction(t *testing.T) {
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
-	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
+	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder, build.Eip155ChainId)
 	require.NoError(t, err)
 
 	digest, err := txArgs.ToRlpUnsignedMsg()
@@ -110,7 +110,7 @@ func TestEthAccountAbstraction(t *testing.T) {
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
-	txArgs, err = ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
+	txArgs, err = ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder, build.Eip155ChainId)
 	require.NoError(t, err)
 
 	digest, err = txArgs.ToRlpUnsignedMsg()
@@ -184,7 +184,7 @@ func TestEthAccountAbstractionFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	msgFromPlaceholder.Value = abi.TokenAmount(types.MustParseFIL("1000"))
-	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
+	txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder, build.Eip155ChainId)
 	require.NoError(t, err)
 
 	digest, err := txArgs.ToRlpUnsignedMsg()
@@ -223,7 +223,7 @@ func TestEthAccountAbstractionFailure(t *testing.T) {
 	msgFromPlaceholder, err = client.GasEstimateMessageGas(ctx, msgFromPlaceholder, nil, types.EmptyTSK)
 	require.NoError(t, err)
 
-	txArgs, err = ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder)
+	txArgs, err = ethtypes.EthTxArgsFromUnsignedEthMessage(msgFromPlaceholder, build.Eip155ChainId)
 	require.NoError(t, err)
 
 	digest, err = txArgs.ToRlpUnsignedMsg()
@@ -298,7 +298,7 @@ func TestEthAccountAbstractionFailsFromEvmActor(t *testing.T) {
 
 	client.EVM().SubmitTransaction(ctx, &tx)
 
-	smsg, err := tx.ToSignedMessage()
+	smsg, err := tx.ToSignedMessage(build.Eip155ChainId)
 	require.NoError(t, err)
 
 	ml, err := client.StateWaitMsg(ctx, smsg.Cid(), 1, api.LookbackNoLimit, true)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -33,6 +34,7 @@ import (
 	builtin6 "github.com/filecoin-project/specs-actors/v6/actors/builtin"
 	runtime7 "github.com/filecoin-project/specs-actors/v7/actors/runtime"
 
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
@@ -101,7 +103,7 @@ func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sys vm.Syscal
 			BaseFee:        big.Zero(),
 		}
 
-		return vm.NewVM(ctx, vmopt)
+		return vm.NewVM(ctx, vmopt, build.Eip155ChainId)
 	}
 
 	genesisVm, err := newVM(sroot)
@@ -324,7 +326,7 @@ func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sys vm.Syscal
 			return cid.Undef, xerrors.Errorf("setting power state: %w", err)
 		}
 
-		rewact, err := SetupRewardActor(ctx, cs.StateBlockstore(), big.Zero(), av, "/root")
+		rewact, err := SetupRewardActor(ctx, cs.StateBlockstore(), big.Zero(), av, sdk.NewRootID(build.Eip155ChainId).String())
 		if err != nil {
 			return cid.Undef, xerrors.Errorf("setup reward actor: %w", err)
 		}

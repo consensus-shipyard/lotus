@@ -3324,8 +3324,10 @@ Inputs:
   "f01234",
   {
     "Parent": {
-      "Parent": "string value",
-      "Actor": "f01234"
+      "Root": 42,
+      "Children": [
+        "f01234"
+      ]
     },
     "Name": "string value",
     "IPCGatewayAddr": 42,
@@ -3350,8 +3352,10 @@ Inputs:
 ```json
 [
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   10101
 ]
@@ -3362,8 +3366,10 @@ Response:
 {
   "Data": {
     "Source": {
-      "Parent": "string value",
-      "Actor": "f01234"
+      "Root": 42,
+      "Children": [
+        "f01234"
+      ]
     },
     "Proof": "Ynl0ZSBhcnJheQ==",
     "Epoch": 10101,
@@ -3373,8 +3379,10 @@ Response:
     "Children": [
       {
         "Source": {
-          "Parent": "string value",
-          "Actor": "f01234"
+          "Root": 42,
+          "Children": [
+            "f01234"
+          ]
         },
         "Checks": [
           {
@@ -3389,15 +3397,19 @@ Response:
           "Msg": {
             "From": {
               "SubnetID": {
-                "Parent": "string value",
-                "Actor": "f01234"
+                "Root": 42,
+                "Children": [
+                  "f01234"
+                ]
               },
               "RawAddress": "f01234"
             },
             "To": {
               "SubnetID": {
-                "Parent": "string value",
-                "Actor": "f01234"
+                "Root": 42,
+                "Children": [
+                  "f01234"
+                ]
               },
               "RawAddress": "f01234"
             },
@@ -3429,8 +3441,10 @@ Inputs:
 ```json
 [
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   10101
 ]
@@ -3456,8 +3470,10 @@ Response:
 {
   "Data": {
     "Source": {
-      "Parent": "string value",
-      "Actor": "f01234"
+      "Root": 42,
+      "Children": [
+        "f01234"
+      ]
     },
     "Proof": "Ynl0ZSBhcnJheQ==",
     "Epoch": 10101,
@@ -3467,8 +3483,10 @@ Response:
     "Children": [
       {
         "Source": {
-          "Parent": "string value",
-          "Actor": "f01234"
+          "Root": 42,
+          "Children": [
+            "f01234"
+          ]
         },
         "Checks": [
           {
@@ -3483,15 +3501,19 @@ Response:
           "Msg": {
             "From": {
               "SubnetID": {
-                "Parent": "string value",
-                "Actor": "f01234"
+                "Root": 42,
+                "Children": [
+                  "f01234"
+                ]
               },
               "RawAddress": "f01234"
             },
             "To": {
               "SubnetID": {
-                "Parent": "string value",
-                "Actor": "f01234"
+                "Root": 42,
+                "Children": [
+                  "f01234"
+                ]
               },
               "RawAddress": "f01234"
             },
@@ -3535,8 +3557,10 @@ Inputs:
 [
   "f01234",
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   }
 ]
 ```
@@ -3553,8 +3577,10 @@ Inputs:
 [
   "f01234",
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   }
 ]
 ```
@@ -3576,8 +3602,10 @@ Inputs:
 [
   "f01234",
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   [
     {
@@ -3598,15 +3626,19 @@ Response:
     "Msg": {
       "From": {
         "SubnetID": {
-          "Parent": "string value",
-          "Actor": "f01234"
+          "Root": 42,
+          "Children": [
+            "f01234"
+          ]
         },
         "RawAddress": "f01234"
       },
       "To": {
         "SubnetID": {
-          "Parent": "string value",
-          "Actor": "f01234"
+          "Root": 42,
+          "Children": [
+            "f01234"
+          ]
         },
         "RawAddress": "f01234"
       },
@@ -3630,8 +3662,10 @@ Inputs:
 [
   "f01234",
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   [
     {
@@ -3661,8 +3695,10 @@ Inputs:
 ```json
 [
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   10101,
   "f01234"
@@ -3696,8 +3732,10 @@ Inputs:
 ```json
 [
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   10101,
   10101
@@ -3710,8 +3748,10 @@ Response:
   {
     "Data": {
       "Source": {
-        "Parent": "string value",
-        "Actor": "f01234"
+        "Root": 42,
+        "Children": [
+          "f01234"
+        ]
       },
       "Proof": "Ynl0ZSBhcnJheQ==",
       "Epoch": 10101,
@@ -3721,8 +3761,10 @@ Response:
       "Children": [
         {
           "Source": {
-            "Parent": "string value",
-            "Actor": "f01234"
+            "Root": 42,
+            "Children": [
+              "f01234"
+            ]
           },
           "Checks": [
             {
@@ -3737,15 +3779,19 @@ Response:
             "Msg": {
               "From": {
                 "SubnetID": {
-                  "Parent": "string value",
-                  "Actor": "f01234"
+                  "Root": 42,
+                  "Children": [
+                    "f01234"
+                  ]
                 },
                 "RawAddress": "f01234"
               },
               "To": {
                 "SubnetID": {
-                  "Parent": "string value",
-                  "Actor": "f01234"
+                  "Root": 42,
+                  "Children": [
+                    "f01234"
+                  ]
                 },
                 "RawAddress": "f01234"
               },
@@ -3774,8 +3820,10 @@ Inputs:
 ```json
 [
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   10101,
   10101
@@ -3806,8 +3854,10 @@ Response:
 [
   {
     "ID": {
-      "Parent": "string value",
-      "Actor": "f01234"
+      "Root": 42,
+      "Children": [
+        "f01234"
+      ]
     },
     "Stake": "0",
     "TopDownMsgs": {
@@ -3819,8 +3869,10 @@ Response:
     "PrevCheckpoint": {
       "Data": {
         "Source": {
-          "Parent": "string value",
-          "Actor": "f01234"
+          "Root": 42,
+          "Children": [
+            "f01234"
+          ]
         },
         "Proof": "Ynl0ZSBhcnJheQ==",
         "Epoch": 10101,
@@ -3830,8 +3882,10 @@ Response:
         "Children": [
           {
             "Source": {
-              "Parent": "string value",
-              "Actor": "f01234"
+              "Root": 42,
+              "Children": [
+                "f01234"
+              ]
             },
             "Checks": [
               {
@@ -3846,15 +3900,19 @@ Response:
               "Msg": {
                 "From": {
                   "SubnetID": {
-                    "Parent": "string value",
-                    "Actor": "f01234"
+                    "Root": 42,
+                    "Children": [
+                      "f01234"
+                    ]
                   },
                   "RawAddress": "f01234"
                 },
                 "To": {
                   "SubnetID": {
-                    "Parent": "string value",
-                    "Actor": "f01234"
+                    "Root": 42,
+                    "Children": [
+                      "f01234"
+                    ]
                   },
                   "RawAddress": "f01234"
                 },
@@ -3901,8 +3959,10 @@ Response:
 ```json
 {
   "NetworkName": {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   "TotalSubnets": 42,
   "MinStake": "0",
@@ -3960,8 +4020,10 @@ Inputs:
 ```json
 [
   {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   [
     {
@@ -3979,8 +4041,10 @@ Response:
 {
   "Name": "string value",
   "ParentID": {
-    "Parent": "string value",
-    "Actor": "f01234"
+    "Root": 42,
+    "Children": [
+      "f01234"
+    ]
   },
   "IPCGatewayAddr": "f01234",
   "Consensus": 0,

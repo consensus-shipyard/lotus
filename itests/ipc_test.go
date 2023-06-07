@@ -68,7 +68,8 @@ func TestIPCAccessors(t *testing.T) {
 	}
 	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
 	require.NoError(t, err)
-	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
+	root := sdk.NewRootID(build.Eip155ChainId)
+	sn := sdk.NewSubnetID(root, actorAddr)
 	require.NoError(t, err)
 
 	joinSubnet(t, ctx, api, actorAddr)
@@ -191,7 +192,8 @@ func TestIPCCheckpointSubmission(t *testing.T) {
 	}
 	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
 	require.NoError(t, err)
-	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
+	root := sdk.NewRootID(build.Eip155ChainId)
+	sn := sdk.NewSubnetID(root, actorAddr)
 	require.NoError(t, err)
 
 	// join from three validators
@@ -259,7 +261,7 @@ func submitCheckpoint(t *testing.T, ctx context.Context, node *kit.TestFullNode,
 	params, err := actors.SerializeParams(ch)
 	require.NoError(t, err)
 	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
-		To:     sn.Actor,
+		To:     sn.Actor(),
 		From:   from,
 		Value:  abi.NewTokenAmount(0),
 		Method: builtin.MustGenerateFRCMethodNum("SubmitCheckpoint"),

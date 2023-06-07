@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-datastore"
@@ -124,7 +124,7 @@ func init() {
 // kit.EnsembleOneTwo()
 // kit.EnsembleTwoOne()
 
-var ITestSubnet = ipctypes.RootSubnet
+var ITestSubnet = sdk.NewRootID(build.Eip155ChainId)
 
 type Ensemble struct {
 	t            *testing.T

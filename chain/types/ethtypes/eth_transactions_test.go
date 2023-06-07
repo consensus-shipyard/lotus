@@ -18,6 +18,7 @@ import (
 	init10 "github.com/filecoin-project/go-state-types/builtin/v10/init"
 	crypto1 "github.com/filecoin-project/go-state-types/crypto"
 
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/lib/sigs"
 	_ "github.com/filecoin-project/lotus/lib/sigs/delegated"
@@ -50,7 +51,7 @@ func TestTxArgs(t *testing.T) {
 		from, err := txArgs.Sender()
 		require.NoError(t, err, comment)
 
-		smsg, err := txArgs.ToSignedMessage()
+		smsg, err := txArgs.ToSignedMessage(build.Eip155ChainId)
 		require.NoError(t, err, comment)
 
 		err = sigs.Verify(&smsg.Signature, from, msgRecovered)

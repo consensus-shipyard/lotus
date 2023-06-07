@@ -570,4 +570,8 @@ func (sm *StateManager) MarketBalance(ctx context.Context, addr address.Address,
 	return out, nil
 }
 
+func (sm *StateManager) GetChainID(ctx context.Context) (uint64, error) {
+	return GetChainID(ctx, sm)
+}
+
 var _ StateManagerAPI = (*StateManager)(nil)

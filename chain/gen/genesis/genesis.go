@@ -506,7 +506,7 @@ func VerifyPreSealedData(ctx context.Context, cs *store.ChainStore, sys vm.Sysca
 		NetworkVersion: nv,
 		BaseFee:        big.Zero(),
 	}
-	vm, err := vm.NewVM(ctx, &vmopt)
+	vm, err := vm.NewVM(ctx, &vmopt, build.Eip155ChainId)
 	if err != nil {
 		return cid.Undef, xerrors.Errorf("failed to create VM: %w", err)
 	}

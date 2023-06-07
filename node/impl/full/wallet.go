@@ -51,8 +51,11 @@ func (a *WalletAPI) WalletSignMessage(ctx context.Context, k address.Address, ms
 	if err != nil {
 		return nil, xerrors.Errorf("failed to resolve ID address: %w", keyAddr)
 	}
-
-	sb, err := messagesigner.SigningBytes(msg, keyAddr.Protocol())
+	chainID, err := a.StateManagerAPI.GetChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sb, err := messagesigner.SigningBytes(msg, keyAddr.Protocol(), chainID)
 	if err != nil {
 		return nil, err
 	}

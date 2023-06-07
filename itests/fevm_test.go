@@ -691,7 +691,7 @@ func TestFEVMRecursiveActorCallEstimate(t *testing.T) {
 			client.EVM().SignTransaction(tx, key.PrivateKey)
 			hash := client.EVM().SubmitTransaction(ctx, tx)
 
-			smsg, err := tx.ToSignedMessage()
+			smsg, err := tx.ToSignedMessage(build.Eip155ChainId)
 			require.NoError(t, err)
 
 			_, err = client.StateWaitMsg(ctx, smsg.Cid(), 0, 0, false)

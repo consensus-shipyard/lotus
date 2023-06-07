@@ -102,7 +102,7 @@ func TestClientCompatibleWithIPCAgent(t *testing.T) {
 		subnet string
 		tipSet string
 	}{
-		subnet: "/root/test",
+		subnet: "/r123/test",
 		tipSet: "QmPK1s3pNYLi9ERiq3BDxKa3XosgWwFRQUydHUtz4YgpqB",
 	}
 
