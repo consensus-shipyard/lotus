@@ -419,17 +419,25 @@ func (a *IPCAPI) checkParent(ctx context.Context, sn sdk.SubnetID) error {
 // one in the ID, as this is the one for which we have information within the subnet to
 // resolve the ID.
 func (a *IPCAPI) getSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (*gateway.Subnet, bool, error) {
-	// translate the last actor in route if  any to f0 address
-	var err error
-	if len(sn.Children) > 0 {
-		sn.Children[len(sn.Children)-1], err = a.Stmgr.LookupID(ctx, sn.Children[len(sn.Children)-1], nil)
-		if err != nil {
-			return nil, false, xerrors.Errorf("error looking up child ID: %w", err)
-		}
+	if err := a.subnetIDToF0(ctx, &sn); err != nil {
+		return nil, false, err
 	}
 	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
 	if err != nil {
 		return nil, false, err
 	}
 	return st.GetSubnet(adt.WrapStore(ctx, a.Chain.ActorStore(ctx)), sn)
+}
+
+// subnetIDToF0 translates the SubnetID into its f0-based form.
+// It translates the last actor in route if  any to f0 address
+func (a *IPCAPI) subnetIDToF0(ctx context.Context, sn *sdk.SubnetID) error {
+	var err error
+	if len(sn.Children) > 0 {
+		sn.Children[len(sn.Children)-1], err = a.Stmgr.LookupID(ctx, sn.Children[len(sn.Children)-1], nil)
+		if err != nil {
+			return xerrors.Errorf("error looking up child ID: %w", err)
+		}
+	}
+	return nil
 }
