@@ -98,7 +98,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 	if err := r.UnmarshalCBOR(bytes.NewReader(recpt.Receipt.Return)); err != nil {
 		return address.Undef, err
 	}
-	return r.IDAddress, nil
+	return r.RobustAddress, nil
 }
 
 func (a *IPCAPI) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
