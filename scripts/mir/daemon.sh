@@ -37,6 +37,17 @@ mkdir $LOTUS_PATH
 #    ./eudico mir daemon --eudico-make-genesis=./scripts/mir/devgen.car --genesis-template=./scripts/mir/localnet.json --bootstrap=false --api=123$INDEX
 # else
 
+echo "[*] Populating daemon config"
+echo '[Libp2p]
+ListenAddresses = ["/ip4/0.0.0.0/tcp/1347"]
+[Chainstore]
+  EnableSplitstore = true
+[Chainstore.Splitstore]
+  ColdStoreType = "discard"
+[Fevm]
+  EnableEthRPC = true
+' > $LOTUS_PATH/config.toml
+
 API_PORT=""
 if [ "$PORT" != 0 ]
 then
