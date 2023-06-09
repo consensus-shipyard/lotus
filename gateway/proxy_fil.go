@@ -3,6 +3,9 @@ package gateway
 import (
 	"context"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/ipfs/go-cid"
 	blocks "github.com/ipfs/go-libipfs/blocks"
 	"golang.org/x/xerrors"
@@ -13,6 +16,7 @@ import (
 	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/go-state-types/dline"
 	"github.com/filecoin-project/go-state-types/network"
+	abinetwork "github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/lotus/api"
 	apitypes "github.com/filecoin-project/lotus/api/types"
@@ -23,8 +27,139 @@ import (
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 )
 
+func (gw *Node) IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return address.Address{}, err
+	}
+	return gw.target.IPCAddSubnetActor(ctx, wallet, params)
+}
+
+func (gw *Node) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return nil, err
+	}
+	if err := gw.checkTipsetKey(ctx, tsk); err != nil {
+		return nil, err
+	}
+	return gw.target.IPCReadGatewayState(ctx, actor, tsk)
+}
+
+func (gw *Node) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return nil, err
+	}
+	if err := gw.checkTipsetKey(ctx, tsk); err != nil {
+		return nil, err
+	}
+	return gw.target.IPCReadSubnetActorState(ctx, sn, tsk)
+}
+
+func (gw *Node) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return cid.Cid{}, err
+	}
+	return gw.target.IPCGetPrevCheckpointForChild(ctx, gatewayAddr, subnet)
+}
+
+func (gw *Node) IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return nil, err
+	}
+	return gw.target.IPCGetCheckpointTemplate(ctx, gatewayAddr, epoch)
+}
+
+func (gw *Node) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new([]gateway.Subnet), err
+	}
+	return gw.target.IPCListChildSubnets(ctx, gatewayAddr)
+}
+
+func (gw *Node) IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new(bool), err
+	}
+	return gw.target.IPCHasVotedBottomUpCheckpoint(ctx, sn, e, v)
+}
+
+func (gw *Node) IPCHasVotedTopDownCheckpoint(ctx context.Context, gatewayAddr address.Address, e abi.ChainEpoch, v address.Address) (bool, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new(bool), err
+	}
+	return gw.target.IPCHasVotedTopDownCheckpoint(ctx, gatewayAddr, e, v)
+}
+
+func (gw *Node) IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return nil, err
+	}
+	return gw.target.IPCListCheckpoints(ctx, sn, from, to)
+}
+
+func (gw *Node) IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return nil, err
+	}
+	return gw.target.IPCGetCheckpoint(ctx, sn, epoch)
+}
+
+func (gw *Node) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return nil, err
+	}
+	if err := gw.checkTipsetKey(ctx, tsk); err != nil {
+		return nil, err
+	}
+	return gw.target.IPCGetTopDownMsgs(ctx, gatewayAddr, sn, tsk, nonce)
+}
+
+func (gw *Node) IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new(abi.ChainEpoch), err
+	}
+	return gw.target.IPCGetGenesisEpochForSubnet(ctx, gatewayAddr, sn)
+}
+
+func (gw *Node) IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new([]byte), err
+	}
+	return gw.target.IPCGetCheckpointSerialized(ctx, sn, epoch)
+}
+
+func (gw *Node) IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new([][]byte), err
+	}
+	return gw.target.IPCListCheckpointsSerialized(ctx, sn, from, to)
+}
+
+func (gw *Node) IPCGetCheckpointTemplateSerialized(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) ([]byte, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new([]byte), err
+	}
+	return gw.target.IPCGetCheckpointTemplateSerialized(ctx, gatewayAddr, epoch)
+}
+
+func (gw *Node) IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([][]byte, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new([][]byte), err
+	}
+	if err := gw.checkTipsetKey(ctx, tsk); err != nil {
+		return *new([][]byte), err
+	}
+	return gw.target.IPCGetTopDownMsgsSerialized(ctx, gatewayAddr, sn, tsk, nonce)
+}
+
 func (gw *Node) Discover(ctx context.Context) (apitypes.OpenRPCDocument, error) {
 	return build.OpenRPCDiscoverJSON_Gateway(), nil
+}
+
+func (gw *Node) StateActorCodeCIDs(ctx context.Context, nv abinetwork.Version) (map[string]cid.Cid, error) {
+	if err := gw.limit(ctx, basicRateLimitTokens); err != nil {
+		return *new(map[string]cid.Cid), err
+	}
+	return gw.target.StateActorCodeCIDs(ctx, nv)
 }
 
 func (gw *Node) Version(ctx context.Context) (api.APIVersion, error) {

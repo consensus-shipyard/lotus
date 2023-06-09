@@ -463,6 +463,8 @@ type GatewayMethods struct {
 
 	StateAccountKey func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (address.Address, error) ``
 
+	StateActorCodeCIDs func(p0 context.Context, p1 abinetwork.Version) (map[string]cid.Cid, error) ``
+
 	StateCall func(p0 context.Context, p1 *types.Message, p2 types.TipSetKey) (*api.InvocResult, error) ``
 
 	StateDealProviderCollateralBounds func(p0 context.Context, p1 abi.PaddedPieceSize, p2 bool, p3 types.TipSetKey) (api.DealCollateralBounds, error) ``
@@ -2749,6 +2751,17 @@ func (s *GatewayStruct) StateAccountKey(p0 context.Context, p1 address.Address, 
 
 func (s *GatewayStub) StateAccountKey(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (address.Address, error) {
 	return *new(address.Address), ErrNotSupported
+}
+
+func (s *GatewayStruct) StateActorCodeCIDs(p0 context.Context, p1 abinetwork.Version) (map[string]cid.Cid, error) {
+	if s.Internal.StateActorCodeCIDs == nil {
+		return *new(map[string]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.StateActorCodeCIDs(p0, p1)
+}
+
+func (s *GatewayStub) StateActorCodeCIDs(p0 context.Context, p1 abinetwork.Version) (map[string]cid.Cid, error) {
+	return *new(map[string]cid.Cid), ErrNotSupported
 }
 
 func (s *GatewayStruct) StateCall(p0 context.Context, p1 *types.Message, p2 types.TipSetKey) (*api.InvocResult, error) {
