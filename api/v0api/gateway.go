@@ -35,6 +35,7 @@ import (
 //  * Generate openrpc blobs
 
 type Gateway interface {
+	StateActorCodeCIDs(context.Context, abinetwork.Version) (map[string]cid.Cid, error)
 	ChainHasObj(context.Context, cid.Cid) (bool, error)
 	ChainPutObj(context.Context, blocks.Block) error
 	ChainHead(ctx context.Context) (*types.TipSet, error)
