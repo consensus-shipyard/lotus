@@ -767,6 +767,38 @@ type GatewayMethods struct {
 
 	GasEstimateMessageGas func(p0 context.Context, p1 *types.Message, p2 *MessageSendSpec, p3 types.TipSetKey) (*types.Message, error) ``
 
+	IPCAddSubnetActor func(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) ``
+
+	IPCGetCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) ``
+
+	IPCGetCheckpointSerialized func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) ([]byte, error) ``
+
+	IPCGetCheckpointTemplate func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) ``
+
+	IPCGetCheckpointTemplateSerialized func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) ``
+
+	IPCGetGenesisEpochForSubnet func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (abi.ChainEpoch, error) ``
+
+	IPCGetPrevCheckpointForChild func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) ``
+
+	IPCGetTopDownMsgs func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([]*gateway.CrossMsg, error) ``
+
+	IPCGetTopDownMsgsSerialized func(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([][]byte, error) ``
+
+	IPCHasVotedBottomUpCheckpoint func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) ``
+
+	IPCHasVotedTopDownCheckpoint func(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch, p3 address.Address) (bool, error) ``
+
+	IPCListCheckpoints func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) ``
+
+	IPCListCheckpointsSerialized func(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([][]byte, error) ``
+
+	IPCListChildSubnets func(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) ``
+
+	IPCReadGatewayState func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) ``
+
+	IPCReadSubnetActorState func(p0 context.Context, p1 sdk.SubnetID, p2 types.TipSetKey) (*subnetactor.State, error) ``
+
 	MpoolGetNonce func(p0 context.Context, p1 address.Address) (uint64, error) ``
 
 	MpoolPush func(p0 context.Context, p1 *types.SignedMessage) (cid.Cid, error) ``
@@ -784,6 +816,8 @@ type GatewayMethods struct {
 	NetVersion func(p0 context.Context) (string, error) ``
 
 	StateAccountKey func(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (address.Address, error) ``
+
+	StateActorCodeCIDs func(p0 context.Context, p1 abinetwork.Version) (map[string]cid.Cid, error) ``
 
 	StateCall func(p0 context.Context, p1 *types.Message, p2 types.TipSetKey) (*InvocResult, error) ``
 
@@ -4862,6 +4896,182 @@ func (s *GatewayStub) GasEstimateMessageGas(p0 context.Context, p1 *types.Messag
 	return nil, ErrNotSupported
 }
 
+func (s *GatewayStruct) IPCAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
+	if s.Internal.IPCAddSubnetActor == nil {
+		return *new(address.Address), ErrNotSupported
+	}
+	return s.Internal.IPCAddSubnetActor(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCAddSubnetActor(p0 context.Context, p1 address.Address, p2 subnetactor.ConstructParams) (address.Address, error) {
+	return *new(address.Address), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	if s.Internal.IPCGetCheckpoint == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpoint(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCGetCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetCheckpointSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) ([]byte, error) {
+	if s.Internal.IPCGetCheckpointSerialized == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpointSerialized(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCGetCheckpointSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	if s.Internal.IPCGetCheckpointTemplate == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpointTemplate(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCGetCheckpointTemplate(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetCheckpointTemplateSerialized(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) {
+	if s.Internal.IPCGetCheckpointTemplateSerialized == nil {
+		return *new([]byte), ErrNotSupported
+	}
+	return s.Internal.IPCGetCheckpointTemplateSerialized(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCGetCheckpointTemplateSerialized(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch) ([]byte, error) {
+	return *new([]byte), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetGenesisEpochForSubnet(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (abi.ChainEpoch, error) {
+	if s.Internal.IPCGetGenesisEpochForSubnet == nil {
+		return *new(abi.ChainEpoch), ErrNotSupported
+	}
+	return s.Internal.IPCGetGenesisEpochForSubnet(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCGetGenesisEpochForSubnet(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (abi.ChainEpoch, error) {
+	return *new(abi.ChainEpoch), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
+	if s.Internal.IPCGetPrevCheckpointForChild == nil {
+		return *new(cid.Cid), ErrNotSupported
+	}
+	return s.Internal.IPCGetPrevCheckpointForChild(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCGetPrevCheckpointForChild(p0 context.Context, p1 address.Address, p2 sdk.SubnetID) (cid.Cid, error) {
+	return *new(cid.Cid), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([]*gateway.CrossMsg, error) {
+	if s.Internal.IPCGetTopDownMsgs == nil {
+		return *new([]*gateway.CrossMsg), ErrNotSupported
+	}
+	return s.Internal.IPCGetTopDownMsgs(p0, p1, p2, p3, p4)
+}
+
+func (s *GatewayStub) IPCGetTopDownMsgs(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([]*gateway.CrossMsg, error) {
+	return *new([]*gateway.CrossMsg), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCGetTopDownMsgsSerialized(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([][]byte, error) {
+	if s.Internal.IPCGetTopDownMsgsSerialized == nil {
+		return *new([][]byte), ErrNotSupported
+	}
+	return s.Internal.IPCGetTopDownMsgsSerialized(p0, p1, p2, p3, p4)
+}
+
+func (s *GatewayStub) IPCGetTopDownMsgsSerialized(p0 context.Context, p1 address.Address, p2 sdk.SubnetID, p3 types.TipSetKey, p4 uint64) ([][]byte, error) {
+	return *new([][]byte), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCHasVotedBottomUpCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
+	if s.Internal.IPCHasVotedBottomUpCheckpoint == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.IPCHasVotedBottomUpCheckpoint(p0, p1, p2, p3)
+}
+
+func (s *GatewayStub) IPCHasVotedBottomUpCheckpoint(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCHasVotedTopDownCheckpoint(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
+	if s.Internal.IPCHasVotedTopDownCheckpoint == nil {
+		return false, ErrNotSupported
+	}
+	return s.Internal.IPCHasVotedTopDownCheckpoint(p0, p1, p2, p3)
+}
+
+func (s *GatewayStub) IPCHasVotedTopDownCheckpoint(p0 context.Context, p1 address.Address, p2 abi.ChainEpoch, p3 address.Address) (bool, error) {
+	return false, ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
+	if s.Internal.IPCListCheckpoints == nil {
+		return *new([]*gateway.BottomUpCheckpoint), ErrNotSupported
+	}
+	return s.Internal.IPCListCheckpoints(p0, p1, p2, p3)
+}
+
+func (s *GatewayStub) IPCListCheckpoints(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error) {
+	return *new([]*gateway.BottomUpCheckpoint), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCListCheckpointsSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([][]byte, error) {
+	if s.Internal.IPCListCheckpointsSerialized == nil {
+		return *new([][]byte), ErrNotSupported
+	}
+	return s.Internal.IPCListCheckpointsSerialized(p0, p1, p2, p3)
+}
+
+func (s *GatewayStub) IPCListCheckpointsSerialized(p0 context.Context, p1 sdk.SubnetID, p2 abi.ChainEpoch, p3 abi.ChainEpoch) ([][]byte, error) {
+	return *new([][]byte), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
+	if s.Internal.IPCListChildSubnets == nil {
+		return *new([]gateway.Subnet), ErrNotSupported
+	}
+	return s.Internal.IPCListChildSubnets(p0, p1)
+}
+
+func (s *GatewayStub) IPCListChildSubnets(p0 context.Context, p1 address.Address) ([]gateway.Subnet, error) {
+	return *new([]gateway.Subnet), ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
+	if s.Internal.IPCReadGatewayState == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCReadGatewayState(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCReadGatewayState(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (*gateway.State, error) {
+	return nil, ErrNotSupported
+}
+
+func (s *GatewayStruct) IPCReadSubnetActorState(p0 context.Context, p1 sdk.SubnetID, p2 types.TipSetKey) (*subnetactor.State, error) {
+	if s.Internal.IPCReadSubnetActorState == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.IPCReadSubnetActorState(p0, p1, p2)
+}
+
+func (s *GatewayStub) IPCReadSubnetActorState(p0 context.Context, p1 sdk.SubnetID, p2 types.TipSetKey) (*subnetactor.State, error) {
+	return nil, ErrNotSupported
+}
+
 func (s *GatewayStruct) MpoolGetNonce(p0 context.Context, p1 address.Address) (uint64, error) {
 	if s.Internal.MpoolGetNonce == nil {
 		return 0, ErrNotSupported
@@ -4959,6 +5169,17 @@ func (s *GatewayStruct) StateAccountKey(p0 context.Context, p1 address.Address, 
 
 func (s *GatewayStub) StateAccountKey(p0 context.Context, p1 address.Address, p2 types.TipSetKey) (address.Address, error) {
 	return *new(address.Address), ErrNotSupported
+}
+
+func (s *GatewayStruct) StateActorCodeCIDs(p0 context.Context, p1 abinetwork.Version) (map[string]cid.Cid, error) {
+	if s.Internal.StateActorCodeCIDs == nil {
+		return *new(map[string]cid.Cid), ErrNotSupported
+	}
+	return s.Internal.StateActorCodeCIDs(p0, p1)
+}
+
+func (s *GatewayStub) StateActorCodeCIDs(p0 context.Context, p1 abinetwork.Version) (map[string]cid.Cid, error) {
+	return *new(map[string]cid.Cid), ErrNotSupported
 }
 
 func (s *GatewayStruct) StateCall(p0 context.Context, p1 *types.Message, p2 types.TipSetKey) (*InvocResult, error) {
