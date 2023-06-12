@@ -3330,7 +3330,7 @@ Inputs:
       ]
     },
     "Name": "string value",
-    "IPCGatewayAddr": 42,
+    "IPCGatewayAddr": "f01234",
     "Consensus": 0,
     "MinValidatorStake": "0",
     "MinValidators": 42,
