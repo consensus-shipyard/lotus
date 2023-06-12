@@ -20,6 +20,7 @@ import (
 var NetworkBundle = "devnet"
 var BundleOverrides = map[actorstypes.Version]string{
 	actorstypes.Version10: "ipc-actors",
+	actorstypes.Version11: "ipc-actors",
 }
 var ActorDebugging = false
 
@@ -33,7 +34,7 @@ var ActorDebugging = false
 const BootstrappersFile = "spacenet.pi"
 const GenesisFile = "spacenet.car"
 
-const GenesisNetworkVersion = network.Version18
+const GenesisNetworkVersion = network.Version20
 
 var UpgradeBreezeHeight = abi.ChainEpoch(-1)
 
@@ -64,7 +65,9 @@ var UpgradeChocolateHeight = abi.ChainEpoch(-17)
 var UpgradeOhSnapHeight = abi.ChainEpoch(-18)
 var UpgradeSkyrHeight = abi.ChainEpoch(-19)
 var UpgradeSharkHeight = abi.ChainEpoch(-20)
-var UpgradeHyggeHeight = abi.ChainEpoch(-21)
+var UpgradeHyggeHeight = abi.ChainEpoch(-25)
+var UpgradeLightningHeight = abi.ChainEpoch(-26)
+var UpgradeThunderHeight = abi.ChainEpoch(-27)
 
 var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
 	0: DrandMainnet,
@@ -139,6 +142,8 @@ func init() {
 	UpgradeSkyrHeight = getUpgradeHeight("LOTUS_SKYR_HEIGHT", UpgradeSkyrHeight)
 	UpgradeSharkHeight = getUpgradeHeight("LOTUS_SHARK_HEIGHT", UpgradeSharkHeight)
 	UpgradeHyggeHeight = getUpgradeHeight("LOTUS_HYGGE_HEIGHT", UpgradeHyggeHeight)
+	UpgradeLightningHeight = getUpgradeHeight("LOTUS_LIGHTNING_HEIGHT", UpgradeLightningHeight)
+	UpgradeThunderHeight = getUpgradeHeight("LOTUS_THUNDER_HEIGHT", UpgradeThunderHeight)
 
 	BuildType |= Build2k
 

@@ -17,7 +17,7 @@ require (
 	github.com/alecthomas/jsonschema v0.0.0-20200530073317-71f438968921
 	github.com/buger/goterm v1.0.3
 	github.com/chzyer/readline v1.5.0
-	github.com/consensus-shipyard/go-ipc-types v0.1.6-0.20230605095729-e7269af8a509
+	github.com/consensus-shipyard/go-ipc-types v0.1.6-0.20230612102453-86addd7d25b2
 	github.com/containerd/cgroups v1.0.4
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/detailyang/go-fallocate v0.0.0-20180908115635-432fa640bd2e
@@ -46,7 +46,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.2.3
 	github.com/filecoin-project/go-padreader v0.0.1
 	github.com/filecoin-project/go-paramfetch v0.0.4
-	github.com/filecoin-project/go-state-types v0.10.0
+	github.com/filecoin-project/go-state-types v0.11.1
 	github.com/filecoin-project/go-statemachine v1.0.3
 	github.com/filecoin-project/go-statestore v0.2.0
 	github.com/filecoin-project/go-storedcounter v0.1.0
