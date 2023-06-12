@@ -19,6 +19,7 @@ import (
 
 var NetworkBundle = "devnet"
 var BundleOverrides = map[actorstypes.Version]string{
+	actorstypes.Version10: "ipc-actors",
 	actorstypes.Version11: "ipc-actors",
 }
 var ActorDebugging = false
@@ -33,7 +34,7 @@ var ActorDebugging = false
 const BootstrappersFile = "spacenet.pi"
 const GenesisFile = "spacenet.car"
 
-const GenesisNetworkVersion = network.Version18
+const GenesisNetworkVersion = network.Version20
 
 var UpgradeBreezeHeight = abi.ChainEpoch(-1)
 

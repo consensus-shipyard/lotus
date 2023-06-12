@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
@@ -59,7 +60,7 @@ func TestIPCAccessors(t *testing.T) {
 	params := subnetactor.ConstructParams{
 		Parent:              parent,
 		Name:                "test",
-		IPCGatewayAddr:      genesis.DefaultIPCGatewayAddrID,
+		IPCGatewayAddr:      consensus.DefaultGatewayAddr,
 		BottomUpCheckPeriod: genesis.DefaultCheckpointPeriod,
 		TopDownCheckPeriod:  genesis.DefaultCheckpointPeriod,
 		MinValidators:       1,
@@ -183,7 +184,7 @@ func TestIPCCheckpointSubmission(t *testing.T) {
 	params := subnetactor.ConstructParams{
 		Parent:              parent,
 		Name:                "test",
-		IPCGatewayAddr:      genesis.DefaultIPCGatewayAddrID,
+		IPCGatewayAddr:      consensus.DefaultGatewayAddr,
 		BottomUpCheckPeriod: genesis.DefaultCheckpointPeriod,
 		TopDownCheckPeriod:  genesis.DefaultCheckpointPeriod,
 		MinValidators:       1,

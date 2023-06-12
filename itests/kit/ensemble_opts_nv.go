@@ -4,6 +4,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/network"
 
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 )
@@ -67,5 +68,13 @@ func TurboUpgradeAt(upgradeHeight abi.ChainEpoch) EnsembleOpt {
 		Network:   network.Version12,
 		Height:    upgradeHeight,
 		Migration: filcns.UpgradeActorsV4,
+	})
+}
+
+func IPCNetworkVersion() EnsembleOpt {
+	return UpgradeSchedule(stmgr.Upgrade{
+		// use the spacenet network version for IPC tests
+		Network: build.GenesisNetworkVersion,
+		Height:  -1,
 	})
 }
