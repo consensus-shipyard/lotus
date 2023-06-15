@@ -1,8 +1,23 @@
 <h1 align="center">Project Eudico</h1>
 
+**‼️ The IPC Agent, the IPC actors, and eudico haven't been audited, tested in depth, or otherwise verified. Moreover, the system is missing critical recovery functionality in case of crashes. There are multiple ways in which you may lose funds moved into an IPC subnet, and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.**
+
 Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-project/lotus), itself an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io). This is a work-in-progress, intended to enable easier experimentation with future protocol features, and is not meant to be used in the production network.
 
 [![consensus-shipyard](https://circleci.com/gh/consensus-shipyard/lotus.svg?style=svg)](https://app.circleci.com/pipelines/github/consensus-shipyard/lotus)
+
+## Branching Strategy
+
+### Production branch
+
+The production branch is `spacenet`.
+The `spacenet` branch is always compatible with the "stable" release that's running on Spacenet and with the stable version of the [IPC Agent](https://github.com/consensus-shipyard/ipc-agent).
+Updates to `spacenet` **always** come from the `dev` branch.
+
+### Development branch
+
+The primary development branch is `dev`.
+`dev` contains the most up-to-date software but may not be compatible with the version running on spacenet or with the stable version of the IPC Agent. Only use `dev` if doing a full local deployment. In such cases, use the IPC Agent `dev` branch too, but note that the packaged deployment scripts default to checking out `spacenet`. 
 
 ## Building & Documentation
 
@@ -10,9 +25,9 @@ Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-pr
  
 For complete instructions on how to build, install and setup eudico/lotus, please visit [https://lotus.filecoin.io](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms). Basic build instructions can be found further down in this readme.
 
-## Reporting a Vulnerability
+## Security
 
-Please send an email to security@filecoin.org. See our [security policy](SECURITY.md) for more details.
+Please send any security reports to ipc@protocol.ai.
 
 ## Basic Build Instructions
 **System-specific Software Dependencies**:
