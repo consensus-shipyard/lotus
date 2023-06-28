@@ -230,7 +230,7 @@ func eudicoDaemonAction(cctx *cli.Context) error {
 	app := fx.New(
 		fxProviders,
 		fx.Populate(&rpcStopper),
-		fxmodules.Invokes(&cfg.Common, cctx.Bool("bootstrap"), isMirValidator),
+		fxmodules.Invokes(cfg, cctx.Bool("bootstrap"), isMirValidator),
 		// Debugging of the dependency graph
 		fx.Invoke(
 			func(dotGraph fx.DotGraph) {

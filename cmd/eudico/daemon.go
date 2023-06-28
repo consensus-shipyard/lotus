@@ -317,7 +317,7 @@ func eudicoDaemonAction(consensusAlgorithm global.ConsensusAlgorithm) func(*cli.
 		app := fx.New(
 			fxProviders,
 			fx.Populate(&rpcStopper),
-			fxmodules.Invokes(&cfg.Common, cctx.Bool("bootstrap"), isMirValidator),
+			fxmodules.Invokes(cfg, cctx.Bool("bootstrap"), isMirValidator),
 			// Debugging of the dependency graph
 			fx.Invoke(
 				func(dotGraph fx.DotGraph) {
