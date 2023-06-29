@@ -26,6 +26,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/delegated"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
@@ -35,6 +36,7 @@ import (
 )
 
 const (
+	DefaultMirHeightDiff          = abi.ChainEpoch(5000)
 	DefaultLookbackCap            = time.Hour * 24
 	DefaultStateWaitLookbackLimit = abi.ChainEpoch(20)
 	DefaultRateLimitTimeout       = time.Second * 5
@@ -214,6 +216,20 @@ func (gw *Node) checkTipsetKey(ctx context.Context, tsk types.TipSetKey) error {
 }
 
 func (gw *Node) checkTipset(ts *types.TipSet) error {
+	// if mir consensus, we check a height diff, not actual timestamps
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
+		h, err := gw.ChainHead(context.Background())
+		if err != nil {
+			return err
+		}
+		if h.Height() > ts.Height() {
+			return fmt.Errorf("tipset height in future")
+		}
+		if (h.Height() - ts.Height()) > DefaultMirHeightDiff {
+			return fmt.Errorf("bad tipset height: %w", gw.errLookback)
+		}
+		return nil
+	}
 	at := time.Unix(int64(ts.Blocks()[0].Timestamp), 0)
 	if err := gw.checkTimestamp(at); err != nil {
 		return fmt.Errorf("bad tipset: %w", err)
@@ -225,6 +241,14 @@ func (gw *Node) checkTipsetHeight(ts *types.TipSet, h abi.ChainEpoch) error {
 	if h > ts.Height() {
 		return fmt.Errorf("tipset height in future")
 	}
+	// if mir consensus, we check a height diff, not actual timestamps
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
+		if (h - ts.Height()) > DefaultMirHeightDiff {
+			return fmt.Errorf("bad tipset height: %w", gw.errLookback)
+		}
+		return nil
+	}
+
 	tsBlock := ts.Blocks()[0]
 	heightDelta := time.Duration(uint64(tsBlock.Height-h)*build.BlockDelaySecs) * time.Second
 	timeAtHeight := time.Unix(int64(tsBlock.Timestamp), 0).Add(-heightDelta)
