@@ -222,7 +222,7 @@ func (gw *Node) checkTipset(ts *types.TipSet) error {
 		if err != nil {
 			return err
 		}
-		if h.Height() > ts.Height() {
+		if h.Height() < ts.Height() {
 			return fmt.Errorf("tipset height in future")
 		}
 		if (h.Height() - ts.Height()) > DefaultMirHeightDiff {
