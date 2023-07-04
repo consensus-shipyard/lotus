@@ -1068,11 +1068,11 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 }
 
 func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
-	mb := fmt.Sprintf("%d;", 0)
+	mb := fmt.Sprintf("%d;", 0) // configuration number
 	for _, v := range validators {
-		id, err := NodeLibp2pAddr(v.mirHost)
+		addr, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		mb += fmt.Sprintf("%s@%s,", v.mirAddr, id)
+		mb += fmt.Sprintf("%s:10@%s,", v.mirAddr, addr) // ID:weight@net_addr. Weight must not be 0.
 	}
 	return mb
 }

@@ -415,7 +415,7 @@ var ErrMinNumValidatorNotReached = errors.New("minimum number of validators for 
 var ErrWaitForMembershipTimeout = errors.New("getting membership timeout expired")
 
 // waitForMembershipInfo waits for membership information by reading the membership source and checking that
-// the validator address is in the membership.
+// the validator ID is in the membership.
 //
 // We should sleep and periodically poll membership source until is up
 // (as long as no SIGTERM is turned and the user proactively kills the process),
@@ -460,6 +460,7 @@ func waitForMembershipInfo(
 	}
 }
 
+// getMembershipInfo gets membership information via Reader.
 func getMembershipInfo(
 	id string,
 	r mirmembership.Reader,
