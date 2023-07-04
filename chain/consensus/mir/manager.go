@@ -281,7 +281,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 					newSet.ConfigurationNumber, newSet.Size(), newSet.GetValidatorIDs())
 
 			lastValidatorSet = newSet
-			r := m.createAndStoreConfigurationRequest(newSet)
+			r := m.createAndStoreConfigurationTx(newSet)
 			if r != nil {
 				configRequests = append(configRequests, r)
 			}
@@ -302,7 +302,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 					Errorw("failed to select messages from mempool", "error", err)
 			}
 
-			requests := m.createTransportRequests(msgs)
+			requests := m.createTransportTxs(msgs)
 
 			if len(configRequests) > 0 {
 				requests = append(requests, configRequests...)
@@ -358,7 +358,7 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 	return GetCheckpointByHeight(m.stateManager.ctx, m.ds, height, &params)
 }
 
-func (m *Manager) createTransportRequests(msgs []*types.SignedMessage) []*mirproto.Transaction {
+func (m *Manager) createTransportTxs(msgs []*types.SignedMessage) []*mirproto.Transaction {
 	var requests []*mirproto.Transaction
 	requests = append(requests, m.batchSignedMessages(msgs)...)
 	return requests
@@ -394,7 +394,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*
 	return requests
 }
 
-func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirproto.Transaction {
+func (m *Manager) createAndStoreConfigurationTx(set *validator.Set) *mirproto.Transaction {
 	var b bytes.Buffer
 	if err := set.MarshalCBOR(&b); err != nil {
 		log.With("validator", m.id).Errorf("unable to marshall validator set: %v", err)

@@ -12,6 +12,8 @@ import (
 	"github.com/filecoin-project/mir/pkg/net/libp2p"
 	"github.com/filecoin-project/mir/pkg/pb/eventpb"
 	"github.com/filecoin-project/mir/pkg/pb/messagepb"
+	transportpbtypes "github.com/filecoin-project/mir/pkg/pb/transportpb/types"
+	trantorpbtypes "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
 	t "github.com/filecoin-project/mir/pkg/types"
 )
 
@@ -74,16 +76,16 @@ func (m *MockedTransport) Send(dest t.NodeID, msg *messagepb.Message) error {
 	return m.transport.Send(dest, msg)
 }
 
-func (m *MockedTransport) Connect(nodes map[t.NodeID]t.NodeAddress) {
+func (m *MockedTransport) Connect(nodes *trantorpbtypes.Membership) {
 	m.transport.Connect(nodes)
 }
 
-func (m *MockedTransport) WaitFor(n int) {
-	m.transport.WaitFor(n)
+func (m *MockedTransport) WaitFor(n int) error {
+	return m.transport.WaitFor(n)
 }
 
 // CloseOldConnections closes connections to the nodes that don't needed.
-func (m *MockedTransport) CloseOldConnections(newNodes map[t.NodeID]t.NodeAddress) {
+func (m *MockedTransport) CloseOldConnections(newNodes *trantorpbtypes.Membership) {
 	m.transport.CloseOldConnections(newNodes)
 }
 
@@ -96,11 +98,16 @@ func (m *MockedTransport) ApplyEvents(ctx context.Context, eventList *events.Eve
 		switch e := event.Type.(type) {
 		case *eventpb.Event_Init:
 			// no actions on init
-		case *eventpb.Event_SendMessage:
-			for _, destID := range e.SendMessage.Destinations {
-				if err := m.Send(t.NodeID(destID), e.SendMessage.Msg); err != nil {
-					m.logger.Log(logging.LevelWarn, "Failed to send a message", "dest", destID, "err", err)
+		case *eventpb.Event_Transport:
+			switch e := transportpbtypes.EventFromPb(e.Transport).Type.(type) {
+			case *transportpbtypes.Event_SendMessage:
+				for _, destID := range e.SendMessage.Destinations {
+					if err := m.Send(destID, e.SendMessage.Msg.Pb()); err != nil {
+						m.logger.Log(logging.LevelWarn, "Failed to send a message", "dest", destID, "err", err)
+					}
 				}
+			default:
+				return fmt.Errorf("unexpected transport event: %T", e)
 			}
 		default:
 			return fmt.Errorf("unexpected event: %T", event.Type)
