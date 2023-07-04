@@ -1083,7 +1083,7 @@ func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile st
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", v.mirAddr, id))
+		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s:10@%s", v.mirAddr, id))
 		require.NoError(n.t, err)
 		vs = append(vs, v)
 	}
