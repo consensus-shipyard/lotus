@@ -12,7 +12,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/filecoin-project/mir/pkg/client"
-	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/pb/trantorpb"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
+	"github.com/filecoin-project/mir/pkg/trantor/types"
 	t "github.com/filecoin-project/mir/pkg/types"
 	"github.com/filecoin-project/mir/pkg/util/maputil"
 
@@ -82,10 +84,10 @@ func NewConfigurationManagerWithMembershipInfo(ctx context.Context, ds db.DB, id
 // corresponding to the number of transactions previously created by this client.
 // Until Done is called with the returned request's number,
 // the request will be pending, i.e., among the requests returned by Pending.
-func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Request, error) {
-	r := mirproto.Request{
-		ClientId: cm.id,
-		ReqNo:    cm.nextReqNo,
+func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Transaction, error) {
+	r := mirproto.Transaction{
+		ClientId: types.ClientID(cm.id),
+		TxNo:     types.TxNo(cm.nextReqNo),
 		Type:     ConfigurationRequest,
 		Data:     data,
 	}
@@ -111,7 +113,7 @@ func (cm *ConfigurationManager) GetInitialMembershipInfo() membership.Info {
 }
 
 // Done marks a configuration request as done. It will no longer be among the request returned by Pending.
-func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
+func (cm *ConfigurationManager) Done(txNo types.TxNo) error {
 	cm.nextAppliedNo = uint64(txNo) + 1
 	cm.storeNextAppliedConfigurationNumber(cm.nextAppliedNo)
 	cm.removeRequest(uint64(txNo))
@@ -119,7 +121,7 @@ func (cm *ConfigurationManager) Done(txNo t.ReqNo) error {
 }
 
 // Pending returns from the persistent storage all requests previously returned by NewTX that have not been applied yet.
-func (cm *ConfigurationManager) Pending() (reqs []*mirproto.Request, err error) {
+func (cm *ConfigurationManager) Pending() (reqs []*mirproto.Transaction, err error) {
 	for i := cm.nextAppliedNo; i < cm.nextReqNo; i++ {
 		r, err := cm.getRequest(i)
 		if err != nil {
@@ -167,8 +169,8 @@ func (cm *ConfigurationManager) recover() error {
 }
 
 // storeRequest stores a configuration request and the corresponding configuration number in the persistent database.
-func (cm *ConfigurationManager) storeRequest(r *mirproto.Request, n uint64) error {
-	v, err := proto.Marshal(r)
+func (cm *ConfigurationManager) storeRequest(r *mirproto.Transaction, n uint64) error {
+	v, err := proto.Marshal(r.Pb())
 	if err != nil {
 		return err
 	}
@@ -176,16 +178,17 @@ func (cm *ConfigurationManager) storeRequest(r *mirproto.Request, n uint64) erro
 }
 
 // getRequest gets a configuration request from the persistent database.
-func (cm *ConfigurationManager) getRequest(n uint64) (*mirproto.Request, error) {
+func (cm *ConfigurationManager) getRequest(n uint64) (*mirproto.Transaction, error) {
 	b, err := cm.ds.Get(cm.ctx, configurationIndexKey(n))
 	if err != nil {
 		return nil, err
 	}
-	var r mirproto.Request
+	var r trantorpb.Transaction
 	if err := proto.Unmarshal(b, &r); err != nil {
 		return nil, err
 	}
-	return &r, nil
+
+	return mirproto.TransactionFromPb(&r), nil
 }
 
 func (cm *ConfigurationManager) removeRequest(n uint64) {

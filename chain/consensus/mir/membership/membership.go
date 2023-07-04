@@ -13,6 +13,8 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/crypto"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
+	tt "github.com/filecoin-project/mir/pkg/trantor/types"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/build"
@@ -153,9 +155,9 @@ func (c *OnChainMembership) GetMembershipInfo() (*Info, error) {
 
 // Membership validates that validators addresses are correct multi-addresses and
 // returns all the corresponding IDs and map between these IDs and the multi-addresses.
-func Membership(validators []*validator.Validator) ([]t.NodeID, map[t.NodeID]t.NodeAddress, error) {
+func Membership(validators []*validator.Validator) ([]t.NodeID, *mirproto.Membership, error) {
 	var nodeIDs []t.NodeID
-	nodeAddrs := make(map[t.NodeID]t.NodeAddress)
+	nodeAddrs := make(map[t.NodeID]*mirproto.NodeIdentity)
 
 	for _, v := range validators {
 		id := t.NodeID(v.ID())
@@ -164,10 +166,19 @@ func Membership(validators []*validator.Validator) ([]t.NodeID, map[t.NodeID]t.N
 			return nil, nil, err
 		}
 		nodeIDs = append(nodeIDs, id)
-		nodeAddrs[id] = a
+		nodeAddrs[id] = &mirproto.NodeIdentity{
+			Id:     id,
+			Addr:   a.String(),
+			Key:    nil,
+			Weight: tt.VoteWeight(v.Weight.Uint64()),
+		}
 	}
 
-	return nodeIDs, nodeAddrs, nil
+	membership := mirproto.Membership{
+		Nodes: nodeAddrs,
+	}
+
+	return nodeIDs, &membership, nil
 }
 
 // NewSetMembershipMsg creates a new message to update implicitly
@@ -207,7 +218,7 @@ func NewInitGenesisEpochMsg(gw address.Address, genesisEpoch abi.ChainEpoch) (*t
 		GasFeeCap:  types.NewInt(0),
 		GasPremium: types.NewInt(0),
 		GasLimit:   build.BlockGasLimit, // Make super sure this is never too little
-		// the nonce must be different than other config messages for the case where
+		// the nonce must be different from other config messages for the case where
 		// all config messages are included in the same block, if not the one with the
 		// largest nonce will be discarded.
 		Nonce: 1,

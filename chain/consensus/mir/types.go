@@ -17,7 +17,7 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	"github.com/filecoin-project/mir/pkg/trantor"
 	mir "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/chain/consensus/mir/db"
@@ -246,7 +246,8 @@ func (ch *Checkpoint) Cid() (cid.Cid, error) {
 }
 
 func CertAsElectionProof(ch *checkpoint.StableCheckpoint) (*ltypes.ElectionProof, error) {
-	b, err := ch.Certificate().Serialize()
+	certificate := ch.Certificate()
+	b, err := certificate.Serialize()
 	if err != nil {
 		return nil, xerrors.Errorf("error serializing checkpoint data: %w", err)
 	}

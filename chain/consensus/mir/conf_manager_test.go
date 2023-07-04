@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
+	"github.com/filecoin-project/mir/pkg/pb/trantorpb"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
+	trantor "github.com/filecoin-project/mir/pkg/trantor/types"
 	"github.com/filecoin-project/mir/pkg/types"
 
 	mirkv "github.com/filecoin-project/lotus/chain/consensus/mir/db/kv"
@@ -66,17 +68,17 @@ func TestMarshalling(t *testing.T) {
 
 	// ----
 
-	r0 := requestpb.Request{
-		ReqNo:    1,
+	r0 := mirproto.Transaction{
+		TxNo:     1,
 		ClientId: "1",
 		Data:     []byte{0},
 		Type:     ConfigurationRequest,
 	}
 
-	b, err := proto.Marshal(&r0)
+	b, err := proto.Marshal(r0.Pb())
 	require.NoError(t, err)
 
-	var r1 requestpb.Request
+	var r1 trantorpb.Transaction
 	err = proto.Unmarshal(b, &r1)
 	require.NoError(t, err)
 }
@@ -102,8 +104,8 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	n = cm.getAppliedConfigurationNumber()
 	require.Equal(t, uint64(200), n)
 
-	r := requestpb.Request{
-		ReqNo:    uint64(1),
+	r := mirproto.Transaction{
+		TxNo:     1,
 		ClientId: "1",
 		Data:     []byte{1},
 		Type:     ConfigurationRequest,
@@ -113,7 +115,7 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	require.NoError(t, err)
 	r1, err := cm.getRequest(200)
 	require.NoError(t, err)
-	require.EqualValues(t, r.ReqNo, r1.ReqNo)
+	require.EqualValues(t, r.TxNo, r1.TxNo)
 }
 
 // TestConfigurationManagerRecoverData_NoCrash tests that if we store two configuration requests then we can get them back.
@@ -142,7 +144,7 @@ func TestConfigurationManagerRecoverData_NoCrash(t *testing.T) {
 	require.True(t, bytes.Equal(reqs[0].Data, []byte{0}))
 	require.True(t, bytes.Equal(reqs[1].Data, []byte{1}))
 
-	err = cm.Done(types.ReqNo(reqs[0].ReqNo))
+	err = cm.Done(reqs[0].TxNo)
 	require.NoError(t, err)
 	reqs, err = cm.Pending()
 	require.NoError(t, err)
@@ -187,27 +189,27 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 
 	// Store the first request.
 
-	r0 := requestpb.Request{
-		ReqNo:    cm2.nextReqNo,
+	r0 := mirproto.Transaction{
+		TxNo:     trantor.TxNo(cm2.nextReqNo),
 		ClientId: "1",
 		Data:     []byte{0},
 		Type:     ConfigurationRequest,
 	}
 
-	err = cm2.storeRequest(&r0, r0.ReqNo)
+	err = cm2.storeRequest(&r0, r0.TxNo.Pb())
 	require.NoError(t, err)
 	cm2.nextReqNo++
 	cm2.storeNextConfigurationNumber(cm2.nextReqNo)
 
 	// Store the second request.
-	r1 := requestpb.Request{
-		ReqNo:    cm2.nextReqNo,
+	r1 := mirproto.Transaction{
+		TxNo:     trantor.TxNo(cm2.nextReqNo),
 		ClientId: "1",
 		Data:     []byte{1},
 		Type:     ConfigurationRequest,
 	}
 
-	err = cm2.storeRequest(&r1, r1.ReqNo)
+	err = cm2.storeRequest(&r1, r1.TxNo.Pb())
 	require.NoError(t, err)
 	cm2.nextReqNo++
 	cm2.storeNextConfigurationNumber(cm2.nextReqNo)
@@ -242,13 +244,13 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 	require.NoError(t, err)
 
 	// Store the second request using low level primitive to simulate a crash.
-	r1 := requestpb.Request{
-		ReqNo:    1,
+	r1 := mirproto.Transaction{
+		TxNo:     1,
 		ClientId: "1",
 		Data:     []byte{1},
 		Type:     ConfigurationRequest,
 	}
-	err = cm.storeRequest(&r1, r1.ReqNo)
+	err = cm.storeRequest(&r1, r1.TxNo.Pb())
 	require.NoError(t, err)
 	cm.storeNextConfigurationNumber(uint64(2))
 
@@ -267,7 +269,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 
 	// Execute the first request.
 
-	err = cm.Done(types.ReqNo(reqs[0].ReqNo))
+	err = cm.Done(reqs[0].TxNo)
 	require.NoError(t, err)
 	reqs, err = cm.Pending()
 	require.NoError(t, err)
