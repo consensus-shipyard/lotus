@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/consensus-shipyard/go-ipc-types/gateway"
 	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/filecoin-project/go-address"
+
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/builtin"
 	"github.com/filecoin-project/go-state-types/crypto"
+
 	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
 	tt "github.com/filecoin-project/mir/pkg/trantor/types"
 	t "github.com/filecoin-project/mir/pkg/types"

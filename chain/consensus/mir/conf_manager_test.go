@@ -93,7 +93,7 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 	require.NoError(t, err)
 	cm, err := NewConfigurationManager(context.Background(), ds, "id1")
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), cm.nextReqNo)
+	require.Equal(t, uint64(0), cm.nextTxNo)
 	require.Equal(t, uint64(0), cm.nextAppliedNo)
 
 	cm.storeNextConfigurationNumber(100)
@@ -111,9 +111,9 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 		Type:     ConfigurationRequest,
 	}
 
-	err = cm.storeRequest(&r, 200)
+	err = cm.storeTx(&r, 200)
 	require.NoError(t, err)
-	r1, err := cm.getRequest(200)
+	r1, err := cm.getTx(200)
 	require.NoError(t, err)
 	require.EqualValues(t, r.TxNo, r1.TxNo)
 }
@@ -152,7 +152,7 @@ func TestConfigurationManagerRecoverData_NoCrash(t *testing.T) {
 	require.True(t, bytes.Equal(reqs[0].Data, []byte{1}))
 
 	// Check the configuration internal state
-	require.Equal(t, uint64(2), cm.nextReqNo)
+	require.Equal(t, uint64(2), cm.nextTxNo)
 	require.Equal(t, uint64(1), cm.nextAppliedNo)
 }
 
@@ -190,33 +190,33 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 	// Store the first request.
 
 	r0 := mirproto.Transaction{
-		TxNo:     trantor.TxNo(cm2.nextReqNo),
+		TxNo:     trantor.TxNo(cm2.nextTxNo),
 		ClientId: "1",
 		Data:     []byte{0},
 		Type:     ConfigurationRequest,
 	}
 
-	err = cm2.storeRequest(&r0, r0.TxNo.Pb())
+	err = cm2.storeTx(&r0, r0.TxNo.Pb())
 	require.NoError(t, err)
-	cm2.nextReqNo++
-	cm2.storeNextConfigurationNumber(cm2.nextReqNo)
+	cm2.nextTxNo++
+	cm2.storeNextConfigurationNumber(cm2.nextTxNo)
 
 	// Store the second request.
 	r1 := mirproto.Transaction{
-		TxNo:     trantor.TxNo(cm2.nextReqNo),
+		TxNo:     trantor.TxNo(cm2.nextTxNo),
 		ClientId: "1",
 		Data:     []byte{1},
 		Type:     ConfigurationRequest,
 	}
 
-	err = cm2.storeRequest(&r1, r1.TxNo.Pb())
+	err = cm2.storeTx(&r1, r1.TxNo.Pb())
 	require.NoError(t, err)
-	cm2.nextReqNo++
-	cm2.storeNextConfigurationNumber(cm2.nextReqNo)
+	cm2.nextTxNo++
+	cm2.storeNextConfigurationNumber(cm2.nextTxNo)
 
 	// check DBs store the same data
 
-	require.Equal(t, cm2.getNextConfigurationNumber(), cm1.nextReqNo)
+	require.Equal(t, cm2.getNextConfigurationNumber(), cm1.nextTxNo)
 	require.Equal(t, cm2.getAppliedConfigurationNumber(), cm1.nextAppliedNo)
 
 	reqs1, err := cm1.Pending()
@@ -250,7 +250,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 		Data:     []byte{1},
 		Type:     ConfigurationRequest,
 	}
-	err = cm.storeRequest(&r1, r1.TxNo.Pb())
+	err = cm.storeTx(&r1, r1.TxNo.Pb())
 	require.NoError(t, err)
 	cm.storeNextConfigurationNumber(uint64(2))
 
@@ -261,7 +261,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 
 	reqs, err := cm.Pending()
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), cm.nextReqNo)
+	require.Equal(t, uint64(2), cm.nextTxNo)
 	require.Equal(t, uint64(0), cm.nextAppliedNo)
 	require.Equal(t, 2, len(reqs))
 	require.True(t, bytes.Equal(reqs[0].Data, []byte{0}))
@@ -277,7 +277,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 	require.True(t, bytes.Equal(reqs[0].Data, []byte{1}))
 
 	// Check the configuration internal state
-	require.Equal(t, uint64(2), cm.nextReqNo)
+	require.Equal(t, uint64(2), cm.nextTxNo)
 	require.Equal(t, uint64(1), cm.nextAppliedNo)
 }
 
@@ -299,7 +299,7 @@ func TestConfigurationManagerRecoverData_WithZeroNonce0(t *testing.T) {
 
 	reqs, err := cm.Pending()
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), cm.nextReqNo)
+	require.Equal(t, uint64(0), cm.nextTxNo)
 	require.Equal(t, uint64(0), cm.nextAppliedNo)
 	require.Equal(t, 0, len(reqs))
 }
