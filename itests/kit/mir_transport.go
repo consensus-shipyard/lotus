@@ -47,7 +47,7 @@ func (m *MockedTransport) Start() error {
 }
 
 func (m *MockedTransport) Disable() {
-	m.h.RemoveStreamHandler("/mir/0.0.1")
+	m.h.RemoveStreamHandler(libp2p.DefaultParams().ProtocolID)
 	conns := m.h.Network().Conns()
 	for _, c := range conns {
 		_ = c.Close() // nolint
@@ -91,10 +91,10 @@ func (m *MockedTransport) CloseOldConnections(newNodes *trantorpbtypes.Membershi
 
 func (m *MockedTransport) ImplementsModule() {}
 
-func (m *MockedTransport) ApplyEvents(ctx context.Context, eventList *events.EventList) error {
+func (m *MockedTransport) ApplyEvents(_ context.Context, eventList *events.EventList) error {
 	iter := eventList.Iterator()
-	for event := iter.Next(); event != nil; event = iter.Next() {
 
+	for event := iter.Next(); event != nil; event = iter.Next() {
 		switch e := event.Type.(type) {
 		case *eventpb.Event_Init:
 			// no actions on init
@@ -113,6 +113,7 @@ func (m *MockedTransport) ApplyEvents(ctx context.Context, eventList *events.Eve
 			return fmt.Errorf("unexpected event: %T", event.Type)
 		}
 	}
+
 	return nil
 }
 

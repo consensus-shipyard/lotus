@@ -64,7 +64,7 @@ type Manager struct {
 	mirErrChan      chan error
 	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
-	requestPool     *fifo.Pool
+	txPool          *fifo.Pool
 	net             net.Transport
 	interceptor     *eventlog.Recorder
 	readyForTxsChan chan chan []*mirproto.Transaction
@@ -134,7 +134,7 @@ func NewManager(ctx context.Context,
 		netName:             netName,
 		lotusNode:           node,
 		readyForTxsChan:     make(chan chan []*mirproto.Transaction),
-		requestPool:         fifo.New(),
+		txPool:              fifo.New(),
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
 		net:                 net,
@@ -144,7 +144,7 @@ func NewManager(ctx context.Context,
 	m.mirErrChan = make(chan error, 1)
 	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
-	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.requestPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.txPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
@@ -247,9 +247,9 @@ func (m *Manager) Serve(ctx context.Context) error {
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
 
-	configRequests, err := m.confManager.Pending()
+	configTxs, err := m.confManager.Pending()
 	if err != nil {
-		return fmt.Errorf("validator %v failed to get pending confgiguration requests: %w", m.id, err)
+		return fmt.Errorf("validator %v failed to get pending confgiguration txs: %w", m.id, err)
 	}
 
 	lastValidatorSet := m.initialValidatorSet
@@ -283,7 +283,7 @@ func (m *Manager) Serve(ctx context.Context) error {
 			lastValidatorSet = newSet
 			r := m.createAndStoreConfigurationTx(newSet)
 			if r != nil {
-				configRequests = append(configRequests, r)
+				configTxs = append(configTxs, r)
 			}
 
 		case mirChan := <-m.readyForTxsChan:
@@ -302,17 +302,17 @@ func (m *Manager) Serve(ctx context.Context) error {
 					Errorw("failed to select messages from mempool", "error", err)
 			}
 
-			requests := m.createTransportTxs(msgs)
+			txs := m.createTransportTxs(msgs)
 
-			if len(configRequests) > 0 {
-				requests = append(requests, configRequests...)
+			if len(configTxs) > 0 {
+				txs = append(txs, configTxs...)
 			}
 
 			select {
 			case <-ctx.Done():
 				log.With("validator", m.id).Info("Mir manager: context closed while sending txs")
 				return nil
-			case mirChan <- requests:
+			case mirChan <- txs:
 			}
 		}
 	}
@@ -359,18 +359,18 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 }
 
 func (m *Manager) createTransportTxs(msgs []*types.SignedMessage) []*mirproto.Transaction {
-	var requests []*mirproto.Transaction
-	requests = append(requests, m.batchSignedMessages(msgs)...)
-	return requests
+	var txs []*mirproto.Transaction
+	txs = append(txs, m.batchSignedMessages(msgs)...)
+	return txs
 }
 
-// batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
-func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*mirproto.Transaction) {
+// batchPushSignedMessages pushes signed messages into the transactions pool and sends them to Mir.
+func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (txs []*mirproto.Transaction) {
 	for _, msg := range msgs {
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
-		if !m.requestPool.IsTargetTx(clientID, nonce) {
-			log.With("validator", m.id).Warnf("batchSignedMessage: target request not found for client ID")
+		if !m.txPool.IsTargetTx(clientID, nonce) {
+			log.With("validator", m.id).Warnf("batchSignedMessage: target tx not found for client ID")
 			continue
 		}
 
@@ -387,11 +387,11 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*
 			Data:     data,
 		}
 
-		m.requestPool.AddTx(msg.Cid(), r)
+		m.txPool.AddTx(msg.Cid(), r)
 
-		requests = append(requests, r)
+		txs = append(txs, r)
 	}
-	return requests
+	return txs
 }
 
 func (m *Manager) createAndStoreConfigurationTx(set *validator.Set) *mirproto.Transaction {
