@@ -238,7 +238,7 @@ func joinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, snAct
 func fundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID) {
 	from, err := node.WalletDefaultAddress(ctx)
 	require.NoError(t, err)
-	params, err := actors.SerializeParams(&sn)
+	params, err := actors.SerializeParams(&gateway.FundParams{To: from, Subnet: sn})
 	require.NoError(t, err)
 	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
 		To:     genesis.DefaultIPCGatewayAddr,
