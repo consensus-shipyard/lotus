@@ -324,13 +324,12 @@ func (sm *StateManager) ApplyTXs(txs []*mirproto.Transaction) error {
 		}
 	}
 
-	// For each request in the batch
-	for _, req := range txs {
-		switch req.Type {
-		case TransportRequest:
-			mirMsgs = append(mirMsgs, req.Data)
-		case ConfigurationRequest:
-			votedValSet, err := sm.applyConfigMsg(req)
+	for _, tx := range txs {
+		switch tx.Type {
+		case TransportTransaction:
+			mirMsgs = append(mirMsgs, tx.Data)
+		case ConfigurationTransaction:
+			votedValSet, err := sm.applyConfigTx(tx)
 			if err != nil {
 				return err
 			}
@@ -411,24 +410,24 @@ func (sm *StateManager) ApplyTXs(txs []*mirproto.Transaction) error {
 	return nil
 }
 
-func (sm *StateManager) applyConfigMsg(msg *mirproto.Transaction) (*validator.Set, error) {
+func (sm *StateManager) applyConfigTx(tx *mirproto.Transaction) (*validator.Set, error) {
 	var valSet validator.Set
-	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
+	if err := valSet.UnmarshalCBOR(bytes.NewReader(tx.Data)); err != nil {
 		return nil, err
 	}
 
-	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
+	enoughVotes, finished, err := sm.processVote(t.NodeID(tx.ClientId), &valSet)
 	if err != nil {
-		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
+		log.With("validator", sm.id).Errorf("failed to apply config tx: %v", err)
 		// This error is not critical for the operation of the validator process, we should notify
 		// the user but not kill the process. Returning an error here would exit the validator
 		// process with failure.
 		return nil, nil
 	}
 
-	// If we get the configuration message we have sent then we remove it from the configuration request storage.
-	if msg.ClientId == trantor.ClientID(sm.id) {
-		if err := sm.confManager.Done(msg.TxNo); err != nil {
+	// If we get the configuration message we have sent then we remove it from the configuration manager.
+	if tx.ClientId == trantor.ClientID(sm.id) {
+		if err := sm.confManager.Done(tx.TxNo); err != nil {
 			log.With("validator", sm.id).Errorf("failed to mark config message as done: %v", err)
 		}
 	}
@@ -608,7 +607,7 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 		return xerrors.Errorf("validator %v failed to deliver checkpoint: %w", sm.id, err)
 	}
 
-	// Reset fifo between checkpoints to avoid requests getting stuck.
+	// Reset fifo between checkpoints to avoid txs getting stuck.
 	// See https://github.com/consensus-shipyard/lotus/issues/28.
 	sm.txPool.Purge()
 	return nil

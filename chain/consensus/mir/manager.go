@@ -383,7 +383,7 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (txs []*mirpr
 		r := &mirproto.Transaction{
 			ClientId: types2.ClientID(clientID),
 			TxNo:     types2.TxNo(nonce),
-			Type:     TransportRequest,
+			Type:     TransportTransaction,
 			Data:     data,
 		}
 
@@ -401,7 +401,7 @@ func (m *Manager) createAndStoreConfigurationTx(set *validator.Set) *mirproto.Tr
 		return nil
 	}
 
-	r, err := m.confManager.NewTX(ConfigurationRequest, b.Bytes())
+	r, err := m.confManager.NewTX(ConfigurationTransaction, b.Bytes())
 	if err != nil {
 		log.With("validator", m.id).Errorf("unable to create configuration tx: %v", err)
 		return nil

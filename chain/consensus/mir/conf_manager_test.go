@@ -72,7 +72,7 @@ func TestMarshalling(t *testing.T) {
 		TxNo:     1,
 		ClientId: "1",
 		Data:     []byte{0},
-		Type:     ConfigurationRequest,
+		Type:     ConfigurationTransaction,
 	}
 
 	b, err := proto.Marshal(r0.Pb())
@@ -108,7 +108,7 @@ func TestConfigurationManagerDBOperations(t *testing.T) {
 		TxNo:     1,
 		ClientId: "1",
 		Data:     []byte{1},
-		Type:     ConfigurationRequest,
+		Type:     ConfigurationTransaction,
 	}
 
 	err = cm.storeTx(&r, 200)
@@ -130,10 +130,10 @@ func TestConfigurationManagerRecoverData_NoCrash(t *testing.T) {
 	cm, err := NewConfigurationManager(context.Background(), ds, "id1")
 	require.NoError(t, err)
 
-	_, err = cm.NewTX(ConfigurationRequest, []byte{0})
+	_, err = cm.NewTX(ConfigurationTransaction, []byte{0})
 	require.NoError(t, err)
 
-	_, err = cm.NewTX(ConfigurationRequest, []byte{1})
+	_, err = cm.NewTX(ConfigurationTransaction, []byte{1})
 	require.NoError(t, err)
 
 	// Recover the state and check it is correct.
@@ -174,10 +174,10 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 	cm1, err := NewConfigurationManager(context.Background(), ds1, "id1")
 	require.NoError(t, err)
 
-	_, err = cm1.NewTX(ConfigurationRequest, []byte{0})
+	_, err = cm1.NewTX(ConfigurationTransaction, []byte{0})
 	require.NoError(t, err)
 
-	_, err = cm1.NewTX(ConfigurationRequest, []byte{1})
+	_, err = cm1.NewTX(ConfigurationTransaction, []byte{1})
 	require.NoError(t, err)
 
 	// ---
@@ -193,7 +193,7 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 		TxNo:     trantor.TxNo(cm2.nextTxNo),
 		ClientId: "1",
 		Data:     []byte{0},
-		Type:     ConfigurationRequest,
+		Type:     ConfigurationTransaction,
 	}
 
 	err = cm2.storeTx(&r0, r0.TxNo.Pb())
@@ -206,7 +206,7 @@ func TestConfigurationManagerNewTX_Atomicity(t *testing.T) {
 		TxNo:     trantor.TxNo(cm2.nextTxNo),
 		ClientId: "1",
 		Data:     []byte{1},
-		Type:     ConfigurationRequest,
+		Type:     ConfigurationTransaction,
 	}
 
 	err = cm2.storeTx(&r1, r1.TxNo.Pb())
@@ -240,7 +240,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 	require.NoError(t, err)
 
 	// Store the first request.
-	_, err = cm.NewTX(ConfigurationRequest, []byte{0})
+	_, err = cm.NewTX(ConfigurationTransaction, []byte{0})
 	require.NoError(t, err)
 
 	// Store the second request using low level primitive to simulate a crash.
@@ -248,7 +248,7 @@ func TestConfigurationManagerRecoverData_WithCrash(t *testing.T) {
 		TxNo:     1,
 		ClientId: "1",
 		Data:     []byte{1},
-		Type:     ConfigurationRequest,
+		Type:     ConfigurationTransaction,
 	}
 	err = cm.storeTx(&r1, r1.TxNo.Pb())
 	require.NoError(t, err)

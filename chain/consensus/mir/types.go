@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	TransportRequest     = 1
-	ConfigurationRequest = 0
+	TransportTransaction     = 1
+	ConfigurationTransaction = 0
 )
 
 type CtxCanceledWhileWaitingForBlockError struct {

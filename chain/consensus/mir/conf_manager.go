@@ -88,7 +88,7 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Transact
 	r := mirproto.Transaction{
 		ClientId: types.ClientID(cm.id),
 		TxNo:     types.TxNo(cm.nextTxNo),
-		Type:     ConfigurationRequest,
+		Type:     ConfigurationTransaction,
 		Data:     data,
 	}
 
