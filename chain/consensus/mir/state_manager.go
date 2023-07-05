@@ -66,18 +66,16 @@ type StateManager struct {
 	// For each epoch number, stores the corresponding membership.
 	// It stores the current membership and the memberships of ConfigOffset following epochs.
 	// It is updated by the NewEpoch function called by Mir on epoch transition (and on state transfer).
-	memberships map[trantor.EpochNr]map[t.NodeID]*mirproto.NodeIdentity
+	memberships map[trantor.EpochNr]*mirproto.Membership
 
 	// Next membership to return from NewEpoch.
 	// Attention: No in-place modifications of this field are allowed.
 	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
-	nextNewMembership map[t.NodeID]*mirproto.NodeIdentity
+	nextNewMembership *mirproto.Membership
 
 	confManager *ConfigurationManager
-
-	ds db.DB
-
-	txPool *fifo.Pool
+	ds          db.DB
+	txPool      *fifo.Pool
 
 	configurationVotes *ConfigurationVotes
 
@@ -132,11 +130,11 @@ func NewStateManager(
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
-	sm.memberships = make(map[trantor.EpochNr]map[t.NodeID]*mirproto.NodeIdentity, sm.configOffset+1)
+	sm.memberships = make(map[trantor.EpochNr]*mirproto.Membership, sm.configOffset+1)
 	for e := 0; e < sm.configOffset+1; e++ {
-		sm.memberships[trantor.EpochNr(e)] = initialMembership.Nodes
+		sm.memberships[trantor.EpochNr(e)] = initialMembership
 	}
-	sm.nextNewMembership = initialMembership.Nodes
+	sm.nextNewMembership = initialMembership
 
 	// Initialize manager checkpoint state with the corresponding latest
 	// checkpoint
@@ -175,7 +173,7 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 			log.With("validator", sm.id).Warnf("syncFromPeers for TSK %s: no connected peers", tsk)
 			// if we are the only validator, we can return was we don't need to sync from anyone.
 			// This way we can restart a solo validator without the need of other nodes.
-			if len(sm.memberships[sm.currentEpoch]) == 1 {
+			if len(sm.memberships[sm.currentEpoch].Nodes) == 1 {
 				return nil
 			}
 		}
@@ -242,14 +240,16 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	// Set memberships for the current epoch and ConfigOffset following ones.
 	// Note that sm.memberships[i+sm.currentEpoch] will almost immediately be overwritten by the first call to NewEpoch.
-	sm.memberships = make(map[trantor.EpochNr]map[t.NodeID]*mirproto.NodeIdentity, len(config.Memberships))
+	sm.memberships = make(map[trantor.EpochNr]*mirproto.Membership, len(config.Memberships))
 	for i, mb := range config.Memberships {
-		sm.memberships[trantor.EpochNr(i)+sm.currentEpoch] = mb.Nodes
+		sm.memberships[trantor.EpochNr(i)+sm.currentEpoch] = &mirproto.Membership{Nodes: mb.Nodes}
 	}
 
 	// The next membership is the last known membership. It may be replaced by another one during this epoch.
 	sm.nextNewMembership = sm.memberships[config.EpochNr+trantor.EpochNr(sm.configOffset)]
-	log.With("validator", sm.id).Infof("RestoreState: next membership size is %d at epoch %d", len(sm.nextNewMembership), sm.currentEpoch)
+	log.With("validator", sm.id).Infof(
+		"RestoreState: next membership size is %d at epoch %d",
+		len(sm.nextNewMembership.Nodes), sm.currentEpoch)
 
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
@@ -452,7 +452,7 @@ func (sm *StateManager) updateNextMembership(set *validator.Set) error {
 	if err != nil {
 		return err
 	}
-	sm.nextNewMembership = mbs.Nodes
+	sm.nextNewMembership = &mirproto.Membership{Nodes: mbs.Nodes}
 	log.With("validator", sm.id).
 		Infof("updateNextMembership: current epoch %d, config number %d, next membership size: %d",
 			sm.currentEpoch, sm.nextConfigurationNumber, len(mbs.Nodes))
@@ -469,7 +469,7 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 			votingValidator, set.ConfigurationNumber, sm.nextConfigurationNumber)
 	}
 
-	if _, found := sm.memberships[sm.currentEpoch][votingValidator]; !found {
+	if _, found := sm.memberships[sm.currentEpoch].Nodes[votingValidator]; !found {
 		return false, false, xerrors.Errorf("validator %s is not in the membership", votingValidator)
 	}
 
@@ -487,7 +487,7 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 	}
 
 	votes := sm.configurationVotes.GetVotesForConfiguration(set.ConfigurationNumber, string(h))
-	nodes := len(sm.memberships[sm.currentEpoch])
+	nodes := len(sm.memberships[sm.currentEpoch].Nodes)
 	log.With("validator", sm.id).
 		Infof("countVote: valset number %d, epoch %d: votes %d, nodes %d",
 			set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
@@ -528,9 +528,9 @@ func (sm *StateManager) NewEpoch(nr trantor.EpochNr) (*mirproto.Membership, erro
 
 	log.With("validator", sm.id).
 		Debugf("New epoch result: current epoch %d, current membership size %d, next membership size: %d, height: %d",
-			sm.currentEpoch, len(sm.memberships[sm.currentEpoch]), len(sm.nextNewMembership), sm.height)
+			sm.currentEpoch, len(sm.memberships[sm.currentEpoch].Nodes), len(sm.nextNewMembership.Nodes), sm.height)
 
-	return &mirproto.Membership{Nodes: sm.nextNewMembership}, nil
+	return sm.nextNewMembership, nil
 }
 
 // Snapshot is called by Mir every time a checkpoint period has
