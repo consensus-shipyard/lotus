@@ -242,7 +242,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	// Note that sm.memberships[i+sm.currentEpoch] will almost immediately be overwritten by the first call to NewEpoch.
 	sm.memberships = make(map[trantor.EpochNr]*mirproto.Membership, len(config.Memberships))
 	for i, mb := range config.Memberships {
-		sm.memberships[trantor.EpochNr(i)+sm.currentEpoch] = &mirproto.Membership{Nodes: mb.Nodes}
+		sm.memberships[trantor.EpochNr(i)+sm.currentEpoch] = mb
 	}
 
 	// The next membership is the last known membership. It may be replaced by another one during this epoch.
@@ -451,7 +451,7 @@ func (sm *StateManager) updateNextMembership(set *validator.Set) error {
 	if err != nil {
 		return err
 	}
-	sm.nextNewMembership = &mirproto.Membership{Nodes: mbs.Nodes}
+	sm.nextNewMembership = mbs
 	log.With("validator", sm.id).
 		Infof("updateNextMembership: current epoch %d, config number %d, next membership size: %d",
 			sm.currentEpoch, sm.nextConfigurationNumber, len(mbs.Nodes))

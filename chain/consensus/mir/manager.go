@@ -103,6 +103,12 @@ func NewManager(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to configure membership: %w", id, err)
 	}
+	if nodes == nil {
+		return nil, fmt.Errorf("empty membership nodes")
+	}
+	if membershipInfo == nil {
+		return nil, fmt.Errorf("empty membership info")
+	}
 
 	e := membershipInfo.GenesisEpoch
 	initialValidatorSet := membershipInfo.ValidatorSet
@@ -111,9 +117,6 @@ func NewManager(ctx context.Context,
 	// Create Mir modules.
 	if err := net.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
-	}
-	if nodes == nil {
-		return nil, fmt.Errorf("empty membership")
 	}
 	net.Connect(nodes)
 
@@ -188,12 +191,11 @@ func NewManager(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("validator %v failed to get mangler params: %w", id, err)
 		}
-		err = trantor.PerturbMessages(&eventmangler.ModuleParams{
+		if err = trantor.PerturbMessages(&eventmangler.ModuleParams{
 			MinDelay: p.MinDelay,
 			MaxDelay: p.MaxDelay,
 			DropRate: p.DropRate,
-		}, "net", smrSystem)
-		if err != nil {
+		}, "net", smrSystem); err != nil {
 			return nil, fmt.Errorf("validator %v failed to configure SMR mangler: %w", id, err)
 		}
 	}
@@ -215,10 +217,8 @@ func NewManager(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("failed to create interceptor: %w", err)
 		}
-		m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), m.interceptor)
-	} else {
-		m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), nil)
 	}
+	m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), m.interceptor)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create Mir node: %w", id, err)
 	}
@@ -358,10 +358,9 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 	return GetCheckpointByHeight(m.stateManager.ctx, m.ds, height, &params)
 }
 
-func (m *Manager) createTransportTxs(msgs []*types.SignedMessage) []*mirproto.Transaction {
-	var txs []*mirproto.Transaction
+func (m *Manager) createTransportTxs(msgs []*types.SignedMessage) (txs []*mirproto.Transaction) {
 	txs = append(txs, m.batchSignedMessages(msgs)...)
-	return txs
+	return
 }
 
 // batchPushSignedMessages pushes signed messages into the transactions pool and sends them to Mir.

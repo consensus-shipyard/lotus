@@ -43,7 +43,7 @@ type ConfigurationManager struct {
 	ctx                  context.Context // Parent context
 	ds                   db.DB           // Persistent storage.
 	id                   string          // Manager ID.
-	nextTxNo             uint64          // The number that will be used in the next configuration Mir tx.
+	nextTxNo             uint64          // The number that will be used in the next Mir configuration transaction.
 	nextAppliedNo        uint64          // The number of the next configuration Mir transaction that will be applied.
 	initialConfiguration membership.Info // Initial membership information.
 }
@@ -80,10 +80,10 @@ func NewConfigurationManagerWithMembershipInfo(ctx context.Context, ds db.DB, id
 	return cm, nil
 }
 
-// NewTX creates and returns a new configuration transaction with the next transaction number,
+// NewTX creates and returns a new configuration transaction with the next nextTxNo number,
 // corresponding to the number of transactions previously created by this client.
 // Until Done is called with the returned transaction number,
-// the transaction will be pending, i.e., among the txs returned by Pending.
+// the transaction will be pending, i.e., among the transactions returned by Pending.
 func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Transaction, error) {
 	r := mirproto.Transaction{
 		ClientId: types.ClientID(cm.id),
@@ -98,7 +98,7 @@ func (cm *ConfigurationManager) NewTX(_ uint64, data []byte) (*mirproto.Transact
 	}
 
 	{
-		// If a transaction with number n has been persisted and the node had crashed here
+		// If a transaction with number n was persisted and the node had crashed here
 		// then when recovering the next configuration nonce can be n+1.
 	}
 
@@ -112,18 +112,17 @@ func (cm *ConfigurationManager) GetInitialMembershipInfo() membership.Info {
 	return cm.initialConfiguration
 }
 
-// Done marks a configuration transaction as done. It will no longer be among the transaction returned by Pending.
+// Done marks a configuration transaction as done. It will no longer be among the transactions returned by Pending.
 func (cm *ConfigurationManager) Done(txNo types.TxNo) error {
-	cm.nextAppliedNo = uint64(txNo) + 1
+	cm.nextAppliedNo = txNo.Pb() + 1
 	cm.storeNextAppliedConfigurationNumber(cm.nextAppliedNo)
-	cm.removeTx(uint64(txNo))
+	cm.removeTx(txNo.Pb())
 	return nil
 }
 
 // Pending returns from the persistent storage all transactions previously returned by NewTX
 // that have not been applied yet.
-func (cm *ConfigurationManager) Pending() ([]*mirproto.Transaction, error) {
-	var txs []*mirproto.Transaction
+func (cm *ConfigurationManager) Pending() (txs []*mirproto.Transaction, err error) {
 	for i := cm.nextAppliedNo; i < cm.nextTxNo; i++ {
 		tx, err := cm.getTx(i)
 		if err != nil {
