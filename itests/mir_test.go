@@ -115,7 +115,7 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
 
-	// initialMembership := membership
+	initialMembership := membership
 
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[:MirTotalValidatorNumber],
 		&kit.MirTestConfig{
@@ -150,50 +150,46 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
 
-	/*
+	t.Log(">>> remove the last added validator from membership")
+	ens.SaveValidatorSetToFile(2, membershipFileName, validators[:MirTotalValidatorNumber]...)
+	membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(2), membership.GetConfigurationNumber())
 
-		t.Log(">>> remove the last added validator from membership")
-		ens.SaveValidatorSetToFile(2, membershipFileName, validators[:MirTotalValidatorNumber]...)
-		membership, err = validator.NewValidatorSetFromFile(membershipFileName)
+	t.Log(">>> final advancing chain")
+	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+	t.Log(">>> final advancing chain")
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+	require.NoError(t, err)
+
+	// Check the configuration client persistent DB state.
+	// Core validators have sent 2 messages.
+	for _, m := range validators[:MirTotalValidatorNumber] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
-		require.Equal(t, MirTotalValidatorNumber, membership.Size())
-		require.Equal(t, uint64(2), membership.GetConfigurationNumber())
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
 
-		t.Log(">>> final advancing chain")
-		err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
+		nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
 		require.NoError(t, err)
-		t.Log(">>> final advancing chain")
-		err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:MirTotalValidatorNumber]...)
+		require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
+	}
+
+	// Added validators must send 1 message.
+	for _, m := range validators[MirTotalValidatorNumber:] {
+		db := m.GetDB()
+		nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
 		require.NoError(t, err)
+		require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
+	}
 
-		// Check the configuration client persistent DB state.
-		// Core validators have sent 2 messages.
-		for _, m := range validators[:MirTotalValidatorNumber] {
-			db := m.GetDB()
-			nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
-			require.NoError(t, err)
-			require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
+	err = kit.MirNodesWaitForInitialConfigInFirstBlock(ctx, initialMembership, nodes...)
+	require.NoError(t, err)
 
-			nonce, err = db.Get(ctx, mir.NextAppliedConfigurationNumberKey)
-			require.NoError(t, err)
-			require.Equal(t, uint64(2), binary.LittleEndian.Uint64(nonce))
-		}
-
-		// Added validators must send 1 message.
-		for _, m := range validators[MirTotalValidatorNumber:] {
-			db := m.GetDB()
-			nonce, err := db.Get(ctx, mir.NextConfigurationNumberKey)
-			require.NoError(t, err)
-			require.Equal(t, uint64(1), binary.LittleEndian.Uint64(nonce))
-		}
-
-		err = kit.MirNodesWaitForInitialConfigInFirstBlock(ctx, initialMembership, nodes...)
-		require.NoError(t, err)
-
-		err = kit.MirNodesWaitForMembershipMsg(ctx, membership, nodes...)
-		require.NoError(t, err)
-
-	*/
+	err = kit.MirNodesWaitForMembershipMsg(ctx, membership, nodes...)
+	require.NoError(t, err)
 }
 
 // TestMirReconfigurationOnChain_RunSubnet tests that the membership can be received using a stub JSON RPC client.
