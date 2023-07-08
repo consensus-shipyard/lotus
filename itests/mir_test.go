@@ -64,17 +64,6 @@ func TestMirReconfiguration_PretestChecks(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	g, ctx := errgroup.WithContext(ctx)
-
-	defer func() {
-		t.Logf("[*] defer: cancelling %s context", t.Name())
-		cancel()
-		err := g.Wait()
-		require.NoError(t, err)
-		t.Logf("[*] defer: system %s stopped", t.Name())
-	}()
-
 	_, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+1)
 	ens.SaveValidatorSetToFile(0, membershipFileName, validators[:MirTotalValidatorNumber]...)
 
