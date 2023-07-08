@@ -294,8 +294,6 @@ func (sm *StateManager) ApplyTXs(txs []*mirproto.Transaction) error {
 	log.With("validator", sm.id).Info("ApplyTXs started")
 	defer log.With("validator", sm.id).Info("ApplyTXs finished")
 
-	fmt.Println(">>> apply txs height=", sm.height, sm.id, txs)
-
 	var (
 		mirMsgs    []Message
 		valSetMsgs []*types.SignedMessage
@@ -374,7 +372,6 @@ func (sm *StateManager) ApplyTXs(txs []*mirproto.Transaction) error {
 		if err != nil {
 			return xerrors.Errorf("validator %v failed to set vrfproof from checkpoint: %w", sm.id, err)
 		}
-		fmt.Println(">>> checkpoint ser", sm.height, sm.id, vrfCheckpoint)
 		log.With("validator", sm.id).Infof("Including Mir checkpoint for in block %d", sm.height)
 	}
 
@@ -400,11 +397,6 @@ func (sm *StateManager) ApplyTXs(txs []*mirproto.Transaction) error {
 		log.With("validator", sm.id).With("epoch", sm.height).Debug("created a nil block")
 		return nil
 	}
-
-	fmt.Println(">>> apply txs base height=", sm.height, sm.id, base.Key())
-	fmt.Println(">>> apply txs msgs height=", sm.height, sm.id, len(msgs), msgs)
-	fmt.Println(">>> apply txs ticket height=", sm.height, sm.id, vrfCheckpoint)
-	fmt.Println(">>> apply txs eproof height=", sm.height, sm.id, eproofCheckpoint)
 
 	err = sm.api.SyncSubmitBlock(sm.ctx, &types.BlockMsg{
 		Header:        bh.Header,
@@ -591,7 +583,6 @@ func (sm *StateManager) Snapshot() ([]byte, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("snapshot: validator %v failed to serialize checkpoint: %w", sm.id, err)
 	}
-	fmt.Printf(">>> snapshot epoch %d ID %v %v\n", sm.currentEpoch, sm.id, ch.BlockCids)
 	log.With("validator", sm.id).Infof("Snapshot finished: epoch - %d, height - %d", sm.currentEpoch, sm.height)
 	return b, nil
 }
