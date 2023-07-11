@@ -13,6 +13,7 @@ import (
 
 	"github.com/filecoin-project/go-address"
 
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/messagepool"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/wallet"
@@ -44,6 +45,10 @@ func (mp *mockMpool) GetNonce(_ context.Context, addr address.Address, _ types.T
 }
 func (mp *mockMpool) GetActor(_ context.Context, addr address.Address, _ types.TipSetKey) (*types.Actor, error) {
 	panic("don't use it")
+}
+
+func (mp *mockMpool) GetChainID(_ context.Context) (uint64, error) {
+	return build.Eip155ChainId, nil
 }
 
 func TestMessageSignerSignMessage(t *testing.T) {

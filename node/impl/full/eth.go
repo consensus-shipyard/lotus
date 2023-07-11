@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -669,7 +670,19 @@ func (a *EthModule) EthGetBalance(ctx context.Context, address ethtypes.EthAddre
 }
 
 func (a *EthModule) EthChainId(ctx context.Context) (ethtypes.EthUint64, error) {
-	return ethtypes.EthUint64(build.Eip155ChainId), nil
+	return chainIDFromSubnetID(ctx, a.StateAPI)
+}
+
+func chainIDFromSubnetID(ctx context.Context, a StateAPI) (ethtypes.EthUint64, error) {
+	nn, err := a.StateNetworkName(ctx)
+	if err != nil {
+		return ethtypes.EthUint64(0), err
+	}
+	sn, err := sdk.NewSubnetIDFromString(string(nn))
+	if err != nil {
+		return ethtypes.EthUint64(0), err
+	}
+	return ethtypes.EthUint64(sn.ChainID()), nil
 }
 
 func (a *EthModule) EthFeeHistory(ctx context.Context, p jsonrpc.RawParams) (ethtypes.EthFeeHistory, error) {
@@ -765,8 +778,12 @@ func (a *EthModule) EthFeeHistory(ctx context.Context, p jsonrpc.RawParams) (eth
 	return ret, nil
 }
 
-func (a *EthModule) NetVersion(_ context.Context) (string, error) {
-	return strconv.FormatInt(build.Eip155ChainId, 10), nil
+func (a *EthModule) NetVersion(ctx context.Context) (string, error) {
+	id, err := chainIDFromSubnetID(ctx, a.StateAPI)
+	if err != nil {
+		return "", err
+	}
+	return strconv.FormatInt(int64(id), 10), nil
 }
 
 func (a *EthModule) NetListening(ctx context.Context) (bool, error) {
@@ -808,7 +825,11 @@ func (a *EthModule) EthSendRawTransaction(ctx context.Context, rawTx ethtypes.Et
 		return ethtypes.EmptyEthHash, err
 	}
 
-	smsg, err := txArgs.ToSignedMessage()
+	chainID, err := chainIDFromSubnetID(ctx, a.StateAPI)
+	if err != nil {
+		return ethtypes.EmptyEthHash, err
+	}
+	smsg, err := txArgs.ToSignedMessage(int(chainID))
 	if err != nil {
 		return ethtypes.EmptyEthHash, err
 	}
@@ -1861,6 +1882,10 @@ func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTx
 		return ethtypes.EthBlock{}, xerrors.Errorf("failed to retrieve messages and receipts: %w", err)
 	}
 
+	chainID, err := chainIDFromSubnetID(ctx, sa)
+	if err != nil {
+		return ethtypes.EthBlock{}, err
+	}
 	block := ethtypes.NewEthBlock(len(msgs) > 0)
 
 	gasUsed := int64(0)
@@ -1887,7 +1912,7 @@ func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTx
 			return ethtypes.EthBlock{}, xerrors.Errorf("failed to convert msg to ethTx: %w", err)
 		}
 
-		tx.ChainID = ethtypes.EthUint64(build.Eip155ChainId)
+		tx.ChainID = chainID
 		tx.BlockHash = &blkHash
 		tx.BlockNumber = &bn
 		tx.TransactionIndex = &ti
@@ -2006,7 +2031,11 @@ func newEthTxFromSignedMessage(ctx context.Context, smsg *types.SignedMessage, s
 
 	// This is an eth tx
 	if smsg.Signature.Type == crypto.SigTypeDelegated {
-		tx, err = ethtypes.EthTxFromSignedEthMessage(smsg)
+		chainID, err := chainIDFromSubnetID(ctx, sa)
+		if err != nil {
+			return ethtypes.EthTx{}, xerrors.Errorf("failed to get chain ID: %w", err)
+		}
+		tx, err = ethtypes.EthTxFromSignedEthMessage(smsg, int(chainID))
 		if err != nil {
 			return ethtypes.EthTx{}, xerrors.Errorf("failed to convert from signed message: %w", err)
 		}
@@ -2048,11 +2077,12 @@ func ethTxFromNativeMessage(ctx context.Context, msg *types.Message, sa StateAPI
 	// We don't care if we error here, conversion is best effort for non-eth transactions
 	from, _ := lookupEthAddress(ctx, msg.From, sa)
 	to, _ := lookupEthAddress(ctx, msg.To, sa)
+	chainID, _ := chainIDFromSubnetID(ctx, sa)
 	return ethtypes.EthTx{
 		To:                   &to,
 		From:                 from,
 		Nonce:                ethtypes.EthUint64(msg.Nonce),
-		ChainID:              ethtypes.EthUint64(build.Eip155ChainId),
+		ChainID:              chainID,
 		Value:                ethtypes.EthBigInt(msg.Value),
 		Type:                 ethtypes.Eip1559TxType,
 		Gas:                  ethtypes.EthUint64(msg.GasLimit),
@@ -2119,7 +2149,12 @@ func newEthTxFromMessageLookup(ctx context.Context, msgLookup *api.MsgLookup, tx
 		ti = ethtypes.EthUint64(txIdx)
 	)
 
-	tx.ChainID = ethtypes.EthUint64(build.Eip155ChainId)
+	chainID, err := chainIDFromSubnetID(ctx, sa)
+	if err != nil {
+		return ethtypes.EthTx{}, err
+	}
+
+	tx.ChainID = chainID
 	tx.BlockHash = &blkHash
 	tx.BlockNumber = &bn
 	tx.TransactionIndex = &ti

@@ -20,7 +20,7 @@ func TestMembership(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, 2, len(ids))
-	require.Equal(t, 2, len(mb))
+	require.Equal(t, 2, len(mb.Nodes))
 
 	require.Equal(t, "t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy",
 		ids[0].Pb())
@@ -28,9 +28,9 @@ func TestMembership(t *testing.T) {
 		ids[1].Pb())
 
 	require.Equal(t, "/ip4/127.0.0.1/tcp/10000/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ",
-		mb["t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy"].String())
+		mb.Nodes["t1wpixt5mihkj75lfhrnaa6v56n27epvlgwparujy"].Addr)
 	require.Equal(t, "/ip4/127.0.0.1/tcp/10001/p2p/12D3KooWJhKBXvytYgPCAaiRtiNLJNSFG5jreKDu2jiVpJetzvVJ",
-		mb["t12zjpclnis2uytmcydrx7i5jcbvehs5ut3x6mvvq"].String())
+		mb.Nodes["t12zjpclnis2uytmcydrx7i5jcbvehs5ut3x6mvvq"].Addr)
 }
 
 func TestStringMembershipInfo(t *testing.T) {

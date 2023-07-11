@@ -189,6 +189,11 @@ func checkBlockMessages(ctx context.Context, sm *stmgr.StateManager, cs *store.C
 		}
 	}
 
+	chainID, err := stmgr.GetChainID(ctx, sm)
+	if err != nil {
+		return xerrors.Errorf("failed to get chain ID: %w", err)
+	}
+
 	nonces := make(map[address.Address]uint64)
 
 	stateroot, _, err := sm.TipSetState(ctx, baseTs)
@@ -293,7 +298,7 @@ func checkBlockMessages(ctx context.Context, sm *stmgr.StateManager, cs *store.C
 				return xerrors.Errorf("failed to resolve key addr: %w", err)
 			}
 
-			if err := AuthenticateMessage(m, kaddr); err != nil {
+			if err := AuthenticateMessage(m, kaddr, int(chainID)); err != nil {
 				return xerrors.Errorf("failed to validate signature: %w", err)
 			}
 		}

@@ -17,7 +17,6 @@ import (
 	builtintypes "github.com/filecoin-project/go-state-types/builtin"
 	typescrypto "github.com/filecoin-project/go-state-types/crypto"
 
-	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/types"
 )
 
@@ -64,12 +63,12 @@ type EthTxArgs struct {
 // - TransactionIndex
 // - From
 // - Hash
-func EthTxFromSignedEthMessage(smsg *types.SignedMessage) (EthTx, error) {
+func EthTxFromSignedEthMessage(smsg *types.SignedMessage, chainID int) (EthTx, error) {
 	if smsg.Signature.Type != typescrypto.SigTypeDelegated {
 		return EthTx{}, xerrors.Errorf("signature is not delegated type, is type: %d", smsg.Signature.Type)
 	}
 
-	txArgs, err := EthTxArgsFromUnsignedEthMessage(&smsg.Message)
+	txArgs, err := EthTxArgsFromUnsignedEthMessage(&smsg.Message, chainID)
 	if err != nil {
 		return EthTx{}, xerrors.Errorf("failed to convert the unsigned message: %w", err)
 	}
@@ -96,7 +95,7 @@ func EthTxFromSignedEthMessage(smsg *types.SignedMessage) (EthTx, error) {
 	}, nil
 }
 
-func EthTxArgsFromUnsignedEthMessage(msg *types.Message) (EthTxArgs, error) {
+func EthTxArgsFromUnsignedEthMessage(msg *types.Message, chainID int) (EthTxArgs, error) {
 	var (
 		to     *EthAddress
 		params []byte
@@ -138,7 +137,7 @@ func EthTxArgsFromUnsignedEthMessage(msg *types.Message) (EthTxArgs, error) {
 	}
 
 	return EthTxArgs{
-		ChainID:              build.Eip155ChainId,
+		ChainID:              chainID,
 		Nonce:                int(msg.Nonce),
 		To:                   to,
 		Value:                msg.Value,
@@ -149,8 +148,8 @@ func EthTxArgsFromUnsignedEthMessage(msg *types.Message) (EthTxArgs, error) {
 	}, nil
 }
 
-func (tx *EthTxArgs) ToUnsignedMessage(from address.Address) (*types.Message, error) {
-	if tx.ChainID != build.Eip155ChainId {
+func (tx *EthTxArgs) ToUnsignedMessage(from address.Address, chainID int) (*types.Message, error) {
+	if tx.ChainID != chainID {
 		return nil, xerrors.Errorf("unsupported chain id: %d", tx.ChainID)
 	}
 
@@ -192,13 +191,13 @@ func (tx *EthTxArgs) ToUnsignedMessage(from address.Address) (*types.Message, er
 	}, nil
 }
 
-func (tx *EthTxArgs) ToSignedMessage() (*types.SignedMessage, error) {
+func (tx *EthTxArgs) ToSignedMessage(chainID int) (*types.SignedMessage, error) {
 	from, err := tx.Sender()
 	if err != nil {
 		return nil, xerrors.Errorf("failed to calculate sender: %w", err)
 	}
 
-	unsignedMsg, err := tx.ToUnsignedMessage(from)
+	unsignedMsg, err := tx.ToUnsignedMessage(from, chainID)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to convert to unsigned msg: %w", err)
 	}

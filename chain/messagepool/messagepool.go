@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ipfs/go-cid"
@@ -798,7 +799,11 @@ func (mp *MessagePool) VerifyMsgSig(m *types.SignedMessage) error {
 		return nil
 	}
 
-	if err := consensus.AuthenticateMessage(m, m.Message.From); err != nil {
+	chainID, err := mp.GetChainID(context.Background())
+	if err != nil {
+		return xerrors.Errorf("failed to get chain ID: %w", err)
+	}
+	if err := consensus.AuthenticateMessage(m, m.Message.From, int(chainID)); err != nil {
 		return xerrors.Errorf("failed to validate signature: %w", err)
 	}
 
@@ -1016,6 +1021,14 @@ func (mp *MessagePool) GetActor(_ context.Context, addr address.Address, _ types
 	mp.curTsLk.Lock()
 	defer mp.curTsLk.Unlock()
 	return mp.api.GetActorAfter(addr, mp.curTs)
+}
+
+func (mp *MessagePool) GetChainID(ctc context.Context) (uint64, error) {
+	sn, err := sdk.NewSubnetIDFromString(string(mp.netName))
+	if err != nil {
+		return 0, err
+	}
+	return sn.ChainID(), err
 }
 
 func (mp *MessagePool) getNonceLocked(ctx context.Context, addr address.Address, curTs *types.TipSet) (uint64, error) {
@@ -1609,4 +1622,5 @@ func getBaseFeeLowerBound(baseFee, factor types.BigInt) types.BigInt {
 type MpoolNonceAPI interface {
 	GetNonce(context.Context, address.Address, types.TipSetKey) (uint64, error)
 	GetActor(context.Context, address.Address, types.TipSetKey) (*types.Actor, error)
+	GetChainID(context.Context) (uint64, error)
 }

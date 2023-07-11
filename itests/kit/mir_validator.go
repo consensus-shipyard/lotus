@@ -20,7 +20,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 )
 
-type MirConfig struct {
+type MirTestConfig struct {
 	Delay              int
 	MembershipFileName string
 	MembershipString   string
@@ -30,8 +30,8 @@ type MirConfig struct {
 	MockedTransport    bool
 }
 
-func DefaultMirConfig() *MirConfig {
-	return &MirConfig{
+func DefaultMirTestConfig() *MirTestConfig {
+	return &MirTestConfig{
 		MembershipType: membership.StringSource,
 	}
 }
@@ -50,10 +50,10 @@ type MirValidator struct {
 	db               *TestDB
 	membershipString string
 	membership       membership.Reader
-	config           *MirConfig
+	config           *MirTestConfig
 }
 
-func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirConfig) (*MirValidator, error) {
+func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirTestConfig) (*MirValidator, error) {
 	v := MirValidator{
 		t:         t,
 		miner:     miner,
@@ -98,13 +98,18 @@ func NewMirValidator(t *testing.T, miner *TestValidator, db *TestDB, cfg *MirCon
 	return &v, nil
 }
 
-func (v *MirValidator) MineBlocks(ctx context.Context) error {
+func (v *MirValidator) MineBlocks(ctx context.Context, mirConfig *mir.ConsensusConfig) error {
 	cfg := mir.Config{
 		BaseConfig: &mir.BaseConfig{
 			Addr:      v.addr,
 			GroupName: v.t.Name(),
 		},
-		Consensus: mir.DefaultConsensusConfig(),
+	}
+
+	if mirConfig != nil {
+		cfg.Consensus = mirConfig
+	} else {
+		cfg.Consensus = mir.DefaultConsensusConfig()
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

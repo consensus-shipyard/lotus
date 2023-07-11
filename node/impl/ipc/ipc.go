@@ -69,7 +69,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 		ConstructorParams: constParams,
 	})
 	if err != nil {
-		return address.Undef, err
+		return address.Undef, xerrors.Errorf("error serializing init params: %w", err)
 	}
 
 	smsg, aerr := a.MpoolPushMessage(ctx, &types.Message{
@@ -80,7 +80,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 		Params: initParams,
 	}, nil)
 	if aerr != nil {
-		return address.Undef, aerr
+		return address.Undef, xerrors.Errorf("error pushing msg into mpool: %w", aerr)
 	}
 
 	// this api call is sync and waits for the message to go through, we are adding a
@@ -98,7 +98,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 	if err := r.UnmarshalCBOR(bytes.NewReader(recpt.Receipt.Return)); err != nil {
 		return address.Undef, err
 	}
-	return r.IDAddress, nil
+	return r.RobustAddress, nil
 }
 
 func (a *IPCAPI) IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error) {
@@ -114,7 +114,7 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 		return nil, err
 	}
 	st := subnetactor.State{}
-	if err := a.readActorState(ctx, sn.Actor, tsk, &st); err != nil {
+	if err := a.readActorState(ctx, sn.Actor(), tsk, &st); err != nil {
 		return nil, xerrors.Errorf("error getting subnet actor from StateStore: %w", err)
 	}
 
@@ -148,11 +148,7 @@ func (a *IPCAPI) IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, t
 // This function is expected to be called in the parent of the checkpoint being populated.
 // It inspects the state in the heaviest block (i.e. latest state available)
 func (a *IPCAPI) IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
-	if err != nil {
-		return cid.Undef, err
-	}
-	sn, found, err := st.GetSubnet(adt.WrapStore(ctx, a.Chain.ActorStore(ctx)), subnet)
+	sn, found, err := a.getSubnet(ctx, gatewayAddr, subnet)
 	if err != nil {
 		return cid.Undef, xerrors.Errorf("error getting subnet from actor store: %w", err)
 	}
@@ -337,13 +333,9 @@ func (a *IPCAPI) IPCListChildSubnets(ctx context.Context, gatewayAddr address.Ad
 // IPCGetTopDownMsgs returns the list of top down-messages from a specific nonce
 // to the latest one that has been committed in the subnet.
 func (a *IPCAPI) IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, tsk)
+	subnet, found, err := a.getSubnet(ctx, gatewayAddr, sn)
 	if err != nil {
-		return nil, err
-	}
-	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
-	if err != nil {
-		return nil, xerrors.Errorf("error getting subnet: %w", err)
+		return nil, xerrors.Errorf("error getting subnet from actor store: %w", err)
 	}
 	if !found {
 		return nil, xerrors.Errorf("subnet not found in gateway")
@@ -373,13 +365,9 @@ func (a *IPCAPI) IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr ad
 // IPCGetGenesisEpochForSubnet returns the genesis epoch from which a subnet has been
 // registered in the parent.
 func (a *IPCAPI) IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error) {
-	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	subnet, found, err := a.getSubnet(ctx, gatewayAddr, sn)
 	if err != nil {
-		return 0, err
-	}
-	subnet, found, err := st.GetSubnet(a.Chain.ActorStore(ctx), sn)
-	if err != nil {
-		return 0, xerrors.Errorf("error getting subnet: %w", err)
+		return 0, xerrors.Errorf("error getting subnet from actor store: %w", err)
 	}
 	if !found {
 		return 0, xerrors.Errorf("subnet not found in gateway")
@@ -418,9 +406,38 @@ func (a *IPCAPI) checkParent(ctx context.Context, sn sdk.SubnetID) error {
 		return err
 	}
 
-	if string(netName) != sn.Parent {
+	if string(netName) != sn.Parent().String() {
 		return xerrors.Errorf("wrong subnet being called: the current network is not the parent of subnet provided: %s, %s",
-			netName, sn.Parent)
+			netName, sn.Parent().String())
+	}
+	return nil
+}
+
+// getSubnet is a wrapper over GetSubnet that translate the SubnetID into its f0-based form.
+//
+// We must note that the only actor in the route that we can translate to f0 is the last
+// one in the ID, as this is the one for which we have information within the subnet to
+// resolve the ID.
+func (a *IPCAPI) getSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (*gateway.Subnet, bool, error) {
+	if err := a.subnetIDToF0(ctx, &sn); err != nil {
+		return nil, false, err
+	}
+	st, err := a.IPCReadGatewayState(ctx, gatewayAddr, types.EmptyTSK)
+	if err != nil {
+		return nil, false, err
+	}
+	return st.GetSubnet(adt.WrapStore(ctx, a.Chain.ActorStore(ctx)), sn)
+}
+
+// subnetIDToF0 translates the SubnetID into its f0-based form.
+// It translates the last actor in route if  any to f0 address
+func (a *IPCAPI) subnetIDToF0(ctx context.Context, sn *sdk.SubnetID) error {
+	var err error
+	if len(sn.Children) > 0 {
+		sn.Children[len(sn.Children)-1], err = a.Stmgr.LookupID(ctx, sn.Children[len(sn.Children)-1], nil)
+		if err != nil {
+			return xerrors.Errorf("error looking up child ID: %w", err)
+		}
 	}
 	return nil
 }

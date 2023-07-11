@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/test-vectors/schema"
 
 	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -157,12 +158,12 @@ func (d *Driver) ExecuteTipset(bs blockstore.Blockstore, ds ds.Batching, params 
 		results:  []*vm.ApplyRet{},
 	}
 
-	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 		vmopt.CircSupplyCalc = func(context.Context, abi.ChainEpoch, *state.StateTree) (abi.TokenAmount, error) {
 			return big.Zero(), nil
 		}
 
-		return vm.NewVM(ctx, vmopt)
+		return vm.NewVM(ctx, vmopt, build.Eip155ChainId)
 	})
 
 	postcid, receiptsroot, err := tse.ApplyBlocks(context.Background(),
@@ -274,7 +275,7 @@ func (d *Driver) ExecuteMessage(bs blockstore.Blockstore, params ExecuteMessageP
 		vmi = lvm
 	} else {
 		if vmOpts.NetworkVersion >= network.Version16 {
-			fvm, err := vm.NewFVM(context.TODO(), vmOpts)
+			fvm, err := vm.NewFVM(context.TODO(), vmOpts, build.Eip155ChainId)
 			if err != nil {
 				return nil, cid.Undef, err
 			}

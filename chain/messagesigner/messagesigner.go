@@ -67,7 +67,11 @@ func (ms *MessageSigner) SignMessage(ctx context.Context, msg *types.Message, sp
 	// Sign the message with the nonce
 	msg.Nonce = nonce
 
-	sb, err := SigningBytes(msg, msg.From.Protocol())
+	chainID, err := ms.mpool.GetChainID(ctx)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get chain ID: %w", err)
+	}
+	sb, err := SigningBytes(msg, msg.From.Protocol(), chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -194,9 +198,9 @@ func (ms *MessageSigner) dstoreKey(addr address.Address) datastore.Key {
 	return datastore.KeyWithNamespaces([]string{dsKeyActorNonce, addr.String()})
 }
 
-func SigningBytes(msg *types.Message, sigType address.Protocol) ([]byte, error) {
+func SigningBytes(msg *types.Message, sigType address.Protocol, chainID uint64) ([]byte, error) {
 	if sigType == address.Delegated {
-		txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msg)
+		txArgs, err := ethtypes.EthTxArgsFromUnsignedEthMessage(msg, int(chainID))
 		if err != nil {
 			return nil, xerrors.Errorf("failed to reconstruct eth transaction: %w", err)
 		}

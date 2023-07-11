@@ -5,6 +5,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/eudico-core/genesis"
 )
 
@@ -22,7 +23,7 @@ var genesisNewCmd = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "subnet-id",
-			Value: sdk.RootStr,
+			Value: sdk.NewRootID(build.Eip155ChainId).String(),
 			Usage: "The ID of the subnet",
 		},
 		&cli.StringFlag{

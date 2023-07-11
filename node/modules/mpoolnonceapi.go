@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"go.uber.org/fx"
 	"golang.org/x/xerrors"
 
@@ -102,6 +103,18 @@ func (a *MpoolNonceAPI) GetActor(ctx context.Context, addr address.Address, tsk 
 	}
 
 	return act, nil
+}
+
+func (a *MpoolNonceAPI) GetChainID(ctx context.Context) (uint64, error) {
+	nn, err := a.StateModule.StateNetworkName(ctx)
+	if err != nil {
+		return 0, err
+	}
+	sn, err := sdk.NewSubnetIDFromString(string(nn))
+	if err != nil {
+		return 0, err
+	}
+	return sn.ChainID(), nil
 }
 
 var _ messagepool.MpoolNonceAPI = (*MpoolNonceAPI)(nil)

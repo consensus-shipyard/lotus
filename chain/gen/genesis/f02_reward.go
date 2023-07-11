@@ -41,7 +41,11 @@ func SetupRewardActor(ctx context.Context, bs bstore.Blockstore, qaPower big.Int
 	// let's not allocate any initial balance into the reward actor if this is not
 	// the rootnet.
 	balance := abi.NewTokenAmount(0)
-	if networkName == ipctypes.RootSubnet.String() {
+	id, err := ipctypes.NewSubnetIDFromString(networkName)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to parse network name %s: %w", networkName, err)
+	}
+	if id.IsRoot() {
 		balance = types.BigInt{Int: build.InitialRewardBalance}
 	}
 

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	ipctypes "github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
 	"github.com/consensus-shipyard/go-ipc-types/validator"
 	"github.com/google/uuid"
 	"github.com/ipfs/go-datastore"
@@ -47,6 +47,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/power"
+	"github.com/filecoin-project/lotus/chain/consensus/mir"
 	"github.com/filecoin-project/lotus/chain/consensus/mir/membership"
 	"github.com/filecoin-project/lotus/chain/gen"
 	genesis2 "github.com/filecoin-project/lotus/chain/gen/genesis"
@@ -88,14 +89,14 @@ func init() {
 //
 // Create a new ensemble with:
 //
-//	ens := kit.NewEnsemble()
+// ens := kit.NewEnsemble()
 //
 // Create full nodes and miners:
 //
-//	var full TestFullNode
-//	var miner TestMiner
-//	ens.FullNode(&full, opts...)       // populates a full node
-//	ens.Miner(&miner, &full, opts...)  // populates a miner, using the full node as its chain daemon
+// var full TestFullNode
+// var miner TestMiner
+// ens.FullNode(&full, opts...) // populates a full node
+// ens.Miner(&miner, &full, opts...) // populates a miner, using the full node as its chain daemon
 //
 // It is possible to pass functional options to set initial balances,
 // presealed sectors, owner keys, etc.
@@ -107,23 +108,23 @@ func init() {
 // Nodes also need to be connected with one another, either via `ens.Connect()`
 // or `ens.InterconnectAll()`. A common inchantation for simple tests is to do:
 //
-//	ens.InterconnectAll().BeginMining(blocktime)
+// ens.InterconnectAll().BeginMining(blocktime)
 //
 // You can continue to add more nodes, but you must always follow with
 // `ens.Start()` to activate the new nodes.
 //
 // The API is chainable, so it's possible to do a lot in a very succinct way:
 //
-//	kit.NewEnsemble().FullNode(&full).Miner(&miner, &full).Start().InterconnectAll().BeginMining()
+// kit.NewEnsemble().FullNode(&full).Miner(&miner, &full).Start().InterconnectAll().BeginMining()
 //
 // You can also find convenient fullnode:miner presets, such as 1:1, 1:2,
 // and 2:1, e.g.:
 //
-//	kit.EnsembleMinimal()
-//	kit.EnsembleOneTwo()
-//	kit.EnsembleTwoOne()
+// kit.EnsembleMinimal()
+// kit.EnsembleOneTwo()
+// kit.EnsembleTwoOne()
 
-var ITestSubnet = ipctypes.RootSubnet
+var ITestSubnet = sdk.NewRootID(build.Eip155ChainId)
 
 type Ensemble struct {
 	t            *testing.T
@@ -380,7 +381,7 @@ func (n *Ensemble) Start() *Ensemble {
 	}()
 
 	// ---------------------
-	//  FULL NODES
+	// FULL NODES
 	// ---------------------
 
 	// Create all inactive full nodes.
@@ -459,7 +460,7 @@ func (n *Ensemble) Start() *Ensemble {
 
 		app := fx.New(
 			fxProviders,
-			fxmodules.Invokes(&cfg.Common, false, !full.options.learner),
+			fxmodules.Invokes(cfg, false, !full.options.learner),
 			fx.Invoke(func(fullNode impl.FullNodeAPI) {
 				full.FullNode = &fullNode
 			}),
@@ -517,7 +518,7 @@ func (n *Ensemble) Start() *Ensemble {
 	require.NoError(n.t, err)
 
 	// ---------------------
-	//  MINERS
+	// MINERS
 	// ---------------------
 
 	// Create all inactive miners.
@@ -527,7 +528,7 @@ func (n *Ensemble) Start() *Ensemble {
 				// this is a miner created after genesis, so it won't have a preseal.
 				// we need to create it on chain.
 
-				proofType, err := miner.WindowPoStProofTypeFromSectorSize(m.options.sectorSize)
+				proofType, err := miner.WindowPoStProofTypeFromSectorSize(m.options.sectorSize, n.genesis.version)
 				require.NoError(n.t, err)
 
 				params, aerr := actors.SerializeParams(&power3.CreateMinerParams{
@@ -811,7 +812,7 @@ func (n *Ensemble) Start() *Ensemble {
 	n.inactive.miners = n.inactive.miners[:0]
 
 	// ---------------------
-	//  WORKERS
+	// WORKERS
 	// ---------------------
 
 	// Create all inactive workers.
@@ -874,7 +875,7 @@ func (n *Ensemble) Start() *Ensemble {
 	n.inactive.workers = n.inactive.workers[:0]
 
 	// ---------------------
-	//  MISC
+	// MISC
 	// ---------------------
 
 	// Link all the nodes.
@@ -998,7 +999,7 @@ func (n *Ensemble) BeginMiningMustPost(blocktime time.Duration, miners ...*TestM
 
 	// wait one second to make sure that nodes are connected and have handshaken.
 	// TODO make this deterministic by listening to identify events on the
-	//  libp2p eventbus instead (or something else).
+	// libp2p eventbus instead (or something else).
 	time.Sleep(1 * time.Second)
 
 	var bms []*BlockMiner
@@ -1038,7 +1039,7 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 
 	// wait one second to make sure that nodes are connected and have handshaken.
 	// TODO make this deterministic by listening to identify events on the
-	//  libp2p eventbus instead (or something else).
+	// libp2p eventbus instead (or something else).
 	time.Sleep(1 * time.Second)
 
 	var bms []*BlockMiner
@@ -1067,11 +1068,11 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 }
 
 func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
-	mb := fmt.Sprintf("%d;", 0)
+	mb := fmt.Sprintf("%d;", 0) // configuration number
 	for _, v := range validators {
-		id, err := NodeLibp2pAddr(v.mirHost)
+		addr, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		mb += fmt.Sprintf("%s@%s,", v.mirAddr, id)
+		mb += fmt.Sprintf("%s:10@%s,", v.mirAddr, addr) // ID:weight@net_addr. Weight must not be 0.
 	}
 	return mb
 }
@@ -1082,7 +1083,7 @@ func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile st
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s@%s", v.mirAddr, id))
+		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s:10@%s", v.mirAddr, id))
 		require.NoError(n.t, err)
 		vs = append(vs, v)
 	}
@@ -1097,7 +1098,7 @@ func (n *Ensemble) BeginMirMiningWithDelay(ctx context.Context, g *errgroup.Grou
 }
 
 func (n *Ensemble) BeginMirMining(ctx context.Context, g *errgroup.Group, validators ...*TestValidator) {
-	n.BeginMirMiningWithConfig(ctx, g, validators, DefaultMirConfig())
+	n.BeginMirMiningWithConfig(ctx, g, validators, DefaultMirTestConfig())
 }
 
 // Bootstrapped explicitly sets the ensemble as bootstrapped.
@@ -1112,14 +1113,25 @@ func (n *Ensemble) BeginMirMiningWithDelayForFaultyNodes(
 	validators []*TestValidator,
 	faultyValidators ...*TestValidator,
 ) {
-	n.BeginMirMiningWithConfig(ctx, g, validators, &MirConfig{Delay: delay, MembershipType: membership.StringSource}, faultyValidators...)
+	n.BeginMirMiningWithConfig(ctx, g, validators, &MirTestConfig{Delay: delay, MembershipType: membership.StringSource}, faultyValidators...)
 }
 
 func (n *Ensemble) BeginMirMiningWithConfig(
 	ctx context.Context,
 	g *errgroup.Group,
 	validators []*TestValidator,
-	config *MirConfig,
+	testConfig *MirTestConfig,
+	faultyValidators ...*TestValidator,
+) {
+	n.BeginMirMiningWithTestAndConsensusConfigs(ctx, g, validators, testConfig, nil, faultyValidators...)
+}
+
+func (n *Ensemble) BeginMirMiningWithTestAndConsensusConfigs(
+	ctx context.Context,
+	g *errgroup.Group,
+	validators []*TestValidator,
+	testConfig *MirTestConfig,
+	mirConsensusConfig *mir.ConsensusConfig,
 	faultyValidators ...*TestValidator,
 ) {
 	for i, v := range append(validators, faultyValidators...) {
@@ -1127,8 +1139,8 @@ func (n *Ensemble) BeginMirMiningWithConfig(
 		v := v
 
 		var tdb *TestDB
-		if config.Databases != nil {
-			v, ok := config.Databases[v.mirAddr.String()]
+		if testConfig.Databases != nil {
+			v, ok := testConfig.Databases[v.mirAddr.String()]
 			if ok {
 				tdb = v
 			}
@@ -1136,17 +1148,17 @@ func (n *Ensemble) BeginMirMiningWithConfig(
 			tdb = NewTestDB()
 		}
 
-		config.MembershipString = n.fixedMirMembership(append(validators, faultyValidators...)...)
+		testConfig.MembershipString = n.fixedMirMembership(append(validators, faultyValidators...)...)
 
-		if i > len(validators) && config.Delay > 0 {
-			RandomDelay(config.Delay)
+		if i > len(validators) && testConfig.Delay > 0 {
+			RandomDelay(testConfig.Delay)
 		}
-		nv, err := NewMirValidator(n.t, v, tdb, config)
+		nv, err := NewMirValidator(n.t, v, tdb, testConfig)
 		require.NoError(n.t, err)
 		v.mirValidator = nv
 
 		g.Go(func() error {
-			err = nv.MineBlocks(ctx)
+			err = nv.MineBlocks(ctx, mirConsensusConfig)
 			if xerrors.Is(mapi.ErrStopped, err) { // nolint
 				return nil
 			}
@@ -1185,7 +1197,7 @@ func (n *Ensemble) RestoreMirValidatorsWithOptions(ctx context.Context, g *errgr
 				return err
 			}
 			v.mirValidator = mv
-			err = mv.MineBlocks(ctx)
+			err = mv.MineBlocks(ctx, nil)
 			if xerrors.Is(mapi.ErrStopped, err) { // nolint
 				return nil
 			}

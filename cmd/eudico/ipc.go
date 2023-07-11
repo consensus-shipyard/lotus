@@ -95,16 +95,10 @@ var addCmd = &cli.Command{
 		buPeriod := abi.ChainEpoch(cctx.Int("bu-checkpoint-period"))
 		tdPeriod := abi.ChainEpoch(cctx.Int("td-checkpoint-threshold"))
 
-		// get the default gateway address
-		gwAddr, err := address.IDFromAddress(genesis.DefaultIPCGatewayAddr)
-		if err != nil {
-			return err
-		}
-
 		params := subnetactor.ConstructParams{
 			Parent:              parent,
 			Name:                subnetName,
-			IPCGatewayAddr:      gwAddr,
+			IPCGatewayAddr:      genesis.DefaultIPCGatewayAddr,
 			BottomUpCheckPeriod: buPeriod,
 			TopDownCheckPeriod:  tdPeriod,
 			MinValidators:       minVals,

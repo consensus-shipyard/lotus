@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/gen/genesis"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/itests/kit"
@@ -59,7 +60,7 @@ func TestIPCAccessors(t *testing.T) {
 	params := subnetactor.ConstructParams{
 		Parent:              parent,
 		Name:                "test",
-		IPCGatewayAddr:      genesis.DefaultIPCGatewayAddrID,
+		IPCGatewayAddr:      consensus.DefaultGatewayAddr,
 		BottomUpCheckPeriod: genesis.DefaultCheckpointPeriod,
 		TopDownCheckPeriod:  genesis.DefaultCheckpointPeriod,
 		MinValidators:       1,
@@ -68,7 +69,8 @@ func TestIPCAccessors(t *testing.T) {
 	}
 	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
 	require.NoError(t, err)
-	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
+	root := sdk.NewRootID(build.Eip155ChainId)
+	sn := sdk.NewSubnetID(root, actorAddr)
 	require.NoError(t, err)
 
 	joinSubnet(t, ctx, api, actorAddr)
@@ -182,7 +184,7 @@ func TestIPCCheckpointSubmission(t *testing.T) {
 	params := subnetactor.ConstructParams{
 		Parent:              parent,
 		Name:                "test",
-		IPCGatewayAddr:      genesis.DefaultIPCGatewayAddrID,
+		IPCGatewayAddr:      consensus.DefaultGatewayAddr,
 		BottomUpCheckPeriod: genesis.DefaultCheckpointPeriod,
 		TopDownCheckPeriod:  genesis.DefaultCheckpointPeriod,
 		MinValidators:       1,
@@ -191,7 +193,8 @@ func TestIPCCheckpointSubmission(t *testing.T) {
 	}
 	actorAddr, err := api.IPCAddSubnetActor(ctx, src, params)
 	require.NoError(t, err)
-	sn, err := sdk.NewSubnetIDFromString("/root/" + actorAddr.String())
+	root := sdk.NewRootID(build.Eip155ChainId)
+	sn := sdk.NewSubnetID(root, actorAddr)
 	require.NoError(t, err)
 
 	// join from three validators
@@ -235,7 +238,7 @@ func joinSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, snAct
 func fundSubnet(t *testing.T, ctx context.Context, node *kit.TestFullNode, sn sdk.SubnetID) {
 	from, err := node.WalletDefaultAddress(ctx)
 	require.NoError(t, err)
-	params, err := actors.SerializeParams(&sn)
+	params, err := actors.SerializeParams(&gateway.FundParams{To: from, Subnet: sn})
 	require.NoError(t, err)
 	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
 		To:     genesis.DefaultIPCGatewayAddr,
@@ -259,7 +262,7 @@ func submitCheckpoint(t *testing.T, ctx context.Context, node *kit.TestFullNode,
 	params, err := actors.SerializeParams(ch)
 	require.NoError(t, err)
 	smsg, aerr := node.MpoolPushMessage(ctx, &types.Message{
-		To:     sn.Actor,
+		To:     sn.Actor(),
 		From:   from,
 		Value:  abi.NewTokenAmount(0),
 		Method: builtin.MustGenerateFRCMethodNum("SubmitCheckpoint"),

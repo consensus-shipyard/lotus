@@ -177,7 +177,7 @@ func TestForkHeightTriggers(t *testing.T) {
 	registry := builtin.MakeRegistryLegacy([]rtt.VMActor{testActor{}})
 	inv.Register(actorstypes.Version0, nil, registry)
 
-	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 		nvm, err := vm.NewLegacyVM(ctx, vmopt)
 		if err != nil {
 			return nil, err
@@ -295,7 +295,7 @@ func testForkRefuseCall(t *testing.T, nullsBefore, nullsAfter int) {
 	registry := builtin.MakeRegistryLegacy([]rtt.VMActor{testActor{}})
 	inv.Register(actorstypes.Version0, nil, registry)
 
-	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 		nvm, err := vm.NewLegacyVM(ctx, vmopt)
 		if err != nil {
 			return nil, err
@@ -517,7 +517,7 @@ func TestForkPreMigration(t *testing.T) {
 	registry := builtin.MakeRegistryLegacy([]rtt.VMActor{testActor{}})
 	inv.Register(actorstypes.Version0, nil, registry)
 
-	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 		nvm, err := vm.NewLegacyVM(ctx, vmopt)
 		if err != nil {
 			return nil, err
@@ -590,7 +590,7 @@ func TestDisablePreMigration(t *testing.T) {
 	registry := builtin.MakeRegistryLegacy([]rtt.VMActor{testActor{}})
 	inv.Register(actorstypes.Version0, nil, registry)
 
-	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 		nvm, err := vm.NewLegacyVM(ctx, vmopt)
 		require.NoError(t, err)
 		nvm.SetInvoker(inv)
@@ -644,7 +644,7 @@ func TestMigrtionCache(t *testing.T) {
 	registry := builtin.MakeRegistryLegacy([]rtt.VMActor{testActor{}})
 	inv.Register(actorstypes.Version0, nil, registry)
 
-	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+	sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 		nvm, err := vm.NewLegacyVM(ctx, vmopt)
 		require.NoError(t, err)
 		nvm.SetInvoker(inv)
@@ -687,7 +687,7 @@ func TestMigrtionCache(t *testing.T) {
 			metadataDs,
 		)
 		require.NoError(t, err)
-		sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts) (vm.Interface, error) {
+		sm.SetVMConstructor(func(ctx context.Context, vmopt *vm.VMOpts, chainID uint64) (vm.Interface, error) {
 			nvm, err := vm.NewLegacyVM(ctx, vmopt)
 			require.NoError(t, err)
 			nvm.SetInvoker(inv)

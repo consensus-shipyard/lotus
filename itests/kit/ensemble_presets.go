@@ -27,7 +27,7 @@ func EnsembleMinimal(t *testing.T, opts ...interface{}) (*TestFullNode, *TestMin
 }
 
 func EnsembleWithMirValidators(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestValidator, *Ensemble) {
-	opts = append(opts, WithAllSubsystems(), ThroughRPC(), MirConsensus())
+	opts = append(opts, WithAllSubsystems(), ThroughRPC(), MirConsensus(), IPCNetworkVersion())
 
 	eopts, nopts := siftOptions(t, opts)
 
@@ -75,7 +75,7 @@ func AreTwins(t *testing.T, miners []*TestValidator, twins []*TestValidator) {
 }
 
 func EnsembleMirNodesWithByzantineTwins(t *testing.T, n int, opts ...interface{}) ([]*TestFullNode, []*TestFullNode, []*TestValidator, []*TestValidator, *Ensemble) {
-	opts = append(opts, WithAllSubsystems())
+	opts = append(opts, WithAllSubsystems(), IPCNetworkVersion())
 
 	eopts, nopts := siftOptions(t, opts)
 

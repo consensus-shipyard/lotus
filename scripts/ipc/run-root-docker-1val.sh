@@ -19,6 +19,6 @@ sleep 10
 name=`docker ps --format "{{.Names}}" --filter "id=$img"`
 echo ">>> Root daemon running in container: $img (friendly name: $name)"
 token=`docker exec -it $img  eudico auth create-token --perm admin`
-echo ">>> Token to /root daemon: $token"
+echo ">>> Token to /r31415926 daemon: $token"
 wallet=`docker exec -it $img  eudico wallet default`
 echo ">>> Default wallet: $wallet"

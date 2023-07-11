@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/consensus-shipyard/go-ipc-types/gateway"
+	"github.com/consensus-shipyard/go-ipc-types/sdk"
+	"github.com/consensus-shipyard/go-ipc-types/subnetactor"
 	"github.com/ipfs/go-cid"
 	blocks "github.com/ipfs/go-libipfs/blocks"
 	"go.opencensus.io/stats"
@@ -16,12 +19,14 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/dline"
 	"github.com/filecoin-project/go-state-types/network"
+	abinetwork "github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/types/ethtypes"
+	"github.com/filecoin-project/lotus/eudico-core/global"
 	_ "github.com/filecoin-project/lotus/lib/sigs/bls"
 	_ "github.com/filecoin-project/lotus/lib/sigs/delegated"
 	_ "github.com/filecoin-project/lotus/lib/sigs/secp"
@@ -31,6 +36,7 @@ import (
 )
 
 const (
+	DefaultMirHeightDiff          = abi.ChainEpoch(5000)
 	DefaultLookbackCap            = time.Hour * 24
 	DefaultStateWaitLookbackLimit = abi.ChainEpoch(20)
 	DefaultRateLimitTimeout       = time.Second * 5
@@ -43,6 +49,30 @@ const (
 // TargetAPI defines the API methods that the Node depends on
 // (to make it easy to mock for tests)
 type TargetAPI interface {
+	// IPCAddSubnetActor deploys a new subnet actor.
+	IPCAddSubnetActor(ctx context.Context, wallet address.Address, params subnetactor.ConstructParams) (address.Address, error)
+	IPCReadGatewayState(ctx context.Context, actor address.Address, tsk types.TipSetKey) (*gateway.State, error)
+	IPCReadSubnetActorState(ctx context.Context, sn sdk.SubnetID, tsk types.TipSetKey) (*subnetactor.State, error)
+	IPCGetPrevCheckpointForChild(ctx context.Context, gatewayAddr address.Address, subnet sdk.SubnetID) (cid.Cid, error)
+	IPCGetCheckpointTemplate(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)
+	IPCListChildSubnets(ctx context.Context, gatewayAddr address.Address) ([]gateway.Subnet, error)
+	IPCHasVotedBottomUpCheckpoint(ctx context.Context, sn sdk.SubnetID, e abi.ChainEpoch, v address.Address) (bool, error)
+	IPCHasVotedTopDownCheckpoint(ctx context.Context, gatewayAddr address.Address, e abi.ChainEpoch, v address.Address) (bool, error)
+	IPCListCheckpoints(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([]*gateway.BottomUpCheckpoint, error)
+	IPCGetCheckpoint(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) (*gateway.BottomUpCheckpoint, error)
+	IPCGetTopDownMsgs(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([]*gateway.CrossMsg, error)
+	IPCGetGenesisEpochForSubnet(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID) (abi.ChainEpoch, error)
+
+	// Serialized representation of IPC calls.
+	// This calls are serialized version of some of the IPC calls. They return directly the CBOR IPCGetCheckpointSerialized
+	// version of the output of the call. These are really convenient to use the same type of serialization used
+	// in actor's state, removing the need of then intermediate serialization introduced by the Lotus API.
+	IPCGetCheckpointSerialized(ctx context.Context, sn sdk.SubnetID, epoch abi.ChainEpoch) ([]byte, error)
+	IPCListCheckpointsSerialized(ctx context.Context, sn sdk.SubnetID, from, to abi.ChainEpoch) ([][]byte, error)
+	IPCGetCheckpointTemplateSerialized(ctx context.Context, gatewayAddr address.Address, epoch abi.ChainEpoch) ([]byte, error)
+	IPCGetTopDownMsgsSerialized(ctx context.Context, gatewayAddr address.Address, sn sdk.SubnetID, tsk types.TipSetKey, nonce uint64) ([][]byte, error)
+
+	StateActorCodeCIDs(context.Context, abinetwork.Version) (map[string]cid.Cid, error)
 	Version(context.Context) (api.APIVersion, error)
 	ChainGetParentMessages(context.Context, cid.Cid) ([]api.Message, error)
 	ChainGetParentReceipts(context.Context, cid.Cid) ([]*types.MessageReceipt, error)
@@ -186,6 +216,20 @@ func (gw *Node) checkTipsetKey(ctx context.Context, tsk types.TipSetKey) error {
 }
 
 func (gw *Node) checkTipset(ts *types.TipSet) error {
+	// if mir consensus, we check a height diff, not actual timestamps
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
+		h, err := gw.ChainHead(context.Background())
+		if err != nil {
+			return err
+		}
+		if h.Height() < ts.Height() {
+			return fmt.Errorf("tipset height in future")
+		}
+		if (h.Height() - ts.Height()) > DefaultMirHeightDiff {
+			return fmt.Errorf("bad tipset height: %w", gw.errLookback)
+		}
+		return nil
+	}
 	at := time.Unix(int64(ts.Blocks()[0].Timestamp), 0)
 	if err := gw.checkTimestamp(at); err != nil {
 		return fmt.Errorf("bad tipset: %w", err)
@@ -197,6 +241,14 @@ func (gw *Node) checkTipsetHeight(ts *types.TipSet, h abi.ChainEpoch) error {
 	if h > ts.Height() {
 		return fmt.Errorf("tipset height in future")
 	}
+	// if mir consensus, we check a height diff, not actual timestamps
+	if global.IsConsensusAlgorithm(global.MirConsensus) {
+		if (h - ts.Height()) > DefaultMirHeightDiff {
+			return fmt.Errorf("bad tipset height: %w", gw.errLookback)
+		}
+		return nil
+	}
+
 	tsBlock := ts.Blocks()[0]
 	heightDelta := time.Duration(uint64(tsBlock.Height-h)*build.BlockDelaySecs) * time.Second
 	timeAtHeight := time.Unix(int64(tsBlock.Timestamp), 0).Add(-heightDelta)
