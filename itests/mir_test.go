@@ -57,6 +57,25 @@ func setupMangler(t *testing.T) {
 	})
 }
 
+func TestMirReconfiguration_PretestChecks(t *testing.T) {
+	membershipFileName := kit.TempFileName("membership")
+	t.Cleanup(func() {
+		err := os.Remove(membershipFileName)
+		require.NoError(t, err)
+	})
+
+	_, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber+1)
+	ens.SaveValidatorSetToFile(0, membershipFileName, validators[:MirTotalValidatorNumber]...)
+
+	membership, err := validator.NewValidatorSetFromFile(membershipFileName)
+	require.NoError(t, err)
+	require.Equal(t, MirTotalValidatorNumber, membership.Size())
+	require.Equal(t, uint64(0), membership.GetConfigurationNumber())
+	for _, v := range membership.Validators {
+		require.NotEqualValues(t, uint64(0), v.Weight.Uint64())
+	}
+}
+
 // TestMirReconfiguration_AddAndRemoveOneValidator tests that the reconfiguration mechanism operates normally
 // if a new validator joins the network and then leaves it.
 func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {

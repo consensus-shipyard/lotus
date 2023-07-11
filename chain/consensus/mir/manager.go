@@ -23,9 +23,9 @@ import (
 	"github.com/filecoin-project/mir/pkg/logging"
 	"github.com/filecoin-project/mir/pkg/net"
 	mirlibp2p "github.com/filecoin-project/mir/pkg/net"
-	mirproto "github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/simplewal"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
+	"github.com/filecoin-project/mir/pkg/trantor"
+	types2 "github.com/filecoin-project/mir/pkg/trantor/types"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	"github.com/filecoin-project/lotus/api/v1api"
@@ -64,11 +64,10 @@ type Manager struct {
 	mirErrChan      chan error
 	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
-	requestPool     *fifo.Pool
-	wal             *simplewal.WAL
+	txPool          *fifo.Pool
 	net             net.Transport
 	interceptor     *eventlog.Recorder
-	readyForTxsChan chan chan []*mirproto.Request
+	readyForTxsChan chan chan []*mirproto.Transaction
 	stopped         bool
 	cryptoManager   *CryptoManager
 	confManager     *ConfigurationManager
@@ -104,6 +103,12 @@ func NewManager(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to configure membership: %w", id, err)
 	}
+	if nodes == nil {
+		return nil, fmt.Errorf("empty membership nodes")
+	}
+	if membershipInfo == nil {
+		return nil, fmt.Errorf("empty membership info")
+	}
 
 	e := membershipInfo.GenesisEpoch
 	initialValidatorSet := membershipInfo.ValidatorSet
@@ -131,8 +136,8 @@ func NewManager(ctx context.Context,
 		ds:                  ds,
 		netName:             netName,
 		lotusNode:           node,
-		readyForTxsChan:     make(chan chan []*mirproto.Request),
-		requestPool:         fifo.New(),
+		readyForTxsChan:     make(chan chan []*mirproto.Transaction),
+		txPool:              fifo.New(),
 		cryptoManager:       cryptoManager,
 		confManager:         confManager,
 		net:                 net,
@@ -142,7 +147,7 @@ func NewManager(ctx context.Context,
 	m.mirErrChan = make(chan error, 1)
 	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
-	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.requestPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.txPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
@@ -186,12 +191,11 @@ func NewManager(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("validator %v failed to get mangler params: %w", id, err)
 		}
-		err = smrSystem.PerturbMessages(&eventmangler.ModuleParams{
+		if err = trantor.PerturbMessages(&eventmangler.ModuleParams{
 			MinDelay: p.MinDelay,
 			MaxDelay: p.MaxDelay,
 			DropRate: p.DropRate,
-		})
-		if err != nil {
+		}, "net", smrSystem); err != nil {
 			return nil, fmt.Errorf("validator %v failed to configure SMR mangler: %w", id, err)
 		}
 	}
@@ -213,10 +217,8 @@ func NewManager(ctx context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("failed to create interceptor: %w", err)
 		}
-		m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), nil, m.interceptor)
-	} else {
-		m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), nil, nil)
 	}
+	m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), m.interceptor)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create Mir node: %w", id, err)
 	}
@@ -245,9 +247,9 @@ func (m *Manager) Serve(ctx context.Context) error {
 	reconfigure := time.NewTicker(ReconfigurationInterval)
 	defer reconfigure.Stop()
 
-	configRequests, err := m.confManager.Pending()
+	configTxs, err := m.confManager.Pending()
 	if err != nil {
-		return fmt.Errorf("validator %v failed to get pending confgiguration requests: %w", m.id, err)
+		return fmt.Errorf("validator %v failed to get pending confgiguration txs: %w", m.id, err)
 	}
 
 	lastValidatorSet := m.initialValidatorSet
@@ -279,9 +281,9 @@ func (m *Manager) Serve(ctx context.Context) error {
 					newSet.ConfigurationNumber, newSet.Size(), newSet.GetValidatorIDs())
 
 			lastValidatorSet = newSet
-			r := m.createAndStoreConfigurationRequest(newSet)
+			r := m.createAndStoreConfigurationTx(newSet)
 			if r != nil {
-				configRequests = append(configRequests, r)
+				configTxs = append(configTxs, r)
 			}
 
 		case mirChan := <-m.readyForTxsChan:
@@ -300,17 +302,17 @@ func (m *Manager) Serve(ctx context.Context) error {
 					Errorw("failed to select messages from mempool", "error", err)
 			}
 
-			requests := m.createTransportRequests(msgs)
+			txs := m.createTransportTxs(msgs)
 
-			if len(configRequests) > 0 {
-				requests = append(requests, configRequests...)
+			if len(configTxs) > 0 {
+				txs = append(txs, configTxs...)
 			}
 
 			select {
 			case <-ctx.Done():
 				log.With("validator", m.id).Info("Mir manager: context closed while sending txs")
 				return nil
-			case mirChan <- requests:
+			case mirChan <- txs:
 			}
 		}
 	}
@@ -356,19 +358,18 @@ func (m *Manager) initCheckpoint(params trantor.Params, height abi.ChainEpoch) (
 	return GetCheckpointByHeight(m.stateManager.ctx, m.ds, height, &params)
 }
 
-func (m *Manager) createTransportRequests(msgs []*types.SignedMessage) []*mirproto.Request {
-	var requests []*mirproto.Request
-	requests = append(requests, m.batchSignedMessages(msgs)...)
-	return requests
+func (m *Manager) createTransportTxs(msgs []*types.SignedMessage) (txs []*mirproto.Transaction) {
+	txs = append(txs, m.batchSignedMessages(msgs)...)
+	return
 }
 
-// batchPushSignedMessages pushes signed messages into the request pool and sends them to Mir.
-func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*mirproto.Request) {
+// batchPushSignedMessages pushes signed messages into the transactions pool and sends them to Mir.
+func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (txs []*mirproto.Transaction) {
 	for _, msg := range msgs {
 		clientID := msg.Message.From.String()
 		nonce := msg.Message.Nonce
-		if !m.requestPool.IsTargetRequest(clientID, nonce) {
-			log.With("validator", m.id).Warnf("batchSignedMessage: target request not found for client ID")
+		if !m.txPool.IsTargetTx(clientID, nonce) {
+			log.With("validator", m.id).Warnf("batchSignedMessage: target tx not found for client ID")
 			continue
 		}
 
@@ -378,28 +379,28 @@ func (m *Manager) batchSignedMessages(msgs []*types.SignedMessage) (requests []*
 			continue
 		}
 
-		r := &mirproto.Request{
-			ClientId: clientID,
-			ReqNo:    nonce,
-			Type:     TransportRequest,
+		r := &mirproto.Transaction{
+			ClientId: types2.ClientID(clientID),
+			TxNo:     types2.TxNo(nonce),
+			Type:     TransportTransaction,
 			Data:     data,
 		}
 
-		m.requestPool.AddRequest(msg.Cid(), r)
+		m.txPool.AddTx(msg.Cid(), r)
 
-		requests = append(requests, r)
+		txs = append(txs, r)
 	}
-	return requests
+	return txs
 }
 
-func (m *Manager) createAndStoreConfigurationRequest(set *validator.Set) *mirproto.Request {
+func (m *Manager) createAndStoreConfigurationTx(set *validator.Set) *mirproto.Transaction {
 	var b bytes.Buffer
 	if err := set.MarshalCBOR(&b); err != nil {
 		log.With("validator", m.id).Errorf("unable to marshall validator set: %v", err)
 		return nil
 	}
 
-	r, err := m.confManager.NewTX(ConfigurationRequest, b.Bytes())
+	r, err := m.confManager.NewTX(ConfigurationTransaction, b.Bytes())
 	if err != nil {
 		log.With("validator", m.id).Errorf("unable to create configuration tx: %v", err)
 		return nil
@@ -413,7 +414,7 @@ var ErrMinNumValidatorNotReached = errors.New("minimum number of validators for 
 var ErrWaitForMembershipTimeout = errors.New("getting membership timeout expired")
 
 // waitForMembershipInfo waits for membership information by reading the membership source and checking that
-// the validator address is in the membership.
+// the validator ID is in the membership.
 //
 // We should sleep and periodically poll membership source until is up
 // (as long as no SIGTERM is turned and the user proactively kills the process),
@@ -431,7 +432,7 @@ func waitForMembershipInfo(
 	timeout time.Duration,
 ) (
 	*mirmembership.Info,
-	map[t.NodeID]t.NodeAddress,
+	*mirproto.Membership,
 	error,
 ) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -458,12 +459,13 @@ func waitForMembershipInfo(
 	}
 }
 
+// getMembershipInfo gets membership information via Reader.
 func getMembershipInfo(
 	id string,
 	r mirmembership.Reader,
 ) (
 	*mirmembership.Info,
-	map[t.NodeID]t.NodeAddress,
+	*mirproto.Membership,
 	error,
 ) {
 	membershipInfo, err := r.GetMembershipInfo()
@@ -488,7 +490,7 @@ func getMembershipInfo(
 		return nil, nil, fmt.Errorf("validator %v failed to build node membership: %w", id, err)
 	}
 
-	_, ok := initialMembership[t.NodeID(id)]
+	_, ok := initialMembership.Nodes[t.NodeID(id)]
 	if !ok {
 		return nil, nil, ErrMissingOwnIdentityInMembership
 	}

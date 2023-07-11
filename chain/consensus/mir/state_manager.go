@@ -17,8 +17,9 @@ import (
 
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/mir/pkg/checkpoint"
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	"github.com/filecoin-project/mir/pkg/systems/trantor"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
+	"github.com/filecoin-project/mir/pkg/trantor/appmodule"
+	trantor "github.com/filecoin-project/mir/pkg/trantor/types"
 	t "github.com/filecoin-project/mir/pkg/types"
 
 	lapi "github.com/filecoin-project/lotus/api"
@@ -48,7 +49,7 @@ type Batch struct {
 	Messages []Message
 }
 
-var _ trantor.AppLogic = &StateManager{}
+var _ appmodule.AppLogic = &StateManager{}
 
 type StateManager struct {
 	// parent context
@@ -60,23 +61,21 @@ type StateManager struct {
 	genesisEpoch abi.ChainEpoch
 
 	// The current epoch number.
-	currentEpoch t.EpochNr
+	currentEpoch trantor.EpochNr
 
 	// For each epoch number, stores the corresponding membership.
 	// It stores the current membership and the memberships of ConfigOffset following epochs.
 	// It is updated by the NewEpoch function called by Mir on epoch transition (and on state transfer).
-	memberships map[t.EpochNr]map[t.NodeID]t.NodeAddress
+	memberships map[trantor.EpochNr]*mirproto.Membership
 
 	// Next membership to return from NewEpoch.
 	// Attention: No in-place modifications of this field are allowed.
 	//            At reconfiguration, a new map with an updated membership must be assigned to this variable.
-	nextNewMembership map[t.NodeID]t.NodeAddress
+	nextNewMembership *mirproto.Membership
 
 	confManager *ConfigurationManager
-
-	ds db.DB
-
-	requestPool *fifo.Pool
+	ds          db.DB
+	txPool      *fifo.Pool
 
 	configurationVotes *ConfigurationVotes
 
@@ -103,7 +102,7 @@ type StateManager struct {
 func NewStateManager(
 	ctx context.Context,
 	netName dtypes.NetworkName,
-	initialMembership map[t.NodeID]t.NodeAddress,
+	initialMembership *mirproto.Membership,
 	genesisEpoch abi.ChainEpoch,
 	cm *ConfigurationManager,
 	api v1api.FullNode,
@@ -118,7 +117,7 @@ func NewStateManager(
 		nextCheckpointChan:      make(chan *checkpoint.StableCheckpoint, 1),
 		confManager:             cm,
 		ds:                      ds,
-		requestPool:             pool,
+		txPool:                  pool,
 		currentEpoch:            0,
 		api:                     api,
 		id:                      cfg.Addr.String(),
@@ -131,9 +130,9 @@ func NewStateManager(
 
 	// Initialize the membership for the first epoch and the ConfigOffset following ones (thus ConfigOffset+1).
 	// Note that sm.memberships[0] will almost immediately be overwritten by the first call to NewEpoch.
-	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, sm.configOffset+1)
+	sm.memberships = make(map[trantor.EpochNr]*mirproto.Membership, sm.configOffset+1)
 	for e := 0; e < sm.configOffset+1; e++ {
-		sm.memberships[t.EpochNr(e)] = initialMembership
+		sm.memberships[trantor.EpochNr(e)] = initialMembership
 	}
 	sm.nextNewMembership = initialMembership
 
@@ -174,7 +173,7 @@ func (sm *StateManager) syncFromPeers(tsk types.TipSetKey) (err error) {
 			log.With("validator", sm.id).Warnf("syncFromPeers for TSK %s: no connected peers", tsk)
 			// if we are the only validator, we can return was we don't need to sync from anyone.
 			// This way we can restart a solo validator without the need of other nodes.
-			if len(sm.memberships[sm.currentEpoch]) == 1 {
+			if len(sm.memberships[sm.currentEpoch].Nodes) == 1 {
 				return nil
 			}
 		}
@@ -231,7 +230,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 	sm.releaseNextCheckpointChan()
 
 	config := checkpoint.Snapshot.EpochData.EpochConfig
-	sm.currentEpoch = t.EpochNr(config.EpochNr)
+	sm.currentEpoch = config.EpochNr
 
 	// Sanity check.
 	if len(config.Memberships) != sm.configOffset+1 {
@@ -241,14 +240,16 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 	// Set memberships for the current epoch and ConfigOffset following ones.
 	// Note that sm.memberships[i+sm.currentEpoch] will almost immediately be overwritten by the first call to NewEpoch.
-	sm.memberships = make(map[t.EpochNr]map[t.NodeID]t.NodeAddress, len(config.Memberships))
+	sm.memberships = make(map[trantor.EpochNr]*mirproto.Membership, len(config.Memberships))
 	for i, mb := range config.Memberships {
-		sm.memberships[t.EpochNr(i)+sm.currentEpoch] = t.Membership(mb)
+		sm.memberships[trantor.EpochNr(i)+sm.currentEpoch] = mb
 	}
 
 	// The next membership is the last known membership. It may be replaced by another one during this epoch.
-	sm.nextNewMembership = sm.memberships[t.EpochNr(config.EpochNr+uint64(sm.configOffset))]
-	log.With("validator", sm.id).Infof("RestoreState: next membership size is %d at epoch %d", len(sm.nextNewMembership), sm.currentEpoch)
+	sm.nextNewMembership = sm.memberships[config.EpochNr+trantor.EpochNr(sm.configOffset)]
+	log.With("validator", sm.id).Infof(
+		"RestoreState: next membership size is %d at epoch %d",
+		len(sm.nextNewMembership.Nodes), sm.currentEpoch)
 
 	// if mir provides a snapshot
 	snapshot := checkpoint.Snapshot.AppData
@@ -289,7 +290,7 @@ func (sm *StateManager) RestoreState(checkpoint *checkpoint.StableCheckpoint) er
 
 // ApplyTXs applies transactions received from the availability layer to the app state
 // and creates a Lotus block from the delivered batch.
-func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
+func (sm *StateManager) ApplyTXs(txs []*mirproto.Transaction) error {
 	log.With("validator", sm.id).Info("ApplyTXs started")
 	defer log.With("validator", sm.id).Info("ApplyTXs finished")
 
@@ -323,13 +324,12 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		}
 	}
 
-	// For each request in the batch
-	for _, req := range txs {
-		switch req.Type {
-		case TransportRequest:
-			mirMsgs = append(mirMsgs, req.Data)
-		case ConfigurationRequest:
-			votedValSet, err := sm.applyConfigMsg(req)
+	for _, tx := range txs {
+		switch tx.Type {
+		case TransportTransaction:
+			mirMsgs = append(mirMsgs, tx.Data)
+		case ConfigurationTransaction:
+			votedValSet, err := sm.applyConfigTx(tx)
 			if err != nil {
 				return err
 			}
@@ -367,6 +367,7 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 		if err != nil {
 			return xerrors.Errorf("validator %v failed to set eproof from checkpoint certificate: %w", sm.id, err)
 		}
+
 		vrfCheckpoint, err = CheckpointAsVRFProof(ch)
 		if err != nil {
 			return xerrors.Errorf("validator %v failed to set vrfproof from checkpoint: %w", sm.id, err)
@@ -410,24 +411,24 @@ func (sm *StateManager) ApplyTXs(txs []*requestpb.Request) error {
 	return nil
 }
 
-func (sm *StateManager) applyConfigMsg(msg *requestpb.Request) (*validator.Set, error) {
+func (sm *StateManager) applyConfigTx(tx *mirproto.Transaction) (*validator.Set, error) {
 	var valSet validator.Set
-	if err := valSet.UnmarshalCBOR(bytes.NewReader(msg.Data)); err != nil {
+	if err := valSet.UnmarshalCBOR(bytes.NewReader(tx.Data)); err != nil {
 		return nil, err
 	}
 
-	enoughVotes, finished, err := sm.processVote(t.NodeID(msg.ClientId), &valSet)
+	enoughVotes, finished, err := sm.processVote(t.NodeID(tx.ClientId), &valSet)
 	if err != nil {
-		log.With("validator", sm.id).Errorf("failed to apply config message: %v", err)
+		log.With("validator", sm.id).Errorf("failed to apply config tx: %v", err)
 		// This error is not critical for the operation of the validator process, we should notify
 		// the user but not kill the process. Returning an error here would exit the validator
 		// process with failure.
 		return nil, nil
 	}
 
-	// If we get the configuration message we have sent then we remove it from the configuration request storage.
-	if msg.ClientId == sm.id {
-		if err := sm.confManager.Done(t.ReqNo(msg.ReqNo)); err != nil {
+	// If we get the configuration message we have sent then we remove it from the configuration manager.
+	if tx.ClientId == trantor.ClientID(sm.id) {
+		if err := sm.confManager.Done(tx.TxNo); err != nil {
 			log.With("validator", sm.id).Errorf("failed to mark config message as done: %v", err)
 		}
 	}
@@ -454,7 +455,7 @@ func (sm *StateManager) updateNextMembership(set *validator.Set) error {
 	sm.nextNewMembership = mbs
 	log.With("validator", sm.id).
 		Infof("updateNextMembership: current epoch %d, config number %d, next membership size: %d",
-			sm.currentEpoch, sm.nextConfigurationNumber, len(mbs))
+			sm.currentEpoch, sm.nextConfigurationNumber, len(mbs.Nodes))
 	return nil
 }
 
@@ -468,7 +469,7 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 			votingValidator, set.ConfigurationNumber, sm.nextConfigurationNumber)
 	}
 
-	if _, found := sm.memberships[sm.currentEpoch][votingValidator]; !found {
+	if _, found := sm.memberships[sm.currentEpoch].Nodes[votingValidator]; !found {
 		return false, false, xerrors.Errorf("validator %s is not in the membership", votingValidator)
 	}
 
@@ -486,7 +487,7 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 	}
 
 	votes := sm.configurationVotes.GetVotesForConfiguration(set.ConfigurationNumber, string(h))
-	nodes := len(sm.memberships[sm.currentEpoch])
+	nodes := len(sm.memberships[sm.currentEpoch].Nodes)
 	log.With("validator", sm.id).
 		Infof("countVote: valset number %d, epoch %d: votes %d, nodes %d",
 			set.ConfigurationNumber, sm.currentEpoch, votes, nodes)
@@ -502,7 +503,7 @@ func (sm *StateManager) processVote(votingValidator t.NodeID, set *validator.Set
 	}
 }
 
-func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, error) {
+func (sm *StateManager) NewEpoch(nr trantor.EpochNr) (*mirproto.Membership, error) {
 	log.With("validator", sm.id).Infof("New epoch started: updating %d to %d", sm.currentEpoch, nr)
 	defer log.With("validator", sm.id).Infof("New epoch finished: updating %d to %d", sm.currentEpoch, nr)
 
@@ -516,7 +517,7 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 
 	// Make the nextNewMembership (agreed upon during the previous epoch) the fixed membership
 	// for the epoch nr+ConfigOffset and a new copy of it for further modifications during the new epoch.
-	sm.memberships[nr+t.EpochNr(sm.configOffset)+1] = sm.nextNewMembership
+	sm.memberships[nr+trantor.EpochNr(sm.configOffset)+1] = sm.nextNewMembership
 
 	// Update current epoch number.
 	sm.currentEpoch = nr
@@ -527,7 +528,7 @@ func (sm *StateManager) NewEpoch(nr t.EpochNr) (map[t.NodeID]t.NodeAddress, erro
 
 	log.With("validator", sm.id).
 		Debugf("New epoch result: current epoch %d, current membership size %d, next membership size: %d, height: %d",
-			sm.currentEpoch, len(sm.memberships[sm.currentEpoch]), len(sm.nextNewMembership), sm.height)
+			sm.currentEpoch, len(sm.memberships[sm.currentEpoch].Nodes), len(sm.nextNewMembership.Nodes), sm.height)
 
 	return sm.nextNewMembership, nil
 }
@@ -607,9 +608,9 @@ func (sm *StateManager) Checkpoint(checkpoint *checkpoint.StableCheckpoint) erro
 		return xerrors.Errorf("validator %v failed to deliver checkpoint: %w", sm.id, err)
 	}
 
-	// Reset fifo between checkpoints to avoid requests getting stuck.
+	// Reset fifo between checkpoints to avoid txs getting stuck.
 	// See https://github.com/consensus-shipyard/lotus/issues/28.
-	sm.requestPool.Purge()
+	sm.txPool.Purge()
 	return nil
 }
 
@@ -685,7 +686,7 @@ func (sm *StateManager) getSignedMessages(mirMsgs []Message) (msgs []*types.Sign
 		switch msg := input.(type) {
 		case *types.SignedMessage:
 			// batch being processed, remove from mpool
-			found := sm.requestPool.DeleteRequest(msg.Cid(), msg.Message.Nonce)
+			found := sm.txPool.DeleteTx(msg.Cid(), msg.Message.Nonce)
 			if !found {
 				log.With("validator", sm.id).
 					Debugf("unable to find a message with %v hash in our local fifo.Pool", msg.Cid())

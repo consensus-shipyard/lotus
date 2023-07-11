@@ -5,15 +5,15 @@ import (
 
 	"github.com/ipfs/go-cid"
 
-	mirrequest "github.com/filecoin-project/mir/pkg/pb/requestpb"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
 )
 
-// Pool is a structure to implement the simplest pool that enforces FIFO policy on client messages.
-// When a client sends a message we add clientID to orderingClients map and clientByCID.
-// When we receive a message we find the clientID and remove it from orderingClients.
+// Pool is a structure to implement the simplest pool that enforces FIFO policy on client transactions.
+// When a client sends a transaction we add clientID to the orderingClients and clientByCID maps.
+// When we receive a transaction we find the clientID and remove it from the orderingClients.
 // We don't need using sync primitives since the pool's methods are called only by one goroutine.
 type Pool struct {
-	clientByCID     map[cid.Cid]string // messageCID -> clientID
+	clientByCID     map[cid.Cid]string // tx CID -> clientID
 	orderingClients map[string]bool    // clientID -> bool
 	seen            map[string]uint64  // clientID -> nonce
 	lk              sync.RWMutex
@@ -27,33 +27,33 @@ func New() *Pool {
 	}
 }
 
-// AddRequest adds the request if it satisfies to the FIFO policy.
-func (p *Pool) AddRequest(cid cid.Cid, r *mirrequest.Request) (exist bool) {
+// AddTx adds the transaction if it satisfies to the FIFO policy.
+func (p *Pool) AddTx(cid cid.Cid, r *mirproto.Transaction) (exist bool) {
 	p.lk.Lock()
 	defer p.lk.Unlock()
-	_, exist = p.orderingClients[r.ClientId]
-	// if it doesn't exist or it has a greater nonce than the one seen.
-	if !exist || r.ReqNo > p.seen[r.ClientId] {
-		p.clientByCID[cid] = r.ClientId
-		p.orderingClients[r.ClientId] = true
+	_, exist = p.orderingClients[r.ClientId.Pb()]
+	// If it doesn't exist, or it has a greater nonce than the one seen.
+	if !exist || r.TxNo.Pb() > p.seen[r.ClientId.Pb()] {
+		p.clientByCID[cid] = r.ClientId.Pb()
+		p.orderingClients[r.ClientId.Pb()] = true
 		// update last nonce seen
-		p.seen[r.ClientId] = r.ReqNo
+		p.seen[r.ClientId.Pb()] = r.TxNo.Pb()
 
 	}
 	return
 }
 
-// IsTargetRequest returns whether the request with clientID should be sent or there is a request from that client that
+// IsTargetTx returns whether the transaction with clientID should be sent or there is a transaction from that client that
 // is in progress of ordering.
-func (p *Pool) IsTargetRequest(clientID string, nonce uint64) bool {
+func (p *Pool) IsTargetTx(clientID string, nonce uint64) bool {
 	p.lk.RLock()
 	defer p.lk.RUnlock()
 	_, inProgress := p.orderingClients[clientID]
 	return !inProgress || nonce > p.seen[clientID]
 }
 
-// DeleteRequest deletes the target request by the key h.
-func (p *Pool) DeleteRequest(cid cid.Cid, nonce uint64) (ok bool) {
+// DeleteTx deletes the target transaction by the key h.
+func (p *Pool) DeleteTx(cid cid.Cid, nonce uint64) (ok bool) {
 	p.lk.Lock()
 	defer p.lk.Unlock()
 	clientID, ok := p.clientByCID[cid]
@@ -64,8 +64,8 @@ func (p *Pool) DeleteRequest(cid cid.Cid, nonce uint64) (ok bool) {
 		// seen as we have already seen it.
 		return
 	}
-	// if we don't see it mark the request for that nonce
-	// as seen by the pool so we consider the last nonce proposed.
+	// If we don't see it mark the transaction for that nonce
+	// as seen by the pool, so we consider the last nonce proposed.
 	p.seen[clientID] = nonce
 
 	return

@@ -7,7 +7,7 @@ import (
 	u "github.com/ipfs/go-ipfs-util"
 	"github.com/stretchr/testify/require"
 
-	mirrequest "github.com/filecoin-project/mir/pkg/pb/requestpb"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
 )
 
 func TestMirFIFOPool(t *testing.T) {
@@ -16,20 +16,19 @@ func TestMirFIFOPool(t *testing.T) {
 	c1 := cid.NewCidV0(u.Hash([]byte("req1")))
 	c2 := cid.NewCidV0(u.Hash([]byte("req2")))
 
-	inProgress := p.AddRequest(c1, &mirrequest.Request{
+	inProgress := p.AddTx(c1, &mirproto.Transaction{
 		ClientId: "client1", Data: []byte{},
 	})
 	require.Equal(t, false, inProgress)
 
-	inProgress = p.AddRequest(c1, &mirrequest.Request{
+	inProgress = p.AddTx(c1, &mirproto.Transaction{
 		ClientId: "client1", Data: []byte{},
 	})
 	require.Equal(t, true, inProgress)
 
-	inProgress = p.DeleteRequest(c1, 0)
+	inProgress = p.DeleteTx(c1, 0)
 	require.Equal(t, true, inProgress)
 
-	inProgress = p.DeleteRequest(c2, 0)
+	inProgress = p.DeleteTx(c2, 0)
 	require.Equal(t, false, inProgress)
-
 }

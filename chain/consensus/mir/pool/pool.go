@@ -4,39 +4,37 @@ package pool
 import (
 	"context"
 
-	"github.com/filecoin-project/mir/pkg/pb/requestpb"
-	requestpbtypes "github.com/filecoin-project/mir/pkg/pb/requestpb/types"
+	mirproto "github.com/filecoin-project/mir/pkg/pb/trantorpb/types"
 )
 
 type Fetcher struct {
 	ctx             context.Context
-	ReadyForTxsChan chan chan []*requestpb.Request
+	ReadyForTxsChan chan chan []*mirproto.Transaction
 }
 
-func NewFetcher(ctx context.Context, ch chan chan []*requestpb.Request) *Fetcher {
+func NewFetcher(ctx context.Context, ch chan chan []*mirproto.Transaction) *Fetcher {
 	return &Fetcher{
 		ctx:             ctx,
 		ReadyForTxsChan: ch,
 	}
 }
 
-func (f *Fetcher) Fetch() []*requestpbtypes.Request {
-	inputChan := make(chan []*requestpb.Request)
+func (f *Fetcher) Fetch() []*mirproto.Transaction {
+	inputChan := make(chan []*mirproto.Transaction)
 	select {
 	case <-f.ctx.Done():
 		return nil
 	case f.ReadyForTxsChan <- inputChan:
 	}
 
-	var txs []*requestpbtypes.Request
+	var txs []*mirproto.Transaction
 
 	select {
 	case <-f.ctx.Done():
 		return nil
 	case input := <-inputChan:
 		for _, r := range input {
-			tx := requestpbtypes.RequestFromPb(r)
-			txs = append(txs, tx)
+			txs = append(txs, r)
 		}
 		return txs
 	}
