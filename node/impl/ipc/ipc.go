@@ -69,7 +69,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 		ConstructorParams: constParams,
 	})
 	if err != nil {
-		return address.Undef, err
+		return address.Undef, xerrors.Errorf("error serializing init params: %w", err)
 	}
 
 	smsg, aerr := a.MpoolPushMessage(ctx, &types.Message{
@@ -80,7 +80,7 @@ func (a *IPCAPI) IPCAddSubnetActor(ctx context.Context, wallet address.Address, 
 		Params: initParams,
 	}, nil)
 	if aerr != nil {
-		return address.Undef, aerr
+		return address.Undef, xerrors.Errorf("error pushing msg into mpool: %w", aerr)
 	}
 
 	// this api call is sync and waits for the message to go through, we are adding a
