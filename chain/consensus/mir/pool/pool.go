@@ -34,7 +34,6 @@ func (f *Fetcher) Fetch() []*mirproto.Transaction {
 		return nil
 	case input := <-inputChan:
 		for _, r := range input {
-			// tx := requestpbtypes.RequestFromPb(r)
 			txs = append(txs, r)
 		}
 		return txs
