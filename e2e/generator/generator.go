@@ -53,7 +53,7 @@ type ValidatorSetData struct {
 }
 
 func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
-	w := abi.NewTokenAmount(0)
+	w := abi.NewTokenAmount(1)
 	v := Validator{
 		N:       n,
 		APIPort: fmt.Sprintf("123%d", n),
