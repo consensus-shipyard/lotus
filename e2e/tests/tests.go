@@ -67,15 +67,16 @@ func waitForAuthToken(id string) error {
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("time exceeded")
+			return fmt.Errorf("[%s] waitForAuthToken:time exceeded", id)
 		default:
 		}
 
 		if _, err := os.Stat(path.Join(DeploymentPath, id, "token")); errors.Is(err, os.ErrNotExist) {
 			time.Sleep(1 * time.Second)
-			fmt.Println("wait for Lotus token...")
+			fmt.Printf("[%s] waitForAuthToken: wait for node %s Lotus token...\n", id, id)
 			continue
 		}
+		fmt.Printf("[%s] waitForAuthToken: Lotus token is ready\n", id)
 		return nil
 	}
 }
@@ -101,16 +102,16 @@ func waitForLotusAPI(id string) error {
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("time exceeded")
+			return fmt.Errorf("[%s] waitForLotusAPI: time exceeded", id)
 		default:
 		}
 
 		if _, err := c.Version(ctx); errors.Is(err, os.ErrNotExist) {
 			time.Sleep(1 * time.Second)
-			fmt.Printf("wait for node %s Lotus API...\n", id)
+			fmt.Printf("[%s] waitForLotusAPI: wait for node %s Lotus API...\n", id, id)
 			continue
 		}
-
+		fmt.Printf("[%s] waitForLotusAPI: LotusAPI is accessible\n", id)
 		return nil
 	}
 }
