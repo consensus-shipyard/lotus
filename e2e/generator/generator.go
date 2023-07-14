@@ -44,7 +44,7 @@ type Validator struct {
 type ValidatorData struct {
 	Addr    addr.Address `json:"addr"`
 	NetAddr string       `json:"net_addr"`
-	Weight  string       `json:"weight, string"`
+	Weight  string       `json:"weight,string"`
 }
 
 type ValidatorSetData struct {
