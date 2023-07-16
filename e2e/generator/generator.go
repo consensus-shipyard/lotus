@@ -44,7 +44,7 @@ type Validator struct {
 type ValidatorData struct {
 	Addr    addr.Address `json:"addr"`
 	NetAddr string       `json:"net_addr"`
-	Weight  string       `json:"weight,string"`
+	Weight  string       `json:"weight"`
 }
 
 type ValidatorSetData struct {
@@ -53,7 +53,7 @@ type ValidatorSetData struct {
 }
 
 func NewValidator(n int, ip string, ports ...string) (*Validator, error) {
-	w := abi.NewTokenAmount(10)
+	w := abi.NewTokenAmount(1)
 	v := Validator{
 		N:       n,
 		APIPort: fmt.Sprintf("123%d", n),
