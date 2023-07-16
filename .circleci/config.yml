@@ -446,6 +446,7 @@ workflows:
             branches:
               only:
                 - dev
+                - spacenet
     jobs:
       - nightly-test-mir-with-mangler:
           name: nightly-mir-mangler-tests
