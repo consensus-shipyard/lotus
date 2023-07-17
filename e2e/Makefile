@@ -1,4 +1,4 @@
-all: docker gen up tests clean
+all: docker gen up test clean
 
 test: gen up run-tests-locally down clean
 
