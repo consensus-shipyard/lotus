@@ -12,4 +12,4 @@ fi
 IMG=$1
 
 echo "[*] Starting to mine on validator"
-docker exec -it $IMG eudico mir validator run --membership=onchain --nosync --ipcagent-url=http://host.docker.internal:3030/json_rpc
+docker exec -e MIR_INTERCEPTOR_OUTPUT="mir-event-logs" -it $IMG eudico mir validator run --membership=onchain --nosync --ipcagent-url=http://host.docker.internal:3030/json_rpc
