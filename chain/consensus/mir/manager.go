@@ -61,7 +61,8 @@ type Manager struct {
 
 	// Mir types.
 	mirCtx          context.Context
-	mirErrChan      chan error
+	mirStopped      chan struct{}
+	mirErr          error
 	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
 	txPool          *fifo.Pool
@@ -144,7 +145,7 @@ func NewManager(ctx context.Context,
 		initialValidatorSet: initialValidatorSet,
 		membership:          membership,
 	}
-	m.mirErrChan = make(chan error, 1)
+	m.mirStopped = make(chan struct{})
 	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
 	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.txPool, cfg)
@@ -240,7 +241,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 		// node will not be stopped implicitly and there will be no race between Lotus and Mir during shutdown process.
 		// In this case we also know that if we receive an error on mirErrChan before cancelling mirCtx
 		// then that error is not ErrStopped.
-		m.mirErrChan <- m.mirNode.Run(m.mirCtx)
+		m.mirErr = m.mirNode.Run(m.mirCtx)
+		close(m.mirStopped)
 	}()
 	defer m.stop()
 
@@ -255,14 +257,13 @@ func (m *Manager) Serve(ctx context.Context) error {
 	lastValidatorSet := m.initialValidatorSet
 
 	for {
-
 		select {
 		case <-ctx.Done():
 			log.With("validator", m.id).Info("Mir manager: context closed")
 			return nil
 
-		case err := <-m.mirErrChan:
-			panic(fmt.Sprintf("Mir node %v running error: %v", m.id, err))
+		case <-m.mirStopped:
+			return fmt.Errorf("mir stopped with err %w", m.mirErr)
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
@@ -346,9 +347,9 @@ func (m *Manager) stop() {
 	log.With("validator", m.id).Info("Network transport stopped")
 
 	m.mirNode.Stop()
-	err := <-m.mirErrChan
-	if !errors.Is(err, mir.ErrStopped) {
-		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", err)
+	<-m.mirStopped
+	if !errors.Is(m.mirErr, mir.ErrStopped) {
+		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", m.mirErr)
 	} else {
 		log.With("validator", m.id).Infof("Mir node stopped")
 	}
