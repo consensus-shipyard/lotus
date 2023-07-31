@@ -38,8 +38,9 @@ import (
 )
 
 const (
-	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
-	ManglerEnv           = "MIR_MANGLER"
+	InterceptorOutputEnv     = "MIR_INTERCEPTOR_OUTPUT"
+	InterceptorEventsPerFile = 100_000
+	ManglerEnv               = "MIR_MANGLER"
 
 	CheckpointDBKeyPrefix = "mir/checkpoints/"
 
@@ -214,6 +215,7 @@ func NewManager(ctx context.Context,
 			t.NodeID(id),
 			path.Join(interceptorPath, cfg.GroupName, id),
 			logging.Decorate(logger, "Interceptor: "),
+			eventlog.FileSplitterOpt(eventlog.EventLimitLogger(InterceptorEventsPerFile)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create interceptor: %w", err)
