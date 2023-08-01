@@ -172,8 +172,8 @@ github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGX
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/codegangsta/cli v1.20.0/go.mod h1:/qJNoX69yVSKu5o4jLyXAENLRyk1uhi7zkbQ3slBdOA=
-github.com/consensus-shipyard/go-ipc-types v0.1.6 h1:wC9DKpr3qMkwMpaGy3fYbhw910KRk1IT82KMMOPpmjk=
-github.com/consensus-shipyard/go-ipc-types v0.1.6/go.mod h1:oZQ3wFTjxmAQLFZrHkj7pagpNF7Oq+GOy/bpjjgD83A=
+github.com/consensus-shipyard/go-ipc-types v0.1.7 h1:HHCX+V2dUK+ZmC+yrvEWWz0ede/rZWqu+/QGq3346bE=
+github.com/consensus-shipyard/go-ipc-types v0.1.7/go.mod h1:oZQ3wFTjxmAQLFZrHkj7pagpNF7Oq+GOy/bpjjgD83A=
 github.com/containerd/cgroups v0.0.0-20201119153540-4cbc285b3327/go.mod h1:ZJeTFisyysqgcCdecO57Dj79RfL0LNeGiFUqLYQRYLE=
 github.com/containerd/cgroups v1.1.0 h1:v8rEWFl6EoqHB+swVNjVoCJE8o3jX7e8nqBGPLaDFBM=
 github.com/containerd/cgroups v1.1.0/go.mod h1:6ppBcbh/NOOUU+dMKrykgaBnK9lCIBxHqJDGwsa1mIw=
