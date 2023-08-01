@@ -553,9 +553,6 @@ func validateConfig(cfg *Config) error {
 	if cfg.BaseConfig == nil {
 		return fmt.Errorf("nil base config")
 	}
-	if cfg.IPCAgent == nil {
-		return fmt.Errorf("nil IPC agent config")
-	}
 	if cfg.Consensus.SegmentLength <= 0 {
 		return fmt.Errorf("segment length is not positive")
 	}
