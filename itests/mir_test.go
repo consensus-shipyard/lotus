@@ -871,7 +871,35 @@ func TestMirSmoke_AllNodesMine(t *testing.T) {
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
+}
 
+// TestMirSmoke_3NodesMine tests that n nodes with big weights can mine blocks.
+func TestMirSmoke_3NodesMine(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.NoError(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	nodes, validators, ens := kit.EnsembleWithMirValidators(t, 3)
+
+	cfg := kit.DefaultMirTestConfig()
+	cfg.MembershipString = ens.FixedMirMembershipWithWeights("900000000000000000000000000000000000000000000000", validators...)
+
+	ens.InterconnectFullNodes().BeginMirMiningWithTestAndConsensusConfigs(ctx, g, validators,
+		cfg,
+		kit.DefaultConsensusTestConfig(),
+	)
+
+	err := kit.AdvanceChain(ctx, 30, nodes...)
+	require.NoError(t, err)
+	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
+	require.NoError(t, err)
 }
 
 // TestMirWithMangler_AllNodesMining run TestMirBasic_AllNodesMining with mangler.

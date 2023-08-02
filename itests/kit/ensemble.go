@@ -1068,11 +1068,15 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 }
 
 func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
+	return n.FixedMirMembershipWithWeights("10", validators...)
+}
+
+func (n *Ensemble) FixedMirMembershipWithWeights(w string, validators ...*TestValidator) string {
 	mb := fmt.Sprintf("%d;", 0) // configuration number
 	for _, v := range validators {
 		addr, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		mb += fmt.Sprintf("%s:10@%s,", v.mirAddr, addr) // ID:weight@net_addr. Weight must not be 0.
+		mb += fmt.Sprintf("%s:%s@%s,", v.mirAddr, w, addr) // ID:weight@net_addr. Weight must not be 0.
 	}
 	return mb
 }
@@ -1148,7 +1152,9 @@ func (n *Ensemble) BeginMirMiningWithTestAndConsensusConfigs(
 			tdb = NewTestDB()
 		}
 
-		testConfig.MembershipString = n.fixedMirMembership(append(validators, faultyValidators...)...)
+		if testConfig.MembershipString == "" {
+			testConfig.MembershipString = n.fixedMirMembership(append(validators, faultyValidators...)...)
+		}
 
 		if i > len(validators) && testConfig.Delay > 0 {
 			RandomDelay(testConfig.Delay)
