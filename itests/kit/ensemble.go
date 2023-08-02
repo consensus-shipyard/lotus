@@ -78,6 +78,8 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
+const DefaultTestValidatorWeight = "10"
+
 func init() {
 	chain.BootstrapPeerThreshold = 1
 	messagepool.HeadChangeCoalesceMinDelay = time.Microsecond
@@ -1087,7 +1089,7 @@ func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile st
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s:10@%s", v.mirAddr, id))
+		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s:%s@%s", v.mirAddr, DefaultTestValidatorWeight, id))
 		require.NoError(n.t, err)
 		vs = append(vs, v)
 	}

@@ -125,6 +125,9 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber+1, membership.Size())
 	require.Equal(t, uint64(1), membership.GetConfigurationNumber())
+	for _, v := range membership.GetValidators() {
+		require.Equal(t, kit.DefaultTestValidatorWeight, v.Weight.String())
+	}
 	// Start new validators.
 	ens.InterconnectFullNodes().BeginMirMiningWithConfig(ctx, g, validators[MirTotalValidatorNumber:],
 		&kit.MirTestConfig{
@@ -145,6 +148,9 @@ func TestMirReconfiguration_AddAndRemoveOneValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, MirTotalValidatorNumber, membership.Size())
 	require.Equal(t, uint64(2), membership.GetConfigurationNumber())
+	for _, v := range membership.GetValidators() {
+		require.Equal(t, kit.DefaultTestValidatorWeight, v.Weight.String())
+	}
 
 	t.Log(">>> final advancing chain")
 	err = kit.AdvanceChain(ctx, 4*TestedBlockNumber, nodes[:MirTotalValidatorNumber]...)
