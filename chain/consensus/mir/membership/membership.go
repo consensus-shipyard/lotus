@@ -173,7 +173,7 @@ func Membership(validators []*validator.Validator) ([]t.NodeID, *mirproto.Member
 			Id:     id,
 			Addr:   a.String(),
 			Key:    nil,
-			Weight: tt.VoteWeight(v.Weight.Uint64()),
+			Weight: tt.VoteWeight(v.Weight.String()),
 		}
 	}
 
