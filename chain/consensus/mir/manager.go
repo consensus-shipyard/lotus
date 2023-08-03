@@ -38,8 +38,10 @@ import (
 )
 
 const (
-	InterceptorOutputEnv = "MIR_INTERCEPTOR_OUTPUT"
-	ManglerEnv           = "MIR_MANGLER"
+	InterceptorOutputEnv           = "MIR_INTERCEPTOR_OUTPUT"
+	InterceptorWithEventsOutputEnv = "MIR_INTERCEPTOR_WITH_EVENTS_OUTPUT"
+	InterceptorEventsPerFile       = 100_000
+	ManglerEnv                     = "MIR_MANGLER"
 
 	CheckpointDBKeyPrefix = "mir/checkpoints/"
 
@@ -61,7 +63,8 @@ type Manager struct {
 
 	// Mir types.
 	mirCtx          context.Context
-	mirErrChan      chan error
+	mirStopped      chan struct{}
+	mirErr          error
 	mirCancel       context.CancelFunc
 	mirNode         *mir.Node
 	txPool          *fifo.Pool
@@ -85,8 +88,10 @@ func NewManager(ctx context.Context,
 	membership mirmembership.Reader,
 	cfg *Config,
 ) (*Manager, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("nil config")
+	// -------------------------------------------------------------------------
+	// Initial configuration and validation.
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
 	}
 	id := cfg.Addr.String()
 
@@ -95,30 +100,28 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to resolve network name: %w", id, err)
 	}
 
-	if cfg.Consensus.SegmentLength < 0 {
-		return nil, fmt.Errorf("validator %v segment length is negative", id)
-	}
-
-	membershipInfo, nodes, err := waitForMembershipInfo(ctx, id, membership, log, WaitForMembershipTimeout)
+	membershipInfo, initialMembership, err := waitForMembershipInfo(ctx, id, membership, log, WaitForMembershipTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to configure membership: %w", id, err)
 	}
-	if nodes == nil {
-		return nil, fmt.Errorf("empty membership nodes")
+	if err := validateMembership(initialMembership); err != nil {
+		return nil, err
 	}
-	if membershipInfo == nil {
-		return nil, fmt.Errorf("empty membership info")
+	if err := validateMembershipInfo(membershipInfo); err != nil {
+		return nil, err
 	}
 
 	e := membershipInfo.GenesisEpoch
 	initialValidatorSet := membershipInfo.ValidatorSet
 
 	logger := NewLogger(id)
-	// Create Mir modules.
+
+	// -------------------------------------------------------------------------
+	// Mir modules support.
 	if err := net.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start transport: %w", err)
 	}
-	net.Connect(nodes)
+	net.Connect(initialMembership)
 
 	cryptoManager, err := NewCryptoManager(cfg.Addr, node)
 	if err != nil {
@@ -144,15 +147,15 @@ func NewManager(ctx context.Context,
 		initialValidatorSet: initialValidatorSet,
 		membership:          membership,
 	}
-	m.mirErrChan = make(chan error, 1)
+	m.mirStopped = make(chan struct{})
 	m.mirCtx, m.mirCancel = context.WithCancel(context.Background())
 
-	m.stateManager, err = NewStateManager(ctx, m.netName, nodes, abi.ChainEpoch(e), m.confManager, node, ds, m.txPool, cfg)
+	m.stateManager, err = NewStateManager(ctx, m.netName, initialMembership, abi.ChainEpoch(e), m.confManager, node, ds, m.txPool, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to start mir state manager: %w", id, err)
 	}
 
-	params := trantor.DefaultParams(nodes)
+	params := trantor.DefaultParams(initialMembership)
 	params.Iss.SegmentLength = cfg.Consensus.SegmentLength // Segment length determining the checkpoint period.
 	params.Iss.ConfigOffset = cfg.Consensus.ConfigOffset
 	params.Iss.AdjustSpeed(cfg.Consensus.MaxProposeDelay)
@@ -185,6 +188,9 @@ func NewManager(ctx context.Context,
 
 	smrSystem = smrSystem.WithModule("hasher", mircrypto.NewHasher(crypto.SHA256)) // to use sha256 hash from cryptomodule.
 
+	// -------------------------------------------------------------------------
+	// Mir's mangler support.
+
 	mirManglerParams := os.Getenv(ManglerEnv)
 	if mirManglerParams != "" {
 		p, err := GetEnvManglerParams()
@@ -204,20 +210,35 @@ func NewManager(ctx context.Context,
 		return nil, fmt.Errorf("validator %v failed to start SMR system: %w", id, err)
 	}
 
-	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
+	// -------------------------------------------------------------------------
+	// Mir's event recorder support.
 
-	if interceptorPath := os.Getenv(InterceptorOutputEnv); interceptorPath != "" {
-		// TODO: Persist in repo path?
-		log.Infof("Interceptor initialized on %s", interceptorPath)
-		m.interceptor, err = eventlog.NewRecorder(
+	// TODO: Persist in repo path?
+	var recorder *eventlog.Recorder
+	switch {
+	case os.Getenv(InterceptorOutputEnv) != "":
+		recorder, err = eventlog.NewRecorder(
 			t.NodeID(id),
-			path.Join(interceptorPath, cfg.GroupName, id),
+			path.Join(os.Getenv(InterceptorOutputEnv), cfg.GroupName, id),
 			logging.Decorate(logger, "Interceptor: "),
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create interceptor: %w", err)
-		}
+	case os.Getenv(InterceptorWithEventsOutputEnv) != "":
+		recorder, err = eventlog.NewRecorder(
+			t.NodeID(id),
+			path.Join(os.Getenv(InterceptorWithEventsOutputEnv), cfg.GroupName, id),
+			logging.Decorate(logger, "Interceptor: "),
+			eventlog.FileSplitterOpt(eventlog.EventLimitLogger(InterceptorEventsPerFile)),
+		)
+	default:
 	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create event recorder: %w", err)
+	}
+	m.interceptor = recorder
+
+	// -------------------------------------------------------------------------
+	// Mir node initialization.
+	nodeCfg := mir.DefaultNodeConfig().WithLogger(logger)
 	m.mirNode, err = mir.NewNode(t.NodeID(id), nodeCfg, smrSystem.Modules(), m.interceptor)
 	if err != nil {
 		return nil, fmt.Errorf("validator %v failed to create Mir node: %w", id, err)
@@ -240,7 +261,8 @@ func (m *Manager) Serve(ctx context.Context) error {
 		// node will not be stopped implicitly and there will be no race between Lotus and Mir during shutdown process.
 		// In this case we also know that if we receive an error on mirErrChan before cancelling mirCtx
 		// then that error is not ErrStopped.
-		m.mirErrChan <- m.mirNode.Run(m.mirCtx)
+		m.mirErr = m.mirNode.Run(m.mirCtx)
+		close(m.mirStopped)
 	}()
 	defer m.stop()
 
@@ -255,14 +277,13 @@ func (m *Manager) Serve(ctx context.Context) error {
 	lastValidatorSet := m.initialValidatorSet
 
 	for {
-
 		select {
 		case <-ctx.Done():
 			log.With("validator", m.id).Info("Mir manager: context closed")
 			return nil
 
-		case err := <-m.mirErrChan:
-			panic(fmt.Sprintf("Mir node %v running error: %v", m.id, err))
+		case <-m.mirStopped:
+			return fmt.Errorf("mir stopped with err %w", m.mirErr)
 
 		case <-reconfigure.C:
 			// Send a reconfiguration transaction if the validator set in the actor has been changed.
@@ -346,9 +367,9 @@ func (m *Manager) stop() {
 	log.With("validator", m.id).Info("Network transport stopped")
 
 	m.mirNode.Stop()
-	err := <-m.mirErrChan
-	if !errors.Is(err, mir.ErrStopped) {
-		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", err)
+	<-m.mirStopped
+	if !errors.Is(m.mirErr, mir.ErrStopped) {
+		log.With("validator", m.id).Errorf("Mir node stopped with error: %v", m.mirErr)
 	} else {
 		log.With("validator", m.id).Infof("Mir node stopped")
 	}
@@ -495,4 +516,45 @@ func getMembershipInfo(
 		return nil, nil, ErrMissingOwnIdentityInMembership
 	}
 	return membershipInfo, initialMembership, nil
+}
+
+func validateMembership(mb *mirproto.Membership) error {
+	if mb == nil {
+		return fmt.Errorf("nil membership")
+	}
+	if len(mb.Nodes) == 0 {
+		return fmt.Errorf("no nodes in membership")
+	}
+	return nil
+}
+
+func validateMembershipInfo(info *mirmembership.Info) error {
+	if info == nil {
+		return fmt.Errorf("nil membership info")
+	}
+
+	if info.ValidatorSet == nil {
+		return fmt.Errorf("nil validator set in membership info")
+	}
+
+	if len(info.ValidatorSet.Validators) == 0 {
+		return fmt.Errorf("epmty validator set in membership info")
+	}
+	return nil
+}
+
+func validateConfig(cfg *Config) error {
+	if cfg == nil {
+		return fmt.Errorf("nil config")
+	}
+	if cfg.Consensus == nil {
+		return fmt.Errorf("nil consensus config")
+	}
+	if cfg.BaseConfig == nil {
+		return fmt.Errorf("nil base config")
+	}
+	if cfg.Consensus.SegmentLength <= 0 {
+		return fmt.Errorf("segment length is not positive")
+	}
+	return nil
 }

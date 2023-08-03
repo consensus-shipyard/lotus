@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -33,6 +34,17 @@ type MirTestConfig struct {
 func DefaultMirTestConfig() *MirTestConfig {
 	return &MirTestConfig{
 		MembershipType: membership.StringSource,
+	}
+}
+
+func DefaultConsensusTestConfig() *mir.ConsensusConfig {
+	return &mir.ConsensusConfig{
+		SegmentLength:                1,
+		ConfigOffset:                 2,
+		MaxProposeDelay:              5 * time.Second,
+		MaxTransactionsInBatch:       1024,
+		PBFTViewChangeSegmentTimeout: 6 * time.Second,
+		PBFTViewChangeSNTimeout:      6 * time.Second,
 	}
 }
 

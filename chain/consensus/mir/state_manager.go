@@ -136,8 +136,7 @@ func NewStateManager(
 	}
 	sm.nextNewMembership = initialMembership
 
-	// Initialize manager checkpoint state with the corresponding latest
-	// checkpoint
+	// Initialize manager checkpoint state with the corresponding latest checkpoint.
 	ch, err := sm.firstEpochCheckpoint()
 	if err != nil {
 		return nil, xerrors.Errorf("validator %v failed to get checkpoint for epoch 0: %w", sm.id, err)
