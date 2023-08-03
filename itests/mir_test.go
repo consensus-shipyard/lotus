@@ -879,7 +879,7 @@ func TestMirSmoke_AllNodesMine(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestMirSmoke_3NodesMine tests that n nodes with big weights can mine blocks.
+// TestMirSmoke_3NodesMine tests that 3 nodes with big weights can mine blocks.
 func TestMirSmoke_3NodesMine(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	g, ctx := errgroup.WithContext(ctx)
@@ -906,6 +906,31 @@ func TestMirSmoke_3NodesMine(t *testing.T) {
 	require.NoError(t, err)
 	err = kit.CheckNodesInSync(ctx, 0, nodes[0], nodes[1:]...)
 	require.NoError(t, err)
+}
+
+// TestMirSmoke_MembershipWithZeroWeights tests that nodes with zero weights do not work.
+// The membership with 0 weights is considered as incorrect.
+func TestMirSmoke_MembershipWithZeroWeights(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
+	defer func() {
+		t.Logf("[*] defer: cancelling %s context", t.Name())
+		cancel()
+		err := g.Wait()
+		require.Error(t, err)
+		t.Logf("[*] defer: system %s stopped", t.Name())
+	}()
+
+	_, validators, ens := kit.EnsembleWithMirValidators(t, MirTotalValidatorNumber)
+
+	cfg := kit.DefaultMirTestConfig()
+	cfg.MembershipString = ens.FixedMirMembershipWithWeights("0", validators...)
+
+	ens.InterconnectFullNodes().BeginMirMiningWithTestAndConsensusConfigs(ctx, g, validators,
+		cfg,
+		kit.DefaultConsensusTestConfig(),
+	)
 }
 
 // TestMirWithMangler_AllNodesMining run TestMirBasic_AllNodesMining with mangler.
