@@ -78,6 +78,8 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
+const DefaultTestValidatorWeight = "10"
+
 func init() {
 	chain.BootstrapPeerThreshold = 1
 	messagepool.HeadChangeCoalesceMinDelay = time.Microsecond
@@ -1068,11 +1070,15 @@ func (n *Ensemble) BeginMining(blocktime time.Duration, miners ...*TestMiner) []
 }
 
 func (n *Ensemble) fixedMirMembership(validators ...*TestValidator) string {
+	return n.FixedMirMembershipWithWeights("10", validators...)
+}
+
+func (n *Ensemble) FixedMirMembershipWithWeights(w string, validators ...*TestValidator) string {
 	mb := fmt.Sprintf("%d;", 0) // configuration number
 	for _, v := range validators {
 		addr, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		mb += fmt.Sprintf("%s:10@%s,", v.mirAddr, addr) // ID:weight@net_addr. Weight must not be 0.
+		mb += fmt.Sprintf("%s:%s@%s,", v.mirAddr, w, addr) // ID:weight@net_addr. Weight must not be 0.
 	}
 	return mb
 }
@@ -1083,7 +1089,7 @@ func (n *Ensemble) SaveValidatorSetToFile(configNumber uint64, membershipFile st
 	for _, v := range validators {
 		id, err := NodeLibp2pAddr(v.mirHost)
 		require.NoError(n.t, err)
-		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s:10@%s", v.mirAddr, id))
+		v, err := validator.NewValidatorFromString(fmt.Sprintf("%s:%s@%s", v.mirAddr, DefaultTestValidatorWeight, id))
 		require.NoError(n.t, err)
 		vs = append(vs, v)
 	}
@@ -1148,7 +1154,9 @@ func (n *Ensemble) BeginMirMiningWithTestAndConsensusConfigs(
 			tdb = NewTestDB()
 		}
 
-		testConfig.MembershipString = n.fixedMirMembership(append(validators, faultyValidators...)...)
+		if testConfig.MembershipString == "" {
+			testConfig.MembershipString = n.fixedMirMembership(append(validators, faultyValidators...)...)
+		}
 
 		if i > len(validators) && testConfig.Delay > 0 {
 			RandomDelay(testConfig.Delay)

@@ -28,4 +28,4 @@ else
 fi
 
 echo "[*] Starting daemon"
-eudico mir daemon --genesis=subnet.car --bootstrap=false
+eudico mir daemon --genesis=subnet.car --mir-validator --bootstrap=false
