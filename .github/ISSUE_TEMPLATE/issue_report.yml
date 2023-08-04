@@ -24,7 +24,7 @@ body:
   - type: dropdown
     id: latest
     attributes:
-      label: Have you reproduced the bug with the latest `dev` version?
+      label: Have you reproduced the bug with the latest dev version?
       description: We suggest attempting to reproducing the bug with the dev branch
       options:
         - "Yes"
