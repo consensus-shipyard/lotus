@@ -1,7 +1,6 @@
 name: IPC Issue Template
 description: Use this template to report bugs and other issues
 labels: [bug]
-projects: consensus-shipyard/projects/3
 body:
   - type: dropdown
     id: issue-type
