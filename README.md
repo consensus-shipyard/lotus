@@ -2,7 +2,7 @@
 
 **‼️ The IPC Agent, the IPC actors, and eudico haven't been audited, tested in depth, or otherwise verified. Moreover, the system is missing critical recovery functionality in case of crashes. There are multiple ways in which you may lose funds moved into an IPC subnet, and we strongly advise against deploying IPC on mainnet and/or using it with tokens with real value.**
 
-Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-project/lotus), itself an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io). This is a work-in-progress, intended to enable easier experimentation with future protocol features, and is not meant to be used in the production network.
+Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-project/lotus), itself an implementation of the Filecoin Distributed Storage Network. For more details about Filecoin, check out the [Filecoin Spec](https://spec.filecoin.io). This is a work-in-progress intended to enable easier experimentation with future protocol features and is not meant to be used in the production network.
 
 [![consensus-shipyard](https://circleci.com/gh/consensus-shipyard/lotus.svg?style=svg)](https://app.circleci.com/pipelines/github/consensus-shipyard/lotus)
 
@@ -10,18 +10,18 @@ Eudico is a modularised implementation of [Lotus](https://github.com/filecoin-pr
 
 ### Production branch
 
-The production branch is `spacenet`.
-The `spacenet` branch is always compatible with the "stable" release that's running on Spacenet and with the stable version of the [IPC Agent](https://github.com/consensus-shipyard/ipc-agent).
-Updates to `spacenet` **always** come from the `dev` branch.
+The production branch is `main`.
+The `main` branch is always compatible with the stable version of the [IPC Agent](https://github.com/consensus-shipyard/ipc-agent).
+Updates to `main` **always** come from the `dev` branch.
 
 ### Development branch
 
 The primary development branch is `dev`.
-`dev` contains the most up-to-date software but may not be compatible with the version running on spacenet or with the stable version of the IPC Agent. Only use `dev` if doing a full local deployment. In such cases, use the IPC Agent `dev` branch too, but note that the packaged deployment scripts default to checking out `spacenet`. 
+`dev` contains the most up-to-date software but may not be compatible with the stable version of the IPC Agent. Only use `dev` if doing a full local deployment. In such cases, use the IPC Agent `dev` branch too, but note that the packaged deployment scripts default to checking out `main`. 
 
 ## Building & Documentation
 
-> Note: The `dev` branch is the cutting-edge implementation, recommended for subnets, while the `spacenet` branch guarantees Spacenet compatibility.
+> Note: The `dev` branch is the cutting-edge implementation, recommended for subnets, while the `main` branch guarantees compatibility with the stable version of the rest of the stack.
  
 For complete instructions on how to build, install and setup eudico/lotus, please visit [https://lotus.filecoin.io](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms). Basic build instructions can be found further down in this readme.
 
